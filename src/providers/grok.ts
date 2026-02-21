@@ -38,7 +38,7 @@ export class GrokProvider implements LLMProvider {
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
-      throw new Error("Grok returned an empty response");
+      throw new Error(`Grok returned an empty response (model: ${options.model})`);
     }
     return content;
   }

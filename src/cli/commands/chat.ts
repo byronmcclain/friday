@@ -72,6 +72,7 @@ export function chatCommand(program: Command): void {
 				if (
 					["exit", "quit", "bye"].includes(message.toLowerCase().trim())
 				) {
+					shuttingDown = true;
 					await runtime.shutdown();
 					console.log(chalk.cyan("\nSee you later, boss! \u{1F44B}\n"));
 					break;
