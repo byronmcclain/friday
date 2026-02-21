@@ -10,10 +10,14 @@ import { DirectiveEngine } from "../directives/engine.ts";
 import { NotificationManager, TerminalChannel } from "./notifications.ts";
 import { discoverModules } from "../modules/loader.ts";
 import type { FridayModule } from "../modules/types.ts";
+import { SmartsStore } from "../smarts/store.ts";
+import { SQLiteMemory } from "./memory.ts";
+import { SMARTS_DEFAULTS } from "../smarts/types.ts";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
 	modulesDir?: string;
 	injectedProvider?: LLMProvider;
+	smartsDir?: string;
 }
 
 export interface ProcessResult {
@@ -31,6 +35,8 @@ export class FridayRuntime {
 	private _directiveEngine!: DirectiveEngine;
 	private _notifications!: NotificationManager;
 	private _modules: FridayModule[] = [];
+	private _smarts?: SmartsStore;
+	private _smartsMemory?: SQLiteMemory;
 	private _booted = false;
 
 	get isBooted(): boolean {
@@ -51,6 +57,10 @@ export class FridayRuntime {
 
 	get audit(): AuditLogger {
 		return this._audit;
+	}
+
+	get smarts(): SmartsStore | undefined {
+		return this._smarts;
 	}
 
 	async boot(config: RuntimeConfig = {}): Promise<void> {
@@ -78,9 +88,21 @@ export class FridayRuntime {
 				clearance: this._clearance,
 			});
 			this._directiveEngine.start();
+
+			if (config.smartsDir) {
+				const dbPath = `${config.smartsDir}/.smarts-index.db`;
+				this._smartsMemory = new SQLiteMemory(dbPath);
+				this._smarts = new SmartsStore();
+				await this._smarts.initialize(
+					{ ...SMARTS_DEFAULTS, smartsDir: config.smartsDir },
+					this._smartsMemory,
+				);
+			}
+
 			this._cortex = new Cortex({
 				...config,
 				injectedProvider: config.injectedProvider,
+				smartsStore: this._smarts,
 			});
 
 			if (config.modulesDir) {
@@ -156,6 +178,11 @@ export class FridayRuntime {
 			if (mod.onUnload) {
 				await mod.onUnload();
 			}
+		}
+		if (this._smartsMemory) {
+			this._smartsMemory.close();
+			this._smartsMemory = undefined;
+			this._smarts = undefined;
 		}
 		this._audit.log({
 			action: "runtime:shutdown",

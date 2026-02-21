@@ -1,6 +1,7 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { FridayRuntime } from "../../src/core/runtime.ts";
 import type { LLMProvider } from "../../src/providers/types.ts";
+import { mkdir, writeFile, rm } from "node:fs/promises";
 
 const stubProvider: LLMProvider = {
 	name: "stub",
@@ -96,5 +97,51 @@ describe("FridayRuntime", () => {
 		await runtime.boot({ injectedProvider: stubProvider });
 		await runtime.boot({ injectedProvider: stubProvider });
 		expect(runtime.isBooted).toBe(true);
+	});
+});
+
+const TEST_SMARTS_DIR_RT = "/tmp/friday-test-runtime-smarts";
+
+describe("FridayRuntime — SMARTS integration", () => {
+	beforeEach(async () => {
+		await mkdir(TEST_SMARTS_DIR_RT, { recursive: true });
+		await writeFile(
+			`${TEST_SMARTS_DIR_RT}/test-smart.md`,
+			`---
+name: test-knowledge
+domain: testing
+tags: [test, unit]
+confidence: 1.0
+source: manual
+created: 2026-02-21
+updated: 2026-02-21
+---
+
+# Test Knowledge
+
+This is test knowledge.`,
+		);
+	});
+
+	afterEach(async () => {
+		await rm(TEST_SMARTS_DIR_RT, { recursive: true, force: true });
+	});
+
+	test("boots with smartsDir and loads SMARTS", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({
+			injectedProvider: stubProvider,
+			smartsDir: TEST_SMARTS_DIR_RT,
+		});
+		expect(runtime.smarts).toBeDefined();
+		expect(runtime.smarts!.all()).toHaveLength(1);
+		await runtime.shutdown();
+	});
+
+	test("boots without smartsDir (backwards compatible)", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider });
+		expect(runtime.smarts).toBeUndefined();
+		await runtime.shutdown();
 	});
 });
