@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { SYSTEM_PROMPT } from "../../src/core/prompts.ts";
 import { Cortex } from "../../src/core/cortex.ts";
 import type { LLMProvider } from "../../src/providers/types.ts";
+import { PROVIDER_DEFAULTS } from "../../src/providers/index.ts";
 import { SmartsStore } from "../../src/smarts/store.ts";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 import { mkdir, writeFile, rm, unlink } from "node:fs/promises";
@@ -35,7 +36,7 @@ describe("Cortex", () => {
 
   test("defaults to grok-4-1-fast-reasoning-latest model", () => {
     const cortex = new Cortex({ injectedProvider: grokStub });
-    expect(cortex.modelName).toBe("grok-4-1-fast-reasoning-latest");
+    expect(cortex.modelName).toBe(PROVIDER_DEFAULTS.grok);
   });
 
   test("accepts custom model", () => {

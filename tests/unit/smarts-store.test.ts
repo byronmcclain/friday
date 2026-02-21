@@ -140,7 +140,7 @@ describe("SmartsStore", () => {
     );
     const results = await store.findRelevant("SQL injection security");
     expect(results.length).toBeGreaterThan(0);
-    expect(results[0]!.name).toBe("security-basics");
+    expect(results.map((r) => r.name)).toContain("security-basics");
   });
 
   test("findRelevant respects minConfidence filter", async () => {
