@@ -56,18 +56,26 @@ src/
 │   ├── types.ts           # FridayDirective, DirectiveTrigger, DirectiveAction
 │   ├── store.ts           # DirectiveStore — CRUD + signal-based lookup
 │   └── engine.ts          # DirectiveEngine — autonomous rule execution
+├── smarts/
+│   ├── types.ts           # SmartEntry, SmartsConfig, SmartSource types
+│   ├── parser.ts          # YAML frontmatter parser/serializer for .md files
+│   ├── store.ts           # SmartsStore — FTS5-indexed knowledge base with CRUD
+│   ├── protocol.ts        # /smart protocol (list, show, domains, search, reload)
+│   └── curator.ts         # SmartsCurator — autonomous knowledge extraction from conversations
 ├── providers/             # LLM provider adapters (Anthropic, Grok)
 ├── config/                # Runtime configuration loading — future
 └── utils/                 # Shared utilities — future
+smarts/                    # Seed knowledge files (YAML frontmatter + markdown)
 tests/
-├── unit/                  # Unit tests (bun:test) — ~84 tests across 12 files
+├── unit/                  # Unit tests (bun:test) — ~137 tests across 17 files
 └── integration/           # Integration tests — future
 ```
 
 ### Key Design Patterns
 
-- **FridayRuntime** (`src/core/runtime.ts`) is the composition root. It boots all subsystems in order: SignalBus, ClearanceManager, AuditLogger, NotificationManager, ProtocolRegistry, DirectiveStore/Engine, Cortex, then discovers and loads Modules.
-- **Cortex** (`src/core/cortex.ts`) is Friday's LLM brain. It owns conversation history, delegates to providers, and exposes tool registration for modules. Replaces the old FridayCore.
+- **FridayRuntime** (`src/core/runtime.ts`) is the composition root. It boots all subsystems in order: SignalBus, ClearanceManager, AuditLogger, NotificationManager, ProtocolRegistry, DirectiveStore/Engine, SmartsStore, Cortex, then discovers and loads Modules.
+- **Cortex** (`src/core/cortex.ts`) is Friday's LLM brain. It owns conversation history, delegates to providers, and exposes tool registration for modules. When a SmartsStore is provided, Cortex enriches the system prompt with pinned and FTS5-matched knowledge per message. Replaces the old FridayCore.
+- **SMARTS** (`src/smarts/`) is Friday's dynamic knowledge system. Markdown files with YAML frontmatter in `smarts/` are indexed into FTS5, queried per-message to enrich prompts, and new knowledge is extracted from conversations on shutdown via SmartsCurator. The `/smart` protocol provides manual control (list, show, search, reload).
 - **SignalBus** (`src/core/events.ts`) is the reactive nervous system. Typed signals (file:changed, test:failed, etc.) flow through here, triggering directives and module behavior.
 - **Protocols** bypass LLM reasoning entirely — `/command` input is routed directly to a protocol handler via the ProtocolRegistry, while everything else flows through Cortex.
 - **Directives** are autonomous rules: signal triggers fire actions (tools, protocols, prompts) after clearance checks. The DirectiveEngine wires the SignalBus to the DirectiveStore.
@@ -111,7 +119,9 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 ## Design Documents
 
 - Architecture design: `docs/plans/2026-02-21-friday-agent-runtime-design.md`
-- MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission
+- SMARTS design: `docs/plans/2026-02-21-smarts-dynamic-knowledge-design.md`
+- SMARTS implementation plan: `docs/plans/2026-02-21-smarts-implementation-plan.md`
+- MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge
 
 ## Worktrees
 
