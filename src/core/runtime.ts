@@ -13,6 +13,7 @@ import type { FridayModule } from "../modules/types.ts";
 import { SmartsStore } from "../smarts/store.ts";
 import { SQLiteMemory } from "./memory.ts";
 import { SMARTS_DEFAULTS } from "../smarts/types.ts";
+import { createSmartProtocol } from "../smarts/protocol.ts";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
 	modulesDir?: string;
@@ -97,6 +98,7 @@ export class FridayRuntime {
 					{ ...SMARTS_DEFAULTS, smartsDir: config.smartsDir },
 					this._smartsMemory,
 				);
+				this._protocols.register(createSmartProtocol(this._smarts));
 			}
 
 			this._cortex = new Cortex({
