@@ -18,5 +18,7 @@ export function createProvider(name: ProviderName): LLMProvider {
       return new AnthropicProvider();
     case "grok":
       return new GrokProvider();
+    default:
+      throw new Error(`Unknown provider: ${name}`);
   }
 }

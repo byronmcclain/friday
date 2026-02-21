@@ -19,6 +19,10 @@ describe("Provider Abstraction", () => {
     expect(provider.defaultModel).toBe("claude-sonnet-4-20250514");
   });
 
+  test("createProvider throws on unknown provider name", () => {
+    expect(() => createProvider("invalid" as any)).toThrow("Unknown provider");
+  });
+
   test("createProvider('grok') throws without XAI_API_KEY", () => {
     const original = process.env.XAI_API_KEY;
     delete process.env.XAI_API_KEY;
