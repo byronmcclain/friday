@@ -60,8 +60,8 @@ export class SmartsCurator {
           content: smart.content,
         });
       }
-    } catch {
-      // Non-blocking: extraction failure should never break the session
+    } catch (error) {
+      console.warn("SMARTS extraction failed:", error instanceof Error ? error.message : error);
     }
   }
 

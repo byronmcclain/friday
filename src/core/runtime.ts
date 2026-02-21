@@ -189,7 +189,7 @@ export class FridayRuntime {
 
 		if (this._curator) {
 			const history = this._cortex.getHistory();
-			await this._curator.extractFromConversation(history).catch(() => {});
+			await this._curator.extractFromConversation(history);
 		}
 
 		await this._signals.emit("session:end", "runtime");
