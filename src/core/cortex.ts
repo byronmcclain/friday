@@ -6,16 +6,14 @@ import {
   PROVIDER_DEFAULTS,
   type LLMProvider,
 } from "../providers/index.ts";
+import type { FridayTool } from "../modules/types.ts";
 
-/**
- * FridayCore is the central orchestrator for the Friday AI assistant.
- * It manages conversation state, routes to providers, and coordinates tools/agents.
- */
-export class FridayCore {
+export class Cortex {
   private provider: LLMProvider;
   private model: string;
   private maxTokens: number;
   private conversationHistory: ConversationMessage[];
+  private tools: Map<string, FridayTool>;
 
   constructor(config: Partial<FridayConfig> = {}) {
     const providerName = config.provider ?? DEFAULT_PROVIDER;
@@ -23,27 +21,27 @@ export class FridayCore {
     this.model = config.model ?? PROVIDER_DEFAULTS[providerName];
     this.maxTokens = config.maxTokens ?? 4096;
     this.conversationHistory = [];
+    this.tools = new Map();
   }
 
-  /** The active provider name (e.g., "anthropic", "grok") */
   get providerName(): string {
     return this.provider.name;
   }
 
-  /** The active model identifier */
   get modelName(): string {
     return this.model;
   }
 
-  /**
-   * Send a message to Friday and get a response.
-   * Maintains conversation history for context.
-   */
+  get availableTools(): FridayTool[] {
+    return [...this.tools.values()];
+  }
+
+  registerTool(tool: FridayTool): void {
+    this.tools.set(tool.name, tool);
+  }
+
   async chat(userMessage: string): Promise<string> {
-    this.conversationHistory.push({
-      role: "user",
-      content: userMessage,
-    });
+    this.conversationHistory.push({ role: "user", content: userMessage });
 
     const assistantMessage = await this.provider.chat(
       SYSTEM_PROMPT,
@@ -51,21 +49,17 @@ export class FridayCore {
       { model: this.model, maxTokens: this.maxTokens },
     );
 
-    this.conversationHistory.push({
-      role: "assistant",
-      content: assistantMessage,
-    });
-
+    this.conversationHistory.push({ role: "assistant", content: assistantMessage });
     return assistantMessage;
   }
 
-  /** Clear conversation history to start fresh */
   clearHistory(): void {
     this.conversationHistory = [];
   }
 
-  /** Get current conversation length */
   get historyLength(): number {
     return this.conversationHistory.length;
   }
 }
+
+export { Cortex as FridayCore };
