@@ -72,11 +72,7 @@ export function chatCommand(program: Command): void {
 				try {
 					const result = await runtime.process(message);
 					spinner.stop();
-					const prefix =
-						result.source === "protocol"
-							? chalk.magenta("Protocol >")
-							: chalk.cyan("Friday >");
-					console.log(`\n${prefix} ${renderMarkdown(result.output)}`);
+					console.log(`\n${renderMarkdown(result.output)}`);
 				} catch (error) {
 					spinner.fail(chalk.red("Something went wrong"));
 					if (error instanceof Error) {
