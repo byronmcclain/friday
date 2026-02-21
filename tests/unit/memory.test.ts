@@ -126,3 +126,51 @@ describe("SQLiteMemory — Conversation History", () => {
     expect(history).toHaveLength(2);
   });
 });
+
+describe("SQLiteMemory — Semantic Search", () => {
+  let memory: SQLiteMemory;
+
+  beforeEach(() => {
+    memory = new SQLiteMemory(TEST_DB);
+  });
+
+  afterEach(() => {
+    memory.close();
+    try { unlinkSync(TEST_DB); } catch {}
+  });
+
+  test("embed stores content and returns an id", async () => {
+    const id = await memory.embed("test-ns", "TypeScript is a typed superset of JavaScript");
+    expect(id).toBeDefined();
+    expect(typeof id).toBe("string");
+  });
+
+  test("search finds matching content", async () => {
+    await memory.embed("test-ns", "TypeScript is a typed superset of JavaScript");
+    await memory.embed("test-ns", "Bun is a fast JavaScript runtime");
+    await memory.embed("test-ns", "The weather is sunny today");
+    const results = await memory.search("test-ns", "JavaScript", 2);
+    expect(results.length).toBeGreaterThan(0);
+    expect(results.length).toBeLessThanOrEqual(2);
+  });
+
+  test("search respects namespace isolation", async () => {
+    await memory.embed("ns-a", "Alpha content about cats");
+    await memory.embed("ns-b", "Beta content about cats");
+    const results = await memory.search("ns-a", "cats", 10);
+    expect(results).toHaveLength(1);
+  });
+
+  test("forget removes an embedding", async () => {
+    const id = await memory.embed("test-ns", "Temporary content");
+    await memory.forget("test-ns", id);
+    const results = await memory.search("test-ns", "Temporary", 10);
+    expect(results).toHaveLength(0);
+  });
+
+  test("embed stores metadata", async () => {
+    await memory.embed("test-ns", "Important fact", { source: "user", priority: "high" });
+    const results = await memory.search("test-ns", "Important", 1);
+    expect(results[0]?.metadata?.source).toBe("user");
+  });
+});

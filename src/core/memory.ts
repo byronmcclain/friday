@@ -53,6 +53,19 @@ export class SQLiteMemory {
         messages TEXT NOT NULL,
         summary TEXT
       );
+
+      CREATE TABLE IF NOT EXISTS embeddings (
+        id TEXT PRIMARY KEY,
+        namespace TEXT NOT NULL,
+        content TEXT NOT NULL,
+        metadata TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE VIRTUAL TABLE IF NOT EXISTS embeddings_fts USING fts5(
+        content,
+        content_rowid='rowid'
+      );
     `);
   }
 
@@ -126,6 +139,71 @@ export class SQLiteMemory {
       messages: JSON.parse(r.messages) as ConversationMessage[],
       summary: r.summary ?? undefined,
     }));
+  }
+
+  async embed(
+    namespace: string,
+    content: string,
+    metadata?: Record<string, unknown>,
+  ): Promise<string> {
+    const id = crypto.randomUUID();
+    this.db
+      .query("INSERT INTO embeddings (id, namespace, content, metadata) VALUES (?, ?, ?, ?)")
+      .run(id, namespace, content, metadata ? JSON.stringify(metadata) : null);
+    const row = this.db
+      .query<{ rowid: number }, [string]>("SELECT rowid FROM embeddings WHERE id = ?")
+      .get(id);
+    if (row) {
+      this.db
+        .query("INSERT INTO embeddings_fts (rowid, content) VALUES (?, ?)")
+        .run(row.rowid, content);
+    }
+    return id;
+  }
+
+  async search(namespace: string, query: string, limit = 5): Promise<SemanticResult[]> {
+    const sanitized = query.replace(/['"*()]/g, " ").trim();
+    if (!sanitized) return [];
+    const terms = sanitized.split(/\s+/).filter(Boolean);
+    if (terms.length === 0) return [];
+    const ftsQuery = terms.map((t) => `"${t}"*`).join(" OR ");
+
+    try {
+      const rows = this.db
+        .query<
+          { id: string; content: string; metadata: string | null; rank: number },
+          [string, string, number]
+        >(
+          `SELECT e.id, e.content, e.metadata, fts.rank
+           FROM embeddings_fts fts
+           JOIN embeddings e ON e.rowid = fts.rowid
+           WHERE embeddings_fts MATCH ?1 AND e.namespace = ?2
+           ORDER BY fts.rank
+           LIMIT ?3`,
+        )
+        .all(ftsQuery, namespace, limit);
+
+      return rows.map((r) => ({
+        id: r.id,
+        content: r.content,
+        similarity: Math.abs(r.rank),
+        metadata: r.metadata ? JSON.parse(r.metadata) : undefined,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  async forget(namespace: string, embeddingId: string): Promise<void> {
+    const row = this.db
+      .query<{ rowid: number }, [string]>("SELECT rowid FROM embeddings WHERE id = ?")
+      .get(embeddingId);
+    if (row) {
+      this.db.query("DELETE FROM embeddings_fts WHERE rowid = ?").run(row.rowid);
+    }
+    this.db
+      .query("DELETE FROM embeddings WHERE id = ? AND namespace = ?")
+      .run(embeddingId, namespace);
   }
 
   scoped(namespace: string): ScopedMemory {
