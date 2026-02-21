@@ -257,6 +257,23 @@ describe("FridayRuntime — conversation persistence", () => {
 		rmdirSync(dataDir);
 	});
 
+	test("history protocol is registered when dataDir is provided", async () => {
+		const dataDir = "/tmp/friday-test-data-" + Date.now();
+		mkdirSync(dataDir, { recursive: true });
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider, dataDir });
+		const historyProtocol = runtime.protocols.get("history");
+		expect(historyProtocol).toBeDefined();
+		expect(historyProtocol!.name).toBe("history");
+		await runtime.shutdown();
+		await Promise.allSettled([
+			unlink(`${dataDir}/friday.db`),
+			unlink(`${dataDir}/friday.db-wal`),
+			unlink(`${dataDir}/friday.db-shm`),
+		]);
+		rmdirSync(dataDir);
+	});
+
 	test("fresh flag skips loading last session", async () => {
 		const dataDir = "/tmp/friday-test-data-" + Date.now();
 		mkdirSync(dataDir, { recursive: true });

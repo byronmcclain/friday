@@ -15,6 +15,7 @@ import { SQLiteMemory } from "./memory.ts";
 import { SMARTS_DEFAULTS } from "../smarts/types.ts";
 import { createSmartProtocol } from "../smarts/protocol.ts";
 import { SmartsCurator } from "../smarts/curator.ts";
+import { createHistoryProtocol } from "../history/protocol.ts";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
 	modulesDir?: string;
@@ -114,6 +115,8 @@ export class FridayRuntime {
 						this._pendingHistory = recent[0]!.messages;
 					}
 				}
+
+				this._protocols.register(createHistoryProtocol(this._memory));
 			}
 
 			if (config.smartsDir) {

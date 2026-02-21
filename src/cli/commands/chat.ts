@@ -18,6 +18,7 @@ export function chatCommand(program: Command): void {
 			DEFAULT_PROVIDER,
 		)
 		.option("-m, --model <model>", "Model to use (defaults per provider)")
+		.option("--fresh", "Start a fresh session without loading previous conversation")
 		.action(async (options) => {
 			const runtime = new FridayRuntime();
 			try {
@@ -25,6 +26,8 @@ export function chatCommand(program: Command): void {
 					provider: options.provider as ProviderName,
 					model: options.model,
 					smartsDir: resolve("smarts"),
+					dataDir: resolve("data"),
+					fresh: options.fresh,
 				});
 			} catch (error) {
 				if (error instanceof Error) {
