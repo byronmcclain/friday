@@ -43,6 +43,16 @@ describe("renderMarkdown", () => {
     expect(result).toContain("item two");
   });
 
+  test("renders bold inside list items (marked-terminal text bug fix)", () => {
+    const result = renderMarkdown("- **Bold**: description\n- *italic* item");
+    // Bold markers should not appear as raw text
+    expect(result).not.toContain("**Bold**");
+    expect(result).toContain("Bold");
+    // Italic markers should not appear as raw text
+    expect(result).not.toContain("*italic*");
+    expect(result).toContain("italic");
+  });
+
   test("returns empty string for empty input", () => {
     const result = renderMarkdown("");
     expect(result.trim()).toBe("");
