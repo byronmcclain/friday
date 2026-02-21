@@ -1,5 +1,4 @@
 import type { Command } from "commander";
-import inquirer from "inquirer";
 import chalk from "chalk";
 import ora from "ora";
 import { resolve } from "node:path";
@@ -7,6 +6,10 @@ import { FridayRuntime } from "../../core/runtime.ts";
 import type { ProviderName } from "../../core/types.ts";
 import { DEFAULT_PROVIDER } from "../../providers/index.ts";
 import { renderMarkdown } from "../render.ts";
+import {
+	typeaheadPrompt,
+	type TypeaheadEntry,
+} from "../typeahead-prompt.ts";
 
 export function chatCommand(program: Command): void {
 	program
@@ -58,16 +61,19 @@ export function chatCommand(program: Command): void {
 				),
 			);
 
+			const commands: TypeaheadEntry[] = runtime.protocols
+				.list()
+				.map((p) => ({
+					name: p.name,
+					description: p.description,
+					aliases: p.aliases,
+				}));
+
 			while (true) {
-				const { message } = await inquirer.prompt<{ message: string }>([
-					{
-						type: "input",
-						name: "message",
-						message: chalk.green("You >"),
-						validate: (input: string) =>
-							input.trim().length > 0 || "Please enter a message",
-					},
-				]);
+				const message = await typeaheadPrompt({
+					prompt: chalk.green("You >"),
+					commands,
+				});
 
 				if (
 					["exit", "quit", "bye"].includes(message.toLowerCase().trim())
