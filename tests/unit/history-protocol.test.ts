@@ -88,10 +88,17 @@ describe("/history protocol", () => {
     expect(result.summary).toContain("not found");
   });
 
-  test("clear removes all conversations", async () => {
+  test("clear removes all conversations and reports count", async () => {
     const result = await protocol.execute({ rawArgs: "clear" }, stubContext);
     expect(result.success).toBe(true);
+    expect(result.summary).toContain("Cleared 2 conversation(s)");
     const listResult = await protocol.execute({ rawArgs: "list" }, stubContext);
     expect(listResult.summary).toContain("No conversation history");
+  });
+
+  test("list accepts optional count argument", async () => {
+    const result = await protocol.execute({ rawArgs: "list 1" }, stubContext);
+    expect(result.success).toBe(true);
+    expect(result.summary).toContain("Conversations (1)");
   });
 });

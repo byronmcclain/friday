@@ -25,7 +25,18 @@ export interface ScopedMemory {
   list(): Promise<string[]>;
 }
 
+type ConversationRow = {
+  id: string;
+  started_at: string;
+  ended_at: string | null;
+  provider: string;
+  model: string;
+  messages: string;
+  summary: string | null;
+};
+
 export class SQLiteMemory {
+  private static readonly MAX_CONVERSATIONS = 500;
   private db: Database;
 
   constructor(dbPath: string) {
@@ -98,67 +109,7 @@ export class SQLiteMemory {
     return rows.map((r) => r.key);
   }
 
-  async saveConversation(session: ConversationSession): Promise<void> {
-    this.db
-      .query(
-        "INSERT OR REPLACE INTO conversations (id, started_at, ended_at, provider, model, messages, summary) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      )
-      .run(
-        session.id,
-        session.startedAt.toISOString(),
-        session.endedAt?.toISOString() ?? null,
-        session.provider,
-        session.model,
-        JSON.stringify(session.messages),
-        session.summary ?? null,
-      );
-  }
-
-  async getConversationHistory(limit = 20): Promise<ConversationSession[]> {
-    const rows = this.db
-      .query<
-        {
-          id: string;
-          started_at: string;
-          ended_at: string | null;
-          provider: string;
-          model: string;
-          messages: string;
-          summary: string | null;
-        },
-        [number]
-      >("SELECT * FROM conversations ORDER BY started_at DESC LIMIT ?")
-      .all(limit);
-
-    return rows.map((r) => ({
-      id: r.id,
-      startedAt: new Date(r.started_at),
-      endedAt: r.ended_at ? new Date(r.ended_at) : undefined,
-      provider: r.provider,
-      model: r.model,
-      messages: JSON.parse(r.messages) as ConversationMessage[],
-      summary: r.summary ?? undefined,
-    }));
-  }
-
-  async getConversationById(id: string): Promise<ConversationSession | undefined> {
-    const row = this.db
-      .query<
-        {
-          id: string;
-          started_at: string;
-          ended_at: string | null;
-          provider: string;
-          model: string;
-          messages: string;
-          summary: string | null;
-        },
-        [string]
-      >("SELECT * FROM conversations WHERE id = ?")
-      .get(id);
-
-    if (!row) return undefined;
-
+  private mapRow(row: ConversationRow): ConversationSession {
     return {
       id: row.id,
       startedAt: new Date(row.started_at),
@@ -168,6 +119,50 @@ export class SQLiteMemory {
       messages: JSON.parse(row.messages) as ConversationMessage[],
       summary: row.summary ?? undefined,
     };
+  }
+
+  async saveConversation(session: ConversationSession): Promise<void> {
+    this.db.transaction(() => {
+      this.db
+        .query(
+          "INSERT OR REPLACE INTO conversations (id, started_at, ended_at, provider, model, messages, summary) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        )
+        .run(
+          session.id,
+          session.startedAt.toISOString(),
+          session.endedAt?.toISOString() ?? null,
+          session.provider,
+          session.model,
+          JSON.stringify(session.messages),
+          session.summary ?? null,
+        );
+      this.db
+        .query(
+          "DELETE FROM conversations WHERE id NOT IN (SELECT id FROM conversations ORDER BY started_at DESC LIMIT ?)",
+        )
+        .run(SQLiteMemory.MAX_CONVERSATIONS);
+    })();
+  }
+
+  async getConversationHistory(limit = 20): Promise<ConversationSession[]> {
+    const rows = this.db
+      .query<ConversationRow, [number]>(
+        "SELECT id, started_at, ended_at, provider, model, messages, summary FROM conversations ORDER BY started_at DESC LIMIT ?",
+      )
+      .all(limit);
+
+    return rows.map((r) => this.mapRow(r));
+  }
+
+  async getConversationById(id: string): Promise<ConversationSession | undefined> {
+    const row = this.db
+      .query<ConversationRow, [string]>(
+        "SELECT id, started_at, ended_at, provider, model, messages, summary FROM conversations WHERE id = ?",
+      )
+      .get(id);
+
+    if (!row) return undefined;
+    return this.mapRow(row);
   }
 
   async deleteAllConversations(): Promise<void> {

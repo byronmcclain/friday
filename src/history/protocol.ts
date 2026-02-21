@@ -17,7 +17,7 @@ export function createHistoryProtocol(memory: SQLiteMemory): FridayProtocol {
       switch (subcommand) {
         case "":
         case "list":
-          return handleList(memory);
+          return handleList(memory, rest);
         case "show":
           return handleShow(memory, rest);
         case "clear":
@@ -32,8 +32,10 @@ export function createHistoryProtocol(memory: SQLiteMemory): FridayProtocol {
   };
 }
 
-async function handleList(memory: SQLiteMemory): Promise<ProtocolResult> {
-  const sessions = await memory.getConversationHistory(20);
+async function handleList(memory: SQLiteMemory, args: string): Promise<ProtocolResult> {
+  const count = args ? Number.parseInt(args, 10) : 20;
+  const limit = Number.isNaN(count) || count < 1 ? 20 : count;
+  const sessions = await memory.getConversationHistory(limit);
   if (sessions.length === 0) {
     return { success: true, summary: "No conversation history." };
   }
@@ -58,6 +60,8 @@ async function handleShow(memory: SQLiteMemory, id: string): Promise<ProtocolRes
 }
 
 async function handleClear(memory: SQLiteMemory): Promise<ProtocolResult> {
+  const sessions = await memory.getConversationHistory(10000);
+  const count = sessions.length;
   await memory.deleteAllConversations();
-  return { success: true, summary: "Conversation history cleared." };
+  return { success: true, summary: `Cleared ${count} conversation(s).` };
 }

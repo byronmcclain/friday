@@ -1,4 +1,4 @@
-import type { FridayConfig, ConversationMessage } from "./types.ts";
+import type { FridayConfig } from "./types.ts";
 import { Cortex } from "./cortex.ts";
 import type { LLMProvider } from "../providers/index.ts";
 import { SignalBus } from "./events.ts";
@@ -16,6 +16,7 @@ import { SMARTS_DEFAULTS } from "../smarts/types.ts";
 import { createSmartProtocol } from "../smarts/protocol.ts";
 import { SmartsCurator } from "../smarts/curator.ts";
 import { createHistoryProtocol } from "../history/protocol.ts";
+import { mkdirSync } from "node:fs";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
 	modulesDir?: string;
@@ -46,7 +47,6 @@ export class FridayRuntime {
 	private _memory?: SQLiteMemory;
 	private _sessionId?: string;
 	private _sessionStartedAt?: Date;
-	private _pendingHistory?: ConversationMessage[];
 	private _booted = false;
 
 	get isBooted(): boolean {
@@ -104,20 +104,11 @@ export class FridayRuntime {
 			this._directiveEngine.start();
 
 			if (config.dataDir) {
-				const { mkdirSync } = await import("node:fs");
 				mkdirSync(config.dataDir, { recursive: true });
 				const dbPath = `${config.dataDir}/friday.db`;
 				this._memory = new SQLiteMemory(dbPath);
 				this._sessionId = crypto.randomUUID();
 				this._sessionStartedAt = new Date();
-
-				if (!config.fresh) {
-					const recent = await this._memory.getConversationHistory(1);
-					if (recent.length > 0) {
-						this._pendingHistory = recent[0]!.messages;
-					}
-				}
-
 				this._protocols.register(createHistoryProtocol(this._memory));
 			}
 
@@ -142,9 +133,11 @@ export class FridayRuntime {
 				this._curator = new SmartsCurator(this._smarts, this._cortex.llmProvider);
 			}
 
-			if (this._pendingHistory) {
-				this._cortex.setHistory(this._pendingHistory);
-				this._pendingHistory = undefined;
+			if (this._memory && !config.fresh) {
+				const recent = await this._memory.getConversationHistory(1);
+				if (recent.length > 0) {
+					this._cortex.setHistory(recent[0]!.messages);
+				}
 			}
 
 			if (config.modulesDir) {

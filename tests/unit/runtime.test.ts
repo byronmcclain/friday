@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { FridayRuntime } from "../../src/core/runtime.ts";
 import type { LLMProvider } from "../../src/providers/types.ts";
 import { mkdir, writeFile, rm, unlink } from "node:fs/promises";
-import { mkdirSync, rmdirSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { stubProvider } from "../helpers/stubs.ts";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 
@@ -198,24 +198,37 @@ This is test knowledge.`,
 });
 
 describe("FridayRuntime — conversation persistence", () => {
-	test("boot creates main memory when dataDir is provided", async () => {
-		const dataDir = "/tmp/friday-test-data-" + Date.now();
+	let dataDir: string;
+
+	beforeEach(() => {
+		dataDir = "/tmp/friday-test-data-" + Date.now();
 		mkdirSync(dataDir, { recursive: true });
-		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider, dataDir });
-		expect(runtime.memory).toBeDefined();
-		await runtime.shutdown();
+	});
+
+	afterEach(async () => {
 		await Promise.allSettled([
 			unlink(`${dataDir}/friday.db`),
 			unlink(`${dataDir}/friday.db-wal`),
 			unlink(`${dataDir}/friday.db-shm`),
 		]);
-		rmdirSync(dataDir);
+		await rm(dataDir, { recursive: true, force: true });
+	});
+
+	test("boot creates main memory when dataDir is provided", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider, dataDir });
+		expect(runtime.memory).toBeDefined();
+		await runtime.shutdown();
+	});
+
+	test("memory is undefined when dataDir is not provided", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider });
+		expect(runtime.memory).toBeUndefined();
+		await runtime.shutdown();
 	});
 
 	test("conversation is saved on shutdown", async () => {
-		const dataDir = "/tmp/friday-test-data-" + Date.now();
-		mkdirSync(dataDir, { recursive: true });
 		const runtime = new FridayRuntime();
 		await runtime.boot({ injectedProvider: stubProvider, dataDir });
 		await runtime.process("Hello Friday");
@@ -226,19 +239,9 @@ describe("FridayRuntime — conversation persistence", () => {
 		expect(sessions).toHaveLength(1);
 		expect(sessions[0]!.messages.length).toBeGreaterThanOrEqual(2);
 		memory.close();
-
-		await Promise.allSettled([
-			unlink(`${dataDir}/friday.db`),
-			unlink(`${dataDir}/friday.db-wal`),
-			unlink(`${dataDir}/friday.db-shm`),
-		]);
-		rmdirSync(dataDir);
 	});
 
 	test("last session is auto-loaded on boot", async () => {
-		const dataDir = "/tmp/friday-test-data-" + Date.now();
-		mkdirSync(dataDir, { recursive: true });
-
 		const runtime1 = new FridayRuntime();
 		await runtime1.boot({ injectedProvider: stubProvider, dataDir });
 		await runtime1.process("Hello Friday");
@@ -248,36 +251,18 @@ describe("FridayRuntime — conversation persistence", () => {
 		await runtime2.boot({ injectedProvider: stubProvider, dataDir });
 		expect(runtime2.cortex.historyLength).toBeGreaterThanOrEqual(2);
 		await runtime2.shutdown();
-
-		await Promise.allSettled([
-			unlink(`${dataDir}/friday.db`),
-			unlink(`${dataDir}/friday.db-wal`),
-			unlink(`${dataDir}/friday.db-shm`),
-		]);
-		rmdirSync(dataDir);
 	});
 
 	test("history protocol is registered when dataDir is provided", async () => {
-		const dataDir = "/tmp/friday-test-data-" + Date.now();
-		mkdirSync(dataDir, { recursive: true });
 		const runtime = new FridayRuntime();
 		await runtime.boot({ injectedProvider: stubProvider, dataDir });
 		const historyProtocol = runtime.protocols.get("history");
 		expect(historyProtocol).toBeDefined();
 		expect(historyProtocol!.name).toBe("history");
 		await runtime.shutdown();
-		await Promise.allSettled([
-			unlink(`${dataDir}/friday.db`),
-			unlink(`${dataDir}/friday.db-wal`),
-			unlink(`${dataDir}/friday.db-shm`),
-		]);
-		rmdirSync(dataDir);
 	});
 
 	test("fresh flag skips loading last session", async () => {
-		const dataDir = "/tmp/friday-test-data-" + Date.now();
-		mkdirSync(dataDir, { recursive: true });
-
 		const runtime1 = new FridayRuntime();
 		await runtime1.boot({ injectedProvider: stubProvider, dataDir });
 		await runtime1.process("Hello Friday");
@@ -287,12 +272,5 @@ describe("FridayRuntime — conversation persistence", () => {
 		await runtime2.boot({ injectedProvider: stubProvider, dataDir, fresh: true });
 		expect(runtime2.cortex.historyLength).toBe(0);
 		await runtime2.shutdown();
-
-		await Promise.allSettled([
-			unlink(`${dataDir}/friday.db`),
-			unlink(`${dataDir}/friday.db-wal`),
-			unlink(`${dataDir}/friday.db-shm`),
-		]);
-		rmdirSync(dataDir);
 	});
 });
