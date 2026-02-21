@@ -186,6 +186,24 @@ describe("SQLiteMemory — Semantic Search", () => {
     expect(results[0]?.metadata?.source).toBe("user");
   });
 
+  test("search handles FTS5 special characters in query", async () => {
+    await memory.embed("test-ns", "TypeScript patterns and best practices");
+    const results = await memory.search("test-ns", "TypeScript's \"best\" (practices)*", 5);
+    expect(results.length).toBeGreaterThan(0);
+  });
+
+  test("search returns empty array for empty query", async () => {
+    await memory.embed("test-ns", "Some content");
+    const results = await memory.search("test-ns", "", 5);
+    expect(results).toEqual([]);
+  });
+
+  test("search returns empty array for whitespace-only query", async () => {
+    await memory.embed("test-ns", "Some content");
+    const results = await memory.search("test-ns", "   ", 5);
+    expect(results).toEqual([]);
+  });
+
   test("forget respects namespace isolation", async () => {
     const idA = await memory.embed("ns-a", "Shared content about dogs");
     const idB = await memory.embed("ns-b", "Shared content about dogs");
