@@ -62,9 +62,9 @@ export class SQLiteMemory {
         created_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
 
+      -- FTS5 standalone table; manually synced with embeddings via embed()/forget()
       CREATE VIRTUAL TABLE IF NOT EXISTS embeddings_fts USING fts5(
-        content,
-        content_rowid='rowid'
+        content
       );
     `);
   }
