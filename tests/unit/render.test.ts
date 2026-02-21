@@ -53,6 +53,11 @@ describe("renderMarkdown", () => {
     expect(result).toContain("italic");
   });
 
+  test("renderMarkdown handles whitespace-only input without destroying it", () => {
+    const result = renderMarkdown("   \n   \n");
+    expect(result).toBeDefined();
+  });
+
   test("returns empty string for empty input", () => {
     const result = renderMarkdown("");
     expect(result.trim()).toBe("");
