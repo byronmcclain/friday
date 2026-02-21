@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import inquirer from "inquirer";
 import chalk from "chalk";
 import ora from "ora";
+import { resolve } from "node:path";
 import { FridayRuntime } from "../../core/runtime.ts";
 import type { ProviderName } from "../../core/types.ts";
 import { DEFAULT_PROVIDER } from "../../providers/index.ts";
@@ -23,6 +24,7 @@ export function chatCommand(program: Command): void {
 				await runtime.boot({
 					provider: options.provider as ProviderName,
 					model: options.model,
+					smartsDir: resolve("smarts"),
 				});
 			} catch (error) {
 				if (error instanceof Error) {
