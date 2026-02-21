@@ -1,5 +1,9 @@
 import { describe, test, expect } from "bun:test";
-import { gatherMachine, type CpuTimes } from "../../src/sensorium/sensors.ts";
+import {
+	gatherMachine,
+	gatherContainers,
+	type CpuTimes,
+} from "../../src/sensorium/sensors.ts";
 
 describe("gatherMachine", () => {
 	test("returns valid machine snapshot", async () => {
@@ -25,5 +29,25 @@ describe("gatherMachine", () => {
 		const result = await gatherMachine(prevTimes);
 		expect(result.cpus.usage).toBeGreaterThanOrEqual(0);
 		expect(result.cpus.usage).toBeLessThanOrEqual(100);
+	});
+});
+
+describe("gatherContainers", () => {
+	test("returns a valid container snapshot", async () => {
+		const result = await gatherContainers();
+		expect(result.runtime).toMatch(/^(docker|podman|none)$/);
+		expect(Array.isArray(result.running)).toBe(true);
+		expect(typeof result.stopped).toBe("number");
+	});
+
+	test("each running container has required fields", async () => {
+		const result = await gatherContainers();
+		for (const c of result.running) {
+			expect(c.id).toBeTruthy();
+			expect(c.name).toBeTruthy();
+			expect(c.image).toBeTruthy();
+			expect(typeof c.cpu).toBe("number");
+			expect(typeof c.memory).toBe("number");
+		}
 	});
 });
