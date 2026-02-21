@@ -33,6 +33,16 @@ export class ProtocolRegistry {
     return [...this.protocols.values()];
   }
 
+  search(query: string): FridayProtocol[] {
+    if (!query) return this.list();
+    const q = query.toLowerCase();
+    return this.list().filter(
+      (p) =>
+        p.name.toLowerCase().startsWith(q) ||
+        p.aliases.some((a) => a.toLowerCase().startsWith(q)),
+    );
+  }
+
   isProtocol(input: string): boolean {
     if (!input.startsWith("/")) return false;
     const name = input.slice(1).split(/\s+/)[0] ?? "";
