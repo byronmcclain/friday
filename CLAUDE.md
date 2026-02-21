@@ -30,29 +30,50 @@ bun run typecheck      # TypeScript type checking (tsc --noEmit)
 
 ```
 src/
-├── main.ts              # Entrypoint — CLI bootstrap
+├── main.ts                # Entrypoint — CLI bootstrap
 ├── cli/
-│   ├── index.ts          # Commander program definition, command registration
-│   └── commands/         # One file per CLI command (e.g., chat.ts)
+│   ├── index.ts           # Commander program definition, command registration
+│   └── commands/          # One file per CLI command (e.g., chat.ts)
 ├── core/
-│   ├── friday.ts         # FridayCore — central orchestrator, conversation state, provider routing
-│   ├── types.ts          # Shared TypeScript interfaces (FridayConfig, FridayTool, FridayAgent)
-│   └── prompts.ts        # System prompts defining Friday's personality and behavior
-├── agents/               # Specialized sub-agents (coding, research, etc.) — future
-├── providers/            # LLM provider adapters (Anthropic is primary) — future
-├── tools/                # Tool implementations Friday can invoke (file ops, web, etc.) — future
-├── config/               # Runtime configuration loading — future
-└── utils/                # Shared utilities — future
+│   ├── cortex.ts          # Cortex — LLM brain, conversation state, tool registration
+│   ├── runtime.ts         # FridayRuntime — boot/shutdown orchestrator, wires all subsystems
+│   ├── events.ts          # SignalBus — typed event system (file:changed, test:failed, etc.)
+│   ├── clearance.ts       # ClearanceManager — permission gates (read-fs, exec-shell, etc.)
+│   ├── memory.ts          # SQLiteMemory — KV store, conversation history, FTS5 semantic search
+│   ├── notifications.ts   # NotificationManager — multi-channel alerts (terminal, log, slack, webhook)
+│   ├── types.ts           # Core types (FridayConfig, ConversationMessage, ProviderName)
+│   └── prompts.ts         # System prompts defining Friday's personality and behavior
+├── audit/
+│   ├── types.ts           # AuditEntry, AuditFilter interfaces
+│   └── logger.ts          # AuditLogger — action tracking with filtering
+├── modules/
+│   ├── types.ts           # FridayModule, FridayTool, FridayProtocol interfaces
+│   └── loader.ts          # Module discovery, validation, and loading
+├── protocols/
+│   ├── types.ts           # Re-exports from modules/types.ts
+│   └── registry.ts        # ProtocolRegistry — /command routing with aliases
+├── directives/
+│   ├── types.ts           # FridayDirective, DirectiveTrigger, DirectiveAction
+│   ├── store.ts           # DirectiveStore — CRUD + signal-based lookup
+│   └── engine.ts          # DirectiveEngine — autonomous rule execution
+├── providers/             # LLM provider adapters (Anthropic, Grok)
+├── config/                # Runtime configuration loading — future
+└── utils/                 # Shared utilities — future
 tests/
-├── unit/                 # Unit tests (bun:test)
-└── integration/          # Integration tests — future
+├── unit/                  # Unit tests (bun:test) — ~74 tests across 12 files
+└── integration/           # Integration tests — future
 ```
 
 ### Key Design Patterns
 
-- **FridayCore** (`src/core/friday.ts`) is the single orchestrator. All AI interactions flow through it. It owns conversation history and delegates to providers/tools.
-- **Commands** are registered via Commander.js in `src/cli/index.ts`. Each command lives in its own file under `src/cli/commands/` and exports a function that takes the Commander `program` instance.
-- **Types** are centralized in `src/core/types.ts`. The `FridayTool` and `FridayAgent` interfaces define the contracts for extensibility.
+- **FridayRuntime** (`src/core/runtime.ts`) is the composition root. It boots all subsystems in order: SignalBus, ClearanceManager, AuditLogger, NotificationManager, ProtocolRegistry, DirectiveStore/Engine, Cortex, then discovers and loads Modules.
+- **Cortex** (`src/core/cortex.ts`) is Friday's LLM brain. It owns conversation history, delegates to providers, and exposes tool registration for modules. Replaces the old FridayCore.
+- **SignalBus** (`src/core/events.ts`) is the reactive nervous system. Typed signals (file:changed, test:failed, etc.) flow through here, triggering directives and module behavior.
+- **Protocols** bypass LLM reasoning entirely — `/command` input is routed directly to a protocol handler via the ProtocolRegistry, while everything else flows through Cortex.
+- **Directives** are autonomous rules: signal triggers fire actions (tools, protocols, prompts) after clearance checks. The DirectiveEngine wires the SignalBus to the DirectiveStore.
+- **Modules** bundle tools, protocols, knowledge, triggers, and clearance into discoverable units. They're auto-loaded from directories and validated against the manifest contract.
+- **Commands** are registered via Commander.js in `src/cli/index.ts`. Each command lives in its own file under `src/cli/commands/`.
+- **Types** are split by domain: core config in `src/core/types.ts`, tool/module contracts in `src/modules/types.ts`, directive structures in `src/directives/types.ts`.
 - **Prompts** live in `src/core/prompts.ts` as exported constants. Friday's personality is defined here — keep it consistent when modifying.
 
 ## Bun-Specific Rules
