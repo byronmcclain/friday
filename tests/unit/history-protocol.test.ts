@@ -76,6 +76,12 @@ describe("/history protocol", () => {
     expect(result.summary).toContain("Hey boss!");
   });
 
+  test("show without id returns usage error", async () => {
+    const result = await protocol.execute({ rawArgs: "show" }, stubContext);
+    expect(result.success).toBe(false);
+    expect(result.summary).toContain("Usage");
+  });
+
   test("show with unknown id returns error", async () => {
     const result = await protocol.execute({ rawArgs: "show unknown-id" }, stubContext);
     expect(result.success).toBe(false);

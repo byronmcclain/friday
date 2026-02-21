@@ -104,6 +104,8 @@ export class FridayRuntime {
 			this._directiveEngine.start();
 
 			if (config.dataDir) {
+				const { mkdirSync } = await import("node:fs");
+				mkdirSync(config.dataDir, { recursive: true });
 				const dbPath = `${config.dataDir}/friday.db`;
 				this._memory = new SQLiteMemory(dbPath);
 				this._sessionId = crypto.randomUUID();
