@@ -3,13 +3,13 @@ import { createProvider, DEFAULT_PROVIDER, PROVIDER_DEFAULTS } from "../../src/p
 import { AnthropicProvider } from "../../src/providers/anthropic.ts";
 
 describe("Provider Abstraction", () => {
-  test("DEFAULT_PROVIDER is anthropic", () => {
-    expect(DEFAULT_PROVIDER).toBe("anthropic");
+  test("DEFAULT_PROVIDER is grok", () => {
+    expect(DEFAULT_PROVIDER).toBe("grok");
   });
 
   test("PROVIDER_DEFAULTS has entries for all providers", () => {
     expect(PROVIDER_DEFAULTS.anthropic).toBe("claude-sonnet-4-20250514");
-    expect(PROVIDER_DEFAULTS.grok).toBe("grok-3");
+    expect(PROVIDER_DEFAULTS.grok).toBe("grok-4-1-fast-reasoning-latest");
   });
 
   test("createProvider('anthropic') returns an AnthropicProvider", () => {

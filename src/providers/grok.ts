@@ -4,7 +4,7 @@ import type { ChatOptions, LLMProvider } from "./types.ts";
 
 export class GrokProvider implements LLMProvider {
   readonly name = "grok";
-  readonly defaultModel = "grok-3";
+  readonly defaultModel = "grok-4-1-fast-reasoning-latest";
   private client: OpenAI;
 
   constructor() {

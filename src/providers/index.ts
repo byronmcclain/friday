@@ -5,11 +5,11 @@ import type { LLMProvider } from "./types.ts";
 
 export type { LLMProvider, ChatOptions } from "./types.ts";
 
-export const DEFAULT_PROVIDER: ProviderName = "anthropic";
+export const DEFAULT_PROVIDER: ProviderName = "grok";
 
 export const PROVIDER_DEFAULTS: Record<ProviderName, string> = {
   anthropic: "claude-sonnet-4-20250514",
-  grok: "grok-3",
+  grok: "grok-4-1-fast-reasoning-latest",
 };
 
 export function createProvider(name: ProviderName): LLMProvider {
