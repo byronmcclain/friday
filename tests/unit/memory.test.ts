@@ -252,4 +252,44 @@ describe("SQLiteMemory — Semantic Search", () => {
     expect(resultsA).toHaveLength(1);
     expect(resultsB).toHaveLength(1);
   });
+
+  test("purgeNamespace removes all embeddings for a namespace", async () => {
+    await memory.embed("target", "First document about TypeScript");
+    await memory.embed("target", "Second document about Bun runtime");
+    await memory.embed("other", "Content in another namespace");
+    await memory.purgeNamespace("target");
+    const targetResults = await memory.search("target", "TypeScript Bun", 10);
+    const otherResults = await memory.search("other", "Content", 10);
+    expect(targetResults).toHaveLength(0);
+    expect(otherResults).toHaveLength(1);
+  });
+
+  test("purgeNamespace on empty namespace is a no-op", async () => {
+    await memory.embed("keep", "Preserved content");
+    await memory.purgeNamespace("nonexistent");
+    const results = await memory.search("keep", "Preserved", 10);
+    expect(results).toHaveLength(1);
+  });
+
+  test("embedBatch inserts multiple items in one transaction", async () => {
+    const ids = await memory.embedBatch("batch-ns", [
+      { content: "TypeScript generics guide", metadata: { topic: "ts" } },
+      { content: "Bun runtime performance tips", metadata: { topic: "bun" } },
+      { content: "SQLite WAL mode explanation" },
+    ]);
+    expect(ids).toHaveLength(3);
+    const tsResults = await memory.search("batch-ns", "TypeScript generics", 10);
+    expect(tsResults).toHaveLength(1);
+    expect(tsResults[0]?.metadata?.topic).toBe("ts");
+    const bunResults = await memory.search("batch-ns", "Bun runtime", 10);
+    expect(bunResults).toHaveLength(1);
+    const sqlResults = await memory.search("batch-ns", "SQLite WAL", 10);
+    expect(sqlResults).toHaveLength(1);
+    expect(sqlResults[0]?.metadata).toBeUndefined();
+  });
+
+  test("embedBatch with empty array returns empty array", async () => {
+    const ids = await memory.embedBatch("batch-ns", []);
+    expect(ids).toEqual([]);
+  });
 });

@@ -191,6 +191,32 @@ export class SQLiteMemory {
     return id;
   }
 
+  async embedBatch(
+    namespace: string,
+    items: { content: string; metadata?: Record<string, unknown> }[],
+  ): Promise<string[]> {
+    if (items.length === 0) return [];
+    const ids: string[] = [];
+    this.db.transaction(() => {
+      for (const item of items) {
+        const id = crypto.randomUUID();
+        this.db
+          .query("INSERT INTO embeddings (id, namespace, content, metadata) VALUES (?, ?, ?, ?)")
+          .run(id, namespace, item.content, item.metadata ? JSON.stringify(item.metadata) : null);
+        const row = this.db
+          .query<{ rowid: number }, [string]>("SELECT rowid FROM embeddings WHERE id = ?")
+          .get(id);
+        if (row) {
+          this.db
+            .query("INSERT INTO embeddings_fts (rowid, content) VALUES (?, ?)")
+            .run(row.rowid, item.content);
+        }
+        ids.push(id);
+      }
+    })();
+    return ids;
+  }
+
   async search(namespace: string, query: string, limit = 5): Promise<SemanticResult[]> {
     const sanitized = query.replace(/['"*()]/g, " ").trim();
     if (!sanitized) return [];
@@ -234,6 +260,18 @@ export class SQLiteMemory {
     this.db
       .query("DELETE FROM embeddings WHERE id = ? AND namespace = ?")
       .run(embeddingId, namespace);
+  }
+
+  async purgeNamespace(namespace: string): Promise<void> {
+    this.db.transaction(() => {
+      const rows = this.db
+        .query<{ rowid: number }, [string]>("SELECT rowid FROM embeddings WHERE namespace = ?")
+        .all(namespace);
+      for (const row of rows) {
+        this.db.query("DELETE FROM embeddings_fts WHERE rowid = ?").run(row.rowid);
+      }
+      this.db.query("DELETE FROM embeddings WHERE namespace = ?").run(namespace);
+    })();
   }
 
   scoped(namespace: string): ScopedMemory {
