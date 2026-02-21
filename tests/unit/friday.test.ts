@@ -51,6 +51,18 @@ describe("Cortex", () => {
     expect(cortex.availableTools[0]!.name).toBe("test-tool");
   });
 
+  test("setHistory seeds conversation history", async () => {
+    const cortex = new Cortex({ injectedProvider: stubProvider });
+    cortex.setHistory([
+      { role: "user", content: "Previous question" },
+      { role: "assistant", content: "Previous answer" },
+    ]);
+    expect(cortex.historyLength).toBe(2);
+    const history = cortex.getHistory();
+    expect(history[0]!.content).toBe("Previous question");
+    expect(history[1]!.content).toBe("Previous answer");
+  });
+
   test("chat error rolls back history", async () => {
     const failingProvider: LLMProvider = {
       name: "failing",

@@ -85,6 +85,10 @@ export class Cortex {
     this.conversationHistory = [];
   }
 
+  setHistory(messages: ConversationMessage[]): void {
+    this.conversationHistory = [...messages];
+  }
+
   getHistory(): ConversationMessage[] {
     return [...this.conversationHistory];
   }
