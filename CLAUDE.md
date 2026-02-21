@@ -49,7 +49,8 @@ src/
 │   └── logger.ts          # AuditLogger — action tracking with filtering
 ├── modules/
 │   ├── types.ts           # FridayModule, FridayTool, FridayProtocol interfaces
-│   └── loader.ts          # Module discovery, validation, and loading
+│   ├── loader.ts          # Module discovery, validation, and loading
+│   └── filesystem/        # Filesystem module — read, write, list, delete, exec tools
 ├── protocols/
 │   ├── types.ts           # Re-exports from modules/types.ts
 │   └── registry.ts        # ProtocolRegistry — /command routing with aliases
@@ -63,19 +64,25 @@ src/
 │   ├── store.ts           # SmartsStore — FTS5-indexed knowledge base with CRUD
 │   ├── protocol.ts        # /smart protocol (list, show, domains, search, reload)
 │   └── curator.ts         # SmartsCurator — autonomous knowledge extraction from conversations
+├── sensorium/
+│   ├── types.ts           # SystemSnapshot, SensorConfig, AlertThresholds
+│   ├── sensors.ts         # Pure functions: gatherMachine(), gatherContainers(), gatherDev()
+│   ├── sensorium.ts       # Sensorium class — polling loop, snapshot management, alert evaluation
+│   ├── protocol.ts        # /env protocol (status, cpu, memory, docker, ports, git)
+│   └── tool.ts            # getEnvironmentStatus FridayTool
 ├── providers/             # LLM provider adapters (Anthropic, Grok)
 ├── config/                # Runtime configuration loading — future
 └── utils/                 # Shared utilities — future
 smarts/                    # Seed knowledge files (YAML frontmatter + markdown)
 tests/
 ├── helpers/               # Shared test stubs (stubProvider, grokStub)
-├── unit/                  # Unit tests (bun:test) — 150 tests across 17 files
+├── unit/                  # Unit tests (bun:test) — 270 tests across 25 files
 └── integration/           # Integration tests — future
 ```
 
 ### Key Design Patterns
 
-- **FridayRuntime** (`src/core/runtime.ts`) is the composition root. It boots all subsystems in order: SignalBus, ClearanceManager, AuditLogger, NotificationManager, ProtocolRegistry, DirectiveStore/Engine, SmartsStore, Cortex, then discovers and loads Modules.
+- **FridayRuntime** (`src/core/runtime.ts`) is the composition root. It boots all subsystems in order: SignalBus, ClearanceManager, AuditLogger, NotificationManager, ProtocolRegistry, DirectiveStore/Engine, Memory, SmartsStore, Sensorium, Cortex, then discovers and loads Modules.
 - **Cortex** (`src/core/cortex.ts`) is Friday's LLM brain. It owns conversation history, delegates to providers, and exposes tool registration for modules. When a SmartsStore is provided, Cortex enriches the system prompt with pinned and FTS5-matched knowledge per message. Replaces the old FridayCore.
 - **SMARTS** (`src/smarts/`) is Friday's dynamic knowledge system. Markdown files with YAML frontmatter in `smarts/` are indexed into FTS5, queried per-message to enrich prompts, and new knowledge is extracted from conversations on shutdown via SmartsCurator. The `/smart` protocol provides manual control (list, show, search, reload).
 - **SignalBus** (`src/core/events.ts`) is the reactive nervous system. Typed signals (file:changed, test:failed, etc.) flow through here, triggering directives and module behavior.
@@ -84,6 +91,7 @@ tests/
 - **Modules** bundle tools, protocols, knowledge, triggers, and clearance into discoverable units. They're auto-loaded from directories and validated against the manifest contract.
 - **Commands** are registered via Commander.js in `src/cli/index.ts`. Each command lives in its own file under `src/cli/commands/`.
 - **Types** are split by domain: core config in `src/core/types.ts`, tool/module contracts in `src/modules/types.ts`, directive structures in `src/directives/types.ts`.
+- **Sensorium** (`src/sensorium/`) is Friday's environmental awareness. Pure sensor functions gather machine stats (`node:os`), Docker containers (`Bun.$`), and dev environment (git, ports, runtimes). The Sensorium class runs a dual-cadence polling loop (30s fast / 5min slow), evaluates alert thresholds with hysteresis, and injects a compact context block into the system prompt via `getContextBlock()`. The `/env` protocol provides CLI access; `getEnvironmentStatus` tool provides LLM access.
 - **Prompts** live in `src/core/prompts.ts` as exported constants. Friday's personality is defined here — keep it consistent when modifying.
 
 ## Testing
@@ -124,7 +132,8 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 - Architecture design: `docs/plans/2026-02-21-friday-agent-runtime-design.md`
 - SMARTS design: `docs/plans/2026-02-21-smarts-dynamic-knowledge-design.md`
 - CLI markdown rendering: `docs/plans/2026-02-21-cli-markdown-rendering-design.md`
-- MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge
+- Sensorium design: `docs/plans/2026-02-21-sensorium-environment-awareness-design.md`
+- MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite
 
 ## Worktrees
 
