@@ -1,4 +1,4 @@
-import type { FridayConfig } from "./types.ts";
+import type { FridayConfig, ConversationMessage } from "./types.ts";
 import { Cortex } from "./cortex.ts";
 import type { LLMProvider } from "../providers/index.ts";
 import { SignalBus } from "./events.ts";
@@ -20,6 +20,8 @@ export interface RuntimeConfig extends Partial<FridayConfig> {
 	modulesDir?: string;
 	injectedProvider?: LLMProvider;
 	smartsDir?: string;
+	dataDir?: string;
+	fresh?: boolean;
 }
 
 export interface ProcessResult {
@@ -40,6 +42,10 @@ export class FridayRuntime {
 	private _smarts?: SmartsStore;
 	private _smartsMemory?: SQLiteMemory;
 	private _curator?: SmartsCurator;
+	private _memory?: SQLiteMemory;
+	private _sessionId?: string;
+	private _sessionStartedAt?: Date;
+	private _pendingHistory?: ConversationMessage[];
 	private _booted = false;
 
 	get isBooted(): boolean {
@@ -64,6 +70,10 @@ export class FridayRuntime {
 
 	get smarts(): SmartsStore | undefined {
 		return this._smarts;
+	}
+
+	get memory(): SQLiteMemory | undefined {
+		return this._memory;
 	}
 
 	async boot(config: RuntimeConfig = {}): Promise<void> {
@@ -92,6 +102,20 @@ export class FridayRuntime {
 			});
 			this._directiveEngine.start();
 
+			if (config.dataDir) {
+				const dbPath = `${config.dataDir}/friday.db`;
+				this._memory = new SQLiteMemory(dbPath);
+				this._sessionId = crypto.randomUUID();
+				this._sessionStartedAt = new Date();
+
+				if (!config.fresh) {
+					const recent = await this._memory.getConversationHistory(1);
+					if (recent.length > 0) {
+						this._pendingHistory = recent[0]!.messages;
+					}
+				}
+			}
+
 			if (config.smartsDir) {
 				const dbPath = `${config.smartsDir}/.smarts-index.db`;
 				this._smartsMemory = new SQLiteMemory(dbPath);
@@ -111,6 +135,11 @@ export class FridayRuntime {
 
 			if (this._smarts) {
 				this._curator = new SmartsCurator(this._smarts, this._cortex.llmProvider);
+			}
+
+			if (this._pendingHistory) {
+				this._cortex.setHistory(this._pendingHistory);
+				this._pendingHistory = undefined;
 			}
 
 			if (config.modulesDir) {
@@ -144,6 +173,10 @@ export class FridayRuntime {
 				this._smartsMemory.close();
 				this._smartsMemory = undefined;
 				this._smarts = undefined;
+			}
+			if (this._memory) {
+				this._memory.close();
+				this._memory = undefined;
 			}
 			throw err;
 		}
@@ -187,6 +220,20 @@ export class FridayRuntime {
 	async shutdown(): Promise<void> {
 		if (!this._booted) throw new Error("Runtime not booted");
 
+		if (this._memory && this._sessionId && this._sessionStartedAt) {
+			const history = this._cortex.getHistory();
+			if (history.length > 0) {
+				await this._memory.saveConversation({
+					id: this._sessionId,
+					startedAt: this._sessionStartedAt,
+					endedAt: new Date(),
+					provider: this._cortex.providerName,
+					model: this._cortex.modelName,
+					messages: history,
+				});
+			}
+		}
+
 		if (this._curator) {
 			const history = this._cortex.getHistory();
 			await this._curator.extractFromConversation(history);
@@ -202,6 +249,10 @@ export class FridayRuntime {
 			this._smartsMemory.close();
 			this._smartsMemory = undefined;
 			this._smarts = undefined;
+		}
+		if (this._memory) {
+			this._memory.close();
+			this._memory = undefined;
 		}
 		this._audit.log({
 			action: "runtime:shutdown",

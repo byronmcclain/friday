@@ -1,8 +1,10 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { FridayRuntime } from "../../src/core/runtime.ts";
 import type { LLMProvider } from "../../src/providers/types.ts";
-import { mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdir, writeFile, rm, unlink } from "node:fs/promises";
+import { mkdirSync, rmdirSync } from "node:fs";
 import { stubProvider } from "../helpers/stubs.ts";
+import { SQLiteMemory } from "../../src/core/memory.ts";
 
 describe("FridayRuntime", () => {
 	test("boots with default configuration", async () => {
@@ -192,5 +194,88 @@ This is test knowledge.`,
 
 		await runtime.shutdown();
 		expect(extractionTriggered).toBe(false);
+	});
+});
+
+describe("FridayRuntime — conversation persistence", () => {
+	test("boot creates main memory when dataDir is provided", async () => {
+		const dataDir = "/tmp/friday-test-data-" + Date.now();
+		mkdirSync(dataDir, { recursive: true });
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider, dataDir });
+		expect(runtime.memory).toBeDefined();
+		await runtime.shutdown();
+		await Promise.allSettled([
+			unlink(`${dataDir}/friday.db`),
+			unlink(`${dataDir}/friday.db-wal`),
+			unlink(`${dataDir}/friday.db-shm`),
+		]);
+		rmdirSync(dataDir);
+	});
+
+	test("conversation is saved on shutdown", async () => {
+		const dataDir = "/tmp/friday-test-data-" + Date.now();
+		mkdirSync(dataDir, { recursive: true });
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider, dataDir });
+		await runtime.process("Hello Friday");
+		await runtime.shutdown();
+
+		const memory = new SQLiteMemory(`${dataDir}/friday.db`);
+		const sessions = await memory.getConversationHistory(10);
+		expect(sessions).toHaveLength(1);
+		expect(sessions[0]!.messages.length).toBeGreaterThanOrEqual(2);
+		memory.close();
+
+		await Promise.allSettled([
+			unlink(`${dataDir}/friday.db`),
+			unlink(`${dataDir}/friday.db-wal`),
+			unlink(`${dataDir}/friday.db-shm`),
+		]);
+		rmdirSync(dataDir);
+	});
+
+	test("last session is auto-loaded on boot", async () => {
+		const dataDir = "/tmp/friday-test-data-" + Date.now();
+		mkdirSync(dataDir, { recursive: true });
+
+		const runtime1 = new FridayRuntime();
+		await runtime1.boot({ injectedProvider: stubProvider, dataDir });
+		await runtime1.process("Hello Friday");
+		await runtime1.shutdown();
+
+		const runtime2 = new FridayRuntime();
+		await runtime2.boot({ injectedProvider: stubProvider, dataDir });
+		expect(runtime2.cortex.historyLength).toBeGreaterThanOrEqual(2);
+		await runtime2.shutdown();
+
+		await Promise.allSettled([
+			unlink(`${dataDir}/friday.db`),
+			unlink(`${dataDir}/friday.db-wal`),
+			unlink(`${dataDir}/friday.db-shm`),
+		]);
+		rmdirSync(dataDir);
+	});
+
+	test("fresh flag skips loading last session", async () => {
+		const dataDir = "/tmp/friday-test-data-" + Date.now();
+		mkdirSync(dataDir, { recursive: true });
+
+		const runtime1 = new FridayRuntime();
+		await runtime1.boot({ injectedProvider: stubProvider, dataDir });
+		await runtime1.process("Hello Friday");
+		await runtime1.shutdown();
+
+		const runtime2 = new FridayRuntime();
+		await runtime2.boot({ injectedProvider: stubProvider, dataDir, fresh: true });
+		expect(runtime2.cortex.historyLength).toBe(0);
+		await runtime2.shutdown();
+
+		await Promise.allSettled([
+			unlink(`${dataDir}/friday.db`),
+			unlink(`${dataDir}/friday.db-wal`),
+			unlink(`${dataDir}/friday.db-shm`),
+		]);
+		rmdirSync(dataDir);
 	});
 });
