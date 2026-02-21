@@ -4,6 +4,7 @@ import chalk from "chalk";
 import ora from "ora";
 import { FridayRuntime } from "../../core/runtime.ts";
 import type { ProviderName } from "../../core/types.ts";
+import { DEFAULT_PROVIDER } from "../../providers/index.ts";
 
 export function chatCommand(program: Command): void {
 	program
@@ -12,7 +13,7 @@ export function chatCommand(program: Command): void {
 		.option(
 			"-p, --provider <provider>",
 			"LLM provider to use (anthropic, grok)",
-			"anthropic",
+			DEFAULT_PROVIDER,
 		)
 		.option("-m, --model <model>", "Model to use (defaults per provider)")
 		.action(async (options) => {
