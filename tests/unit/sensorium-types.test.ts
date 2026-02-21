@@ -19,8 +19,8 @@ describe("Sensorium types", () => {
 	});
 
 	test("AlertState enum values are correct", () => {
-		expect(AlertState.Normal).toBe("normal");
-		expect(AlertState.High).toBe("high");
-		expect(AlertState.Critical).toBe("critical");
+		expect(AlertState.Normal as string).toBe("normal");
+		expect(AlertState.High as string).toBe("high");
+		expect(AlertState.Critical as string).toBe("critical");
 	});
 });
