@@ -36,6 +36,10 @@ export class GrokProvider implements LLMProvider {
       ],
     });
 
-    return response.choices[0]?.message?.content ?? "";
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error("Grok returned an empty response");
+    }
+    return content;
   }
 }
