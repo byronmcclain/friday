@@ -8,10 +8,12 @@ import {
 } from "../providers/index.ts";
 import type { FridayTool } from "../modules/types.ts";
 import type { SmartsStore } from "../smarts/store.ts";
+import type { Sensorium } from "../sensorium/sensorium.ts";
 
 export interface CortexConfig extends Partial<FridayConfig> {
   injectedProvider?: LLMProvider;
   smartsStore?: SmartsStore;
+  sensorium?: Sensorium;
 }
 
 export class Cortex {
@@ -21,6 +23,7 @@ export class Cortex {
   private conversationHistory: ConversationMessage[];
   private tools: Map<string, FridayTool>;
   private smartsStore?: SmartsStore;
+  private sensorium?: Sensorium;
   private pinnedSmarts = new Set<string>();
 
   constructor(config: CortexConfig = {}) {
@@ -31,6 +34,7 @@ export class Cortex {
     this.conversationHistory = [];
     this.tools = new Map();
     this.smartsStore = config.smartsStore;
+    this.sensorium = config.sensorium;
   }
 
   get providerName(): string {
@@ -98,28 +102,41 @@ export class Cortex {
   }
 
   private async buildSystemPrompt(userMessage: string): Promise<string> {
-    if (!this.smartsStore) return SYSTEM_PROMPT;
+    let prompt = SYSTEM_PROMPT;
 
-    const sections: string[] = [];
+    // SMARTS knowledge enrichment
+    if (this.smartsStore) {
+      const sections: string[] = [];
 
-    for (const name of this.pinnedSmarts) {
-      const entry = await this.smartsStore.getByName(name);
-      if (entry) {
+      for (const name of this.pinnedSmarts) {
+        const entry = await this.smartsStore.getByName(name);
+        if (entry) {
+          const title = entry.content.split("\n")[0]?.replace(/^#+\s*/, "") || entry.name;
+          sections.push(`### ${title} (confidence: ${entry.confidence})\n${entry.content}`);
+        }
+      }
+
+      const relevant = await this.smartsStore.findRelevant(userMessage);
+      for (const entry of relevant) {
+        if (this.pinnedSmarts.has(entry.name)) continue;
         const title = entry.content.split("\n")[0]?.replace(/^#+\s*/, "") || entry.name;
         sections.push(`### ${title} (confidence: ${entry.confidence})\n${entry.content}`);
       }
+
+      if (sections.length > 0) {
+        prompt = `${prompt}\n\n## Active Knowledge\n\nThe following domain knowledge is available for this conversation.\nUse it to inform your responses when relevant.\n\n${sections.join("\n\n")}`;
+      }
     }
 
-    const relevant = await this.smartsStore.findRelevant(userMessage);
-    for (const entry of relevant) {
-      if (this.pinnedSmarts.has(entry.name)) continue;
-      const title = entry.content.split("\n")[0]?.replace(/^#+\s*/, "") || entry.name;
-      sections.push(`### ${title} (confidence: ${entry.confidence})\n${entry.content}`);
+    // Sensorium environment context
+    if (this.sensorium) {
+      const envBlock = this.sensorium.getContextBlock();
+      if (envBlock) {
+        prompt = `${prompt}\n\n## Environment\n\n${envBlock}`;
+      }
     }
 
-    if (sections.length === 0) return SYSTEM_PROMPT;
-
-    return `${SYSTEM_PROMPT}\n\n## Active Knowledge\n\nThe following domain knowledge is available for this conversation.\nUse it to inform your responses when relevant.\n\n${sections.join("\n\n")}`;
+    return prompt;
   }
 }
 

@@ -16,6 +16,10 @@ import { SMARTS_DEFAULTS } from "../smarts/types.ts";
 import { createSmartProtocol } from "../smarts/protocol.ts";
 import { SmartsCurator } from "../smarts/curator.ts";
 import { createHistoryProtocol } from "../history/protocol.ts";
+import { Sensorium } from "../sensorium/sensorium.ts";
+import { createEnvProtocol } from "../sensorium/protocol.ts";
+import { createEnvironmentTool } from "../sensorium/tool.ts";
+import { SENSORIUM_DEFAULTS } from "../sensorium/types.ts";
 import { mkdirSync } from "node:fs";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
@@ -24,6 +28,7 @@ export interface RuntimeConfig extends Partial<FridayConfig> {
 	smartsDir?: string;
 	dataDir?: string;
 	fresh?: boolean;
+	enableSensorium?: boolean;
 }
 
 export interface ProcessResult {
@@ -44,6 +49,7 @@ export class FridayRuntime {
 	private _smarts?: SmartsStore;
 	private _smartsMemory?: SQLiteMemory;
 	private _curator?: SmartsCurator;
+	private _sensorium?: Sensorium;
 	private _memory?: SQLiteMemory;
 	private _sessionId?: string;
 	private _sessionStartedAt?: Date;
@@ -73,6 +79,10 @@ export class FridayRuntime {
 		return this._smarts;
 	}
 
+	get sensorium(): Sensorium | undefined {
+		return this._sensorium;
+	}
+
 	get memory(): SQLiteMemory | undefined {
 		return this._memory;
 	}
@@ -90,6 +100,7 @@ export class FridayRuntime {
 				"git-read",
 				"git-write",
 				"provider",
+				"system",
 			]);
 			this._audit = new AuditLogger();
 			this._notifications = new NotificationManager([new TerminalChannel()]);
@@ -123,11 +134,29 @@ export class FridayRuntime {
 				this._protocols.register(createSmartProtocol(this._smarts));
 			}
 
+			// Sensorium — before Cortex so context block is available from first chat()
+			if (config.enableSensorium !== false) {
+				this._sensorium = new Sensorium({
+					config: SENSORIUM_DEFAULTS,
+					signals: this._signals,
+					notifications: this._notifications,
+				});
+				await this._sensorium.poll();
+				this._sensorium.start();
+				this._protocols.register(createEnvProtocol(this._sensorium));
+			}
+
 			this._cortex = new Cortex({
 				...config,
 				injectedProvider: config.injectedProvider,
 				smartsStore: this._smarts,
+				sensorium: this._sensorium,
 			});
+
+			// Register sensorium tool on Cortex (needs Cortex to exist)
+			if (this._sensorium) {
+				this._cortex.registerTool(createEnvironmentTool(this._sensorium));
+			}
 
 			if (this._smarts) {
 				this._curator = new SmartsCurator(this._smarts, this._cortex.llmProvider);
@@ -167,6 +196,10 @@ export class FridayRuntime {
 		} catch (err) {
 			this._booted = false;
 			this._modules = [];
+			if (this._sensorium) {
+				this._sensorium.stop();
+				this._sensorium = undefined;
+			}
 			if (this._smartsMemory) {
 				this._smartsMemory.close();
 				this._smartsMemory = undefined;
@@ -217,6 +250,12 @@ export class FridayRuntime {
 
 	async shutdown(): Promise<void> {
 		if (!this._booted) throw new Error("Runtime not booted");
+
+		// Stop sensorium polling before cleanup
+		if (this._sensorium) {
+			this._sensorium.stop();
+			this._sensorium = undefined;
+		}
 
 		if (this._memory && this._sessionId && this._sessionStartedAt) {
 			const history = this._cortex.getHistory();
