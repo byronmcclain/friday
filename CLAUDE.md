@@ -68,7 +68,8 @@ src/
 └── utils/                 # Shared utilities — future
 smarts/                    # Seed knowledge files (YAML frontmatter + markdown)
 tests/
-├── unit/                  # Unit tests (bun:test) — ~137 tests across 17 files
+├── helpers/               # Shared test stubs (stubProvider, grokStub)
+├── unit/                  # Unit tests (bun:test) — 150 tests across 17 files
 └── integration/           # Integration tests — future
 ```
 
@@ -88,6 +89,7 @@ tests/
 ## Testing
 
 - Runtime/Cortex tests use `injectedProvider` (stub `LLMProvider`) to avoid needing `ANTHROPIC_API_KEY`
+- Shared test stubs live in `tests/helpers/stubs.ts` — import `stubProvider`/`grokStub` instead of defining inline
 - SQLite tests must clean up WAL files: unlink `db`, `db-wal`, and `db-shm` in afterEach
 - `bun:sqlite` transactions: `db.transaction(() => { ... })()` — must invoke the returned function
 - `node:fs/promises` `appendFile` is an accepted exception where Bun has no native append API
