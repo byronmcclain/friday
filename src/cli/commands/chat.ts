@@ -5,6 +5,7 @@ import ora from "ora";
 import { FridayRuntime } from "../../core/runtime.ts";
 import type { ProviderName } from "../../core/types.ts";
 import { DEFAULT_PROVIDER } from "../../providers/index.ts";
+import { renderMarkdown } from "../render.ts";
 
 export function chatCommand(program: Command): void {
 	program
@@ -75,7 +76,7 @@ export function chatCommand(program: Command): void {
 						result.source === "protocol"
 							? chalk.magenta("Protocol >")
 							: chalk.cyan("Friday >");
-					console.log(`\n${prefix} ${result.output}\n`);
+					console.log(`\n${prefix} ${renderMarkdown(result.output)}`);
 				} catch (error) {
 					spinner.fail(chalk.red("Something went wrong"));
 					if (error instanceof Error) {
