@@ -60,7 +60,7 @@ src/
 ├── config/                # Runtime configuration loading — future
 └── utils/                 # Shared utilities — future
 tests/
-├── unit/                  # Unit tests (bun:test) — ~74 tests across 12 files
+├── unit/                  # Unit tests (bun:test) — ~84 tests across 12 files
 └── integration/           # Integration tests — future
 ```
 
@@ -75,6 +75,13 @@ tests/
 - **Commands** are registered via Commander.js in `src/cli/index.ts`. Each command lives in its own file under `src/cli/commands/`.
 - **Types** are split by domain: core config in `src/core/types.ts`, tool/module contracts in `src/modules/types.ts`, directive structures in `src/directives/types.ts`.
 - **Prompts** live in `src/core/prompts.ts` as exported constants. Friday's personality is defined here — keep it consistent when modifying.
+
+## Testing
+
+- Runtime/Cortex tests use `injectedProvider` (stub `LLMProvider`) to avoid needing `ANTHROPIC_API_KEY`
+- SQLite tests must clean up WAL files: unlink `db`, `db-wal`, and `db-shm` in afterEach
+- `bun:sqlite` transactions: `db.transaction(() => { ... })()` — must invoke the returned function
+- `node:fs/promises` `appendFile` is an accepted exception where Bun has no native append API
 
 ## Bun-Specific Rules
 
@@ -104,7 +111,6 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 ## Design Documents
 
 - Architecture design: `docs/plans/2026-02-21-friday-agent-runtime-design.md`
-- Implementation plan: `docs/plans/2026-02-21-friday-agent-runtime-implementation.md`
 - MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission
 
 ## Worktrees
