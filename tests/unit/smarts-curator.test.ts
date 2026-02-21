@@ -106,6 +106,28 @@ describe("SmartsCurator", () => {
     expect(store.all()).toHaveLength(0);
   });
 
+  test("handles JSON wrapped in markdown code fences", async () => {
+    const fencedProvider: LLMProvider = {
+      name: "fenced",
+      defaultModel: "fenced",
+      chat: async () => `Here are the results:
+
+\`\`\`json
+[{"name": "fenced-knowledge", "domain": "test", "tags": ["fenced"], "confidence": 0.8, "content": "# Fenced\\n\\nExtracted from fences."}]
+\`\`\`
+
+That's what I found.`,
+    };
+    const curator = new SmartsCurator(store, fencedProvider);
+    const messages: ConversationMessage[] = Array.from({ length: 10 }, (_, i) => ({
+      role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
+      content: `Message ${i}`,
+    }));
+    await curator.extractFromConversation(messages);
+    expect(store.all()).toHaveLength(1);
+    expect(store.all()[0]!.name).toBe("fenced-knowledge");
+  });
+
   test("handles provider error gracefully", async () => {
     const failingProvider: LLMProvider = {
       name: "failing",
