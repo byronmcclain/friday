@@ -133,6 +133,45 @@ describe("SQLiteMemory — Conversation History", () => {
     const history = await memory.getConversationHistory(2);
     expect(history).toHaveLength(2);
   });
+
+  test("getConversationById returns a specific session", async () => {
+    await memory.saveConversation({
+      id: "sess-abc",
+      startedAt: new Date("2026-01-15"),
+      provider: "grok",
+      model: "grok-3",
+      messages: [{ role: "user", content: "Hi" }],
+    });
+    const session = await memory.getConversationById("sess-abc");
+    expect(session).toBeDefined();
+    expect(session!.id).toBe("sess-abc");
+    expect(session!.messages).toHaveLength(1);
+  });
+
+  test("getConversationById returns undefined for missing id", async () => {
+    const session = await memory.getConversationById("nonexistent");
+    expect(session).toBeUndefined();
+  });
+
+  test("deleteAllConversations removes all sessions", async () => {
+    await memory.saveConversation({
+      id: "sess-1",
+      startedAt: new Date("2026-01-01"),
+      provider: "grok",
+      model: "grok-3",
+      messages: [],
+    });
+    await memory.saveConversation({
+      id: "sess-2",
+      startedAt: new Date("2026-01-02"),
+      provider: "grok",
+      model: "grok-3",
+      messages: [],
+    });
+    await memory.deleteAllConversations();
+    const history = await memory.getConversationHistory(10);
+    expect(history).toHaveLength(0);
+  });
 });
 
 describe("SQLiteMemory — Semantic Search", () => {

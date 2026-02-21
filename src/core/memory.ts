@@ -141,6 +141,39 @@ export class SQLiteMemory {
     }));
   }
 
+  async getConversationById(id: string): Promise<ConversationSession | undefined> {
+    const row = this.db
+      .query<
+        {
+          id: string;
+          started_at: string;
+          ended_at: string | null;
+          provider: string;
+          model: string;
+          messages: string;
+          summary: string | null;
+        },
+        [string]
+      >("SELECT * FROM conversations WHERE id = ?")
+      .get(id);
+
+    if (!row) return undefined;
+
+    return {
+      id: row.id,
+      startedAt: new Date(row.started_at),
+      endedAt: row.ended_at ? new Date(row.ended_at) : undefined,
+      provider: row.provider,
+      model: row.model,
+      messages: JSON.parse(row.messages) as ConversationMessage[],
+      summary: row.summary ?? undefined,
+    };
+  }
+
+  async deleteAllConversations(): Promise<void> {
+    this.db.query("DELETE FROM conversations").run();
+  }
+
   async embed(
     namespace: string,
     content: string,
