@@ -33,6 +33,17 @@ export function chatCommand(program: Command): void {
 				process.exit(1);
 			}
 
+			let shuttingDown = false;
+			const gracefulShutdown = async () => {
+				if (shuttingDown) return;
+				shuttingDown = true;
+				console.log(chalk.dim("\nShutting down gracefully..."));
+				await runtime.shutdown();
+				process.exit(0);
+			};
+			process.on("SIGINT", gracefulShutdown);
+			process.on("SIGTERM", gracefulShutdown);
+
 			const providerLabel = chalk.dim(
 				`(${runtime.cortex.providerName}: ${runtime.cortex.modelName})`,
 			);
