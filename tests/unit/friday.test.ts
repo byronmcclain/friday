@@ -178,3 +178,59 @@ describe("Cortex — SMARTS integration", () => {
     expect(capturedPrompt).not.toContain("Security Basics");
   });
 });
+
+describe("Cortex — Sensorium integration", () => {
+  test("system prompt includes environment context when sensorium provided", async () => {
+    const { Sensorium } = await import("../../src/sensorium/sensorium.ts");
+    const { SignalBus } = await import("../../src/core/events.ts");
+    const { NotificationManager } = await import(
+      "../../src/core/notifications.ts"
+    );
+    const { SENSORIUM_DEFAULTS } = await import(
+      "../../src/sensorium/types.ts"
+    );
+
+    const sensorium = new Sensorium({
+      config: SENSORIUM_DEFAULTS,
+      signals: new SignalBus(),
+      notifications: new NotificationManager(),
+    });
+    await sensorium.poll();
+
+    let capturedPrompt = "";
+    const capturingProvider: LLMProvider = {
+      name: "capturing",
+      defaultModel: "capture",
+      chat: async (systemPrompt) => {
+        capturedPrompt = systemPrompt;
+        return "ok";
+      },
+    };
+
+    const cortex = new Cortex({
+      injectedProvider: capturingProvider,
+      sensorium,
+    });
+    await cortex.chat("Hello");
+
+    expect(capturedPrompt).toContain("[ENVIRONMENT]");
+    expect(capturedPrompt).toContain("cores");
+  });
+
+  test("works without sensorium (backwards compatible)", async () => {
+    let capturedPrompt = "";
+    const capturingProvider: LLMProvider = {
+      name: "capturing",
+      defaultModel: "capture",
+      chat: async (systemPrompt) => {
+        capturedPrompt = systemPrompt;
+        return "ok";
+      },
+    };
+
+    const cortex = new Cortex({ injectedProvider: capturingProvider });
+    await cortex.chat("Hello");
+
+    expect(capturedPrompt).not.toContain("[ENVIRONMENT]");
+  });
+});

@@ -269,8 +269,70 @@ describe("FridayRuntime — conversation persistence", () => {
 		await runtime1.shutdown();
 
 		const runtime2 = new FridayRuntime();
-		await runtime2.boot({ injectedProvider: stubProvider, dataDir, fresh: true });
+		await runtime2.boot({
+			injectedProvider: stubProvider,
+			dataDir,
+			fresh: true,
+		});
 		expect(runtime2.cortex.historyLength).toBe(0);
 		await runtime2.shutdown();
+	});
+});
+
+describe("FridayRuntime — Sensorium integration", () => {
+	test("boots with sensorium enabled by default", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider });
+		expect(runtime.sensorium).toBeDefined();
+		expect(runtime.sensorium!.currentSnapshot).not.toBeNull();
+		expect(runtime.sensorium!.isRunning).toBe(true);
+		await runtime.shutdown();
+	});
+
+	test("sensorium disabled when enableSensorium is false", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({
+			injectedProvider: stubProvider,
+			enableSensorium: false,
+		});
+		expect(runtime.sensorium).toBeUndefined();
+		await runtime.shutdown();
+	});
+
+	test("shutdown stops sensorium polling", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider });
+		expect(runtime.sensorium!.isRunning).toBe(true);
+		await runtime.shutdown();
+	});
+
+	test("/env protocol is registered when sensorium is enabled", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider });
+		const envProtocol = runtime.protocols.get("env");
+		expect(envProtocol).toBeDefined();
+		expect(envProtocol!.name).toBe("env");
+		await runtime.shutdown();
+	});
+
+	test("process sends environment context in system prompt", async () => {
+		let capturedPrompt = "";
+		const capturingProvider: LLMProvider = {
+			name: "capturing",
+			defaultModel: "capture",
+			chat: async (systemPrompt) => {
+				capturedPrompt = systemPrompt;
+				return "I can see the system!";
+			},
+		};
+
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: capturingProvider });
+		await runtime.process("What's the system status?");
+
+		expect(capturedPrompt).toContain("[ENVIRONMENT]");
+		expect(capturedPrompt).toContain("cores");
+
+		await runtime.shutdown();
 	});
 });
