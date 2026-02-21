@@ -1,0 +1,58 @@
+export type SignalName =
+  | "file:changed"
+  | "file:created"
+  | "file:deleted"
+  | "test:passed"
+  | "test:failed"
+  | "command:pre-execute"
+  | "command:post-execute"
+  | "command:pre-commit"
+  | "session:start"
+  | "session:end"
+  | "error:unhandled"
+  | `custom:${string}`;
+
+export interface Signal {
+  name: SignalName;
+  timestamp: Date;
+  source: string;
+  data?: Record<string, unknown>;
+}
+
+export type SignalHandler = (signal: Signal) => void | Promise<void>;
+
+export interface SignalEmitter {
+  emit(name: SignalName, source: string, data?: Record<string, unknown>): Promise<void>;
+}
+
+export class SignalBus implements SignalEmitter {
+  private listeners = new Map<SignalName, Set<SignalHandler>>();
+
+  on(name: SignalName, handler: SignalHandler): void {
+    if (!this.listeners.has(name)) {
+      this.listeners.set(name, new Set());
+    }
+    this.listeners.get(name)!.add(handler);
+  }
+
+  off(name: SignalName, handler: SignalHandler): void {
+    this.listeners.get(name)?.delete(handler);
+  }
+
+  once(name: SignalName, handler: SignalHandler): void {
+    const wrapper: SignalHandler = async (signal) => {
+      this.off(name, wrapper);
+      await handler(signal);
+    };
+    this.on(name, wrapper);
+  }
+
+  async emit(name: SignalName, source: string, data?: Record<string, unknown>): Promise<void> {
+    const signal: Signal = { name, timestamp: new Date(), source, data };
+    const handlers = this.listeners.get(name);
+    if (!handlers) return;
+    for (const handler of handlers) {
+      await handler(signal);
+    }
+  }
+}
