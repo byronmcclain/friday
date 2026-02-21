@@ -6,11 +6,15 @@ import { chatCommand } from "./commands/chat.ts";
 
 const program = new Command();
 
+let bannerShown = false;
+
 program
   .name("friday")
   .description(description)
   .version(version)
   .hook("preAction", () => {
+    if (bannerShown) return;
+    bannerShown = true;
     console.log(
       boxen(chalk.cyan.bold("F.R.I.D.A.Y.") + "\n" + chalk.dim("Female Replacement Intelligent Digital Assistant Youth"), {
         padding: 1,

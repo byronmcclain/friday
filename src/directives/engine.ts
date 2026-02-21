@@ -22,6 +22,8 @@ export class DirectiveEngine {
   private audit: AuditLogger;
   private clearance: ClearanceManager;
   private actionHandler?: DirectiveActionHandler;
+  private subscribedSignals = new Set<SignalName>();
+  private boundHandler = (signal: Signal) => this.handleSignal(signal);
 
   constructor(config: DirectiveEngineConfig) {
     this.store = config.store;
@@ -35,29 +37,41 @@ export class DirectiveEngine {
   }
 
   start(): void {
-    const signalTypes: SignalName[] = [
-      "file:changed",
-      "file:created",
-      "file:deleted",
-      "test:passed",
-      "test:failed",
-      "command:pre-execute",
-      "command:post-execute",
-      "command:pre-commit",
-      "session:start",
-      "session:end",
-      "error:unhandled",
-    ];
+    this.syncSubscriptions();
+    this.store.onStoreChange(() => this.syncSubscriptions());
+  }
 
-    for (const signalName of signalTypes) {
-      this.signals.on(signalName, (signal) => this.handleSignal(signal));
+  private syncSubscriptions(): void {
+    const needed = new Set<SignalName>();
+    for (const directive of this.store.listEnabled()) {
+      if (directive.trigger.type === "signal") {
+        needed.add(directive.trigger.signal);
+      }
+    }
+
+    for (const signal of this.subscribedSignals) {
+      if (!needed.has(signal)) {
+        this.signals.off(signal, this.boundHandler);
+        this.subscribedSignals.delete(signal);
+      }
+    }
+
+    for (const signal of needed) {
+      if (!this.subscribedSignals.has(signal)) {
+        this.signals.on(signal, this.boundHandler);
+        this.subscribedSignals.add(signal);
+      }
     }
   }
 
   private async handleSignal(signal: Signal): Promise<void> {
     const directives = this.store.findBySignal(signal.name);
     for (const directive of directives) {
-      await this.executeDirective(directive, signal);
+      try {
+        await this.executeDirective(directive, signal);
+      } catch (err) {
+        console.error(`Directive '${directive.name}' error:`, err);
+      }
     }
   }
 
@@ -78,6 +92,21 @@ export class DirectiveEngine {
       }
     }
 
+    if (this.actionHandler) {
+      try {
+        await this.actionHandler(directive, directive.action);
+      } catch (err) {
+        this.audit.log({
+          action: "directive:error",
+          source: directive.name,
+          detail: `Handler failed: ${err instanceof Error ? err.message : String(err)}`,
+          success: false,
+          metadata: { signal: signal.name, directiveId: directive.id },
+        });
+        return;
+      }
+    }
+
     this.store.update(directive.id, {
       executionCount: directive.executionCount + 1,
     });
@@ -89,9 +118,5 @@ export class DirectiveEngine {
       success: true,
       metadata: { signal: signal.name, directiveId: directive.id },
     });
-
-    if (this.actionHandler) {
-      await this.actionHandler(directive, directive.action);
-    }
   }
 }

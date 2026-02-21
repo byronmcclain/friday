@@ -147,17 +147,19 @@ export class SQLiteMemory {
     metadata?: Record<string, unknown>,
   ): Promise<string> {
     const id = crypto.randomUUID();
-    this.db
-      .query("INSERT INTO embeddings (id, namespace, content, metadata) VALUES (?, ?, ?, ?)")
-      .run(id, namespace, content, metadata ? JSON.stringify(metadata) : null);
-    const row = this.db
-      .query<{ rowid: number }, [string]>("SELECT rowid FROM embeddings WHERE id = ?")
-      .get(id);
-    if (row) {
+    this.db.transaction(() => {
       this.db
-        .query("INSERT INTO embeddings_fts (rowid, content) VALUES (?, ?)")
-        .run(row.rowid, content);
-    }
+        .query("INSERT INTO embeddings (id, namespace, content, metadata) VALUES (?, ?, ?, ?)")
+        .run(id, namespace, content, metadata ? JSON.stringify(metadata) : null);
+      const row = this.db
+        .query<{ rowid: number }, [string]>("SELECT rowid FROM embeddings WHERE id = ?")
+        .get(id);
+      if (row) {
+        this.db
+          .query("INSERT INTO embeddings_fts (rowid, content) VALUES (?, ?)")
+          .run(row.rowid, content);
+      }
+    })();
     return id;
   }
 
@@ -196,8 +198,8 @@ export class SQLiteMemory {
 
   async forget(namespace: string, embeddingId: string): Promise<void> {
     const row = this.db
-      .query<{ rowid: number }, [string]>("SELECT rowid FROM embeddings WHERE id = ?")
-      .get(embeddingId);
+      .query<{ rowid: number }, [string, string]>("SELECT rowid FROM embeddings WHERE id = ? AND namespace = ?")
+      .get(embeddingId, namespace);
     if (row) {
       this.db.query("DELETE FROM embeddings_fts WHERE rowid = ?").run(row.rowid);
     }

@@ -101,4 +101,40 @@ describe("DirectiveEngine", () => {
     await signals.emit("session:start", "test");
     expect(store.get("d1")?.executionCount).toBe(1);
   });
+
+  test("does not increment count when handler throws", async () => {
+    store.add({
+      id: "d1",
+      name: "failing",
+      description: "Test",
+      enabled: true,
+      trigger: { type: "signal", signal: "file:changed" },
+      action: { type: "tool", tool: "bad-tool" },
+      clearance: [],
+      executionCount: 0,
+    });
+    engine.onDirectiveAction(() => { throw new Error("handler failed"); });
+    engine.start();
+    await signals.emit("file:changed", "test");
+    expect(store.get("d1")?.executionCount).toBe(0);
+    expect(audit.entries().some((e) => e.action === "directive:error")).toBe(true);
+  });
+
+  test("fires directive added after start with custom signal", async () => {
+    const executed = mock(() => {});
+    engine.onDirectiveAction(executed);
+    engine.start();
+    store.add({
+      id: "d1",
+      name: "deploy-watcher",
+      description: "Test",
+      enabled: true,
+      trigger: { type: "signal", signal: "custom:deploy" },
+      action: { type: "prompt", prompt: "deploy triggered" },
+      clearance: [],
+      executionCount: 0,
+    });
+    await signals.emit("custom:deploy", "test");
+    expect(executed).toHaveBeenCalledTimes(1);
+  });
 });

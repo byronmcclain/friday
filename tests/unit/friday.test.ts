@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { SYSTEM_PROMPT } from "../../src/core/prompts.ts";
 import { Cortex } from "../../src/core/cortex.ts";
+import type { LLMProvider } from "../../src/providers/types.ts";
 
 describe("Cortex", () => {
   test("system prompt is defined and non-empty", () => {
@@ -43,5 +44,19 @@ describe("Cortex", () => {
     });
     expect(cortex.availableTools).toHaveLength(1);
     expect(cortex.availableTools[0]!.name).toBe("test-tool");
+  });
+
+  test("chat error rolls back history", async () => {
+    const failingProvider: LLMProvider = {
+      name: "failing",
+      defaultModel: "fail-model",
+      chat: async () => { throw new Error("API error"); },
+    };
+    const cortex = new Cortex({ injectedProvider: failingProvider });
+    expect(cortex.historyLength).toBe(0);
+    try {
+      await cortex.chat("hello");
+    } catch {}
+    expect(cortex.historyLength).toBe(0);
   });
 });

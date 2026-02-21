@@ -61,4 +61,11 @@ describe("ProtocolRegistry", () => {
     expect(parsed?.name).toBe("deploy");
     expect(parsed?.rawArgs).toBe("--env production");
   });
+
+  test("double-register overwrites without throwing", () => {
+    const registry = new ProtocolRegistry();
+    registry.register(makeProtocol("deploy"));
+    registry.register(makeProtocol("deploy"));
+    expect(registry.list()).toHaveLength(1);
+  });
 });

@@ -52,7 +52,11 @@ export class SignalBus implements SignalEmitter {
     const handlers = this.listeners.get(name);
     if (!handlers) return;
     for (const handler of handlers) {
-      await handler(signal);
+      try {
+        await handler(signal);
+      } catch (err) {
+        console.error(`Signal handler error for '${name}':`, err);
+      }
     }
   }
 }

@@ -1,5 +1,7 @@
 import type { AuditEntry, AuditFilter } from "./types.ts";
 
+// TODO: Persist audit entries to SQLite for durability across sessions.
+// Currently in-memory only — entries are lost on shutdown.
 export class AuditLogger {
   private logEntries: AuditEntry[] = [];
 

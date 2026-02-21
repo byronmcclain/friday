@@ -23,6 +23,13 @@ export class AnthropicProvider implements LLMProvider {
       messages,
     });
 
-    return response.content[0]?.type === "text" ? response.content[0].text : "";
+    if (response.content.length === 0) {
+      throw new Error("Anthropic returned empty response");
+    }
+    const block = response.content[0];
+    if (block?.type !== "text") {
+      throw new Error(`Unexpected Anthropic content type: ${block?.type}`);
+    }
+    return block.text;
   }
 }

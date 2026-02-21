@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import { appendFile } from "node:fs/promises";
 
 export interface FridayNotification {
   level: "info" | "warning" | "alert";
@@ -75,9 +76,7 @@ export class LogChannel implements NotificationChannel {
 
   async send(notification: FridayNotification): Promise<void> {
     const line = `[${new Date().toISOString()}] [${notification.level.toUpperCase()}] [${notification.source}] ${notification.title}: ${notification.body}\n`;
-    const file = Bun.file(this.logPath);
-    const existing = (await file.exists()) ? await file.text() : "";
-    await Bun.write(this.logPath, existing + line);
+    await appendFile(this.logPath, line);
   }
 }
 
@@ -92,11 +91,14 @@ export class WebhookChannel implements NotificationChannel {
   }
 
   async send(notification: FridayNotification): Promise<void> {
-    await fetch(this.url, {
+    const response = await fetch(this.url, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...this.headers },
       body: JSON.stringify(notification),
     });
+    if (!response.ok) {
+      throw new Error(`Webhook failed: ${response.status} ${response.statusText}`);
+    }
   }
 }
 
@@ -114,12 +116,15 @@ export class SlackChannel implements NotificationChannel {
       warning: ":warning:",
       alert: ":rotating_light:",
     };
-    await fetch(this.webhookUrl, {
+    const response = await fetch(this.webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         text: `${emoji[notification.level]} *${notification.title}*\n${notification.body}`,
       }),
     });
+    if (!response.ok) {
+      throw new Error(`Slack webhook failed: ${response.status} ${response.statusText}`);
+    }
   }
 }

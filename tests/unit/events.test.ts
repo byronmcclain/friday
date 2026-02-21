@@ -57,4 +57,15 @@ describe("SignalBus", () => {
     await bus.emit("custom:my-event" as SignalName, "test");
     expect(handler).toHaveBeenCalledTimes(1);
   });
+
+  test("failing handler does not prevent others from running", async () => {
+    const bus = new SignalBus();
+    const h1 = mock(() => { throw new Error("boom"); });
+    const h2 = mock(() => {});
+    bus.on("file:changed", h1);
+    bus.on("file:changed", h2);
+    await bus.emit("file:changed", "test");
+    expect(h1).toHaveBeenCalledTimes(1);
+    expect(h2).toHaveBeenCalledTimes(1);
+  });
 });

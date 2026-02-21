@@ -10,8 +10,14 @@ export class ProtocolRegistry {
   private aliases = new Map<string, string>();
 
   register(protocol: FridayProtocol): void {
+    if (this.protocols.has(protocol.name)) {
+      console.warn(`Protocol '${protocol.name}' already registered — overwriting`);
+    }
     this.protocols.set(protocol.name, protocol);
     for (const alias of protocol.aliases) {
+      if (this.aliases.has(alias)) {
+        console.warn(`Protocol alias '${alias}' already registered — overwriting`);
+      }
       this.aliases.set(alias, protocol.name);
     }
   }

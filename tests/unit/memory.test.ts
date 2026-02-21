@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { SQLiteMemory } from "../../src/core/memory.ts";
-import { unlinkSync } from "node:fs";
+import { unlink } from "node:fs/promises";
 
 const TEST_DB = "/tmp/friday-test-memory.db";
 
@@ -11,9 +11,13 @@ describe("SQLiteMemory — Key-Value", () => {
     memory = new SQLiteMemory(TEST_DB);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     memory.close();
-    try { unlinkSync(TEST_DB); } catch {}
+    await Promise.allSettled([
+      unlink(TEST_DB),
+      unlink(`${TEST_DB}-wal`),
+      unlink(`${TEST_DB}-shm`),
+    ]);
   });
 
   test("set and get a string value", async () => {
@@ -70,9 +74,13 @@ describe("SQLiteMemory — Conversation History", () => {
     memory = new SQLiteMemory(TEST_DB);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     memory.close();
-    try { unlinkSync(TEST_DB); } catch {}
+    await Promise.allSettled([
+      unlink(TEST_DB),
+      unlink(`${TEST_DB}-wal`),
+      unlink(`${TEST_DB}-shm`),
+    ]);
   });
 
   test("save and retrieve a conversation", async () => {
@@ -134,9 +142,13 @@ describe("SQLiteMemory — Semantic Search", () => {
     memory = new SQLiteMemory(TEST_DB);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     memory.close();
-    try { unlinkSync(TEST_DB); } catch {}
+    await Promise.allSettled([
+      unlink(TEST_DB),
+      unlink(`${TEST_DB}-wal`),
+      unlink(`${TEST_DB}-shm`),
+    ]);
   });
 
   test("embed stores content and returns an id", async () => {
@@ -172,5 +184,15 @@ describe("SQLiteMemory — Semantic Search", () => {
     await memory.embed("test-ns", "Important fact", { source: "user", priority: "high" });
     const results = await memory.search("test-ns", "Important", 1);
     expect(results[0]?.metadata?.source).toBe("user");
+  });
+
+  test("forget respects namespace isolation", async () => {
+    const idA = await memory.embed("ns-a", "Shared content about dogs");
+    const idB = await memory.embed("ns-b", "Shared content about dogs");
+    await memory.forget("ns-b", idA);
+    const resultsA = await memory.search("ns-a", "dogs", 10);
+    const resultsB = await memory.search("ns-b", "dogs", 10);
+    expect(resultsA).toHaveLength(1);
+    expect(resultsB).toHaveLength(1);
   });
 });

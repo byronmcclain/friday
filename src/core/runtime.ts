@@ -1,5 +1,6 @@
 import type { FridayConfig } from "./types.ts";
 import { Cortex } from "./cortex.ts";
+import type { LLMProvider } from "../providers/index.ts";
 import { SignalBus } from "./events.ts";
 import { ClearanceManager } from "./clearance.ts";
 import { AuditLogger } from "../audit/logger.ts";
@@ -12,6 +13,7 @@ import type { FridayModule } from "../modules/types.ts";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
 	modulesDir?: string;
+	injectedProvider?: LLMProvider;
 }
 
 export interface ProcessResult {
@@ -52,79 +54,94 @@ export class FridayRuntime {
 	}
 
 	async boot(config: RuntimeConfig = {}): Promise<void> {
-		this._signals = new SignalBus();
-		this._clearance = new ClearanceManager([
-			"read-fs",
-			"write-fs",
-			"exec-shell",
-			"network",
-			"git-read",
-			"git-write",
-			"provider",
-		]);
-		this._audit = new AuditLogger();
-		this._notifications = new NotificationManager([new TerminalChannel()]);
-		this._protocols = new ProtocolRegistry();
-		this._directives = new DirectiveStore();
-		this._directiveEngine = new DirectiveEngine({
-			store: this._directives,
-			signals: this._signals,
-			audit: this._audit,
-			clearance: this._clearance,
-		});
-		this._directiveEngine.start();
-		this._cortex = new Cortex(config);
+		if (this._booted) await this.shutdown();
 
-		if (config.modulesDir) {
-			this._modules = await discoverModules(config.modulesDir);
-			for (const mod of this._modules) {
-				for (const tool of mod.tools) {
-					this._cortex.registerTool(tool);
-				}
-				for (const protocol of mod.protocols) {
-					this._protocols.register(protocol);
-				}
-				if (mod.onLoad) {
-					await mod.onLoad();
+		try {
+			this._signals = new SignalBus();
+			this._clearance = new ClearanceManager([
+				"read-fs",
+				"write-fs",
+				"exec-shell",
+				"network",
+				"git-read",
+				"git-write",
+				"provider",
+			]);
+			this._audit = new AuditLogger();
+			this._notifications = new NotificationManager([new TerminalChannel()]);
+			this._protocols = new ProtocolRegistry();
+			this._directives = new DirectiveStore();
+			this._directiveEngine = new DirectiveEngine({
+				store: this._directives,
+				signals: this._signals,
+				audit: this._audit,
+				clearance: this._clearance,
+			});
+			this._directiveEngine.start();
+			this._cortex = new Cortex({
+				...config,
+				injectedProvider: config.injectedProvider,
+			});
+
+			if (config.modulesDir) {
+				this._modules = await discoverModules(config.modulesDir);
+				for (const mod of this._modules) {
+					for (const tool of mod.tools) {
+						this._cortex.registerTool(tool);
+					}
+					for (const protocol of mod.protocols) {
+						this._protocols.register(protocol);
+					}
+					if (mod.onLoad) {
+						await mod.onLoad();
+					}
 				}
 			}
+
+			await this._signals.emit("session:start", "runtime");
+			this._booted = true;
+
+			this._audit.log({
+				action: "runtime:boot",
+				source: "runtime",
+				detail: `Friday online. Provider: ${this._cortex.providerName}, Modules: ${this._modules.length}`,
+				success: true,
+			});
+		} catch (err) {
+			this._booted = false;
+			this._modules = [];
+			throw err;
 		}
-
-		await this._signals.emit("session:start", "runtime");
-		this._booted = true;
-
-		this._audit.log({
-			action: "runtime:boot",
-			source: "runtime",
-			detail: `Friday online. Provider: ${this._cortex.providerName}, Modules: ${this._modules.length}`,
-			success: true,
-		});
 	}
 
 	async process(input: string): Promise<ProcessResult> {
+		if (!this._booted) throw new Error("Runtime not booted");
+
 		if (this._protocols.isProtocol(input)) {
 			const parsed = this._protocols.parseProtocolInput(input);
-			if (parsed) {
-				const protocol = this._protocols.get(parsed.name);
-				if (protocol) {
-					const result = await protocol.execute(
-						{},
-						{
-							workingDirectory: process.cwd(),
-							audit: this._audit,
-							signal: this._signals,
-							memory: {
-								get: async () => undefined,
-								set: async () => {},
-								delete: async () => {},
-								list: async () => [],
-							},
-							tools: new Map(),
-						},
-					);
-					return { output: result.summary, source: "protocol" };
-				}
+			if (!parsed) {
+				return { output: "Failed to parse protocol input", source: "protocol" };
 			}
+			const protocol = this._protocols.get(parsed.name);
+			if (!protocol) {
+				return { output: `Unknown protocol: ${parsed.name}`, source: "protocol" };
+			}
+			const result = await protocol.execute(
+				{ rawArgs: parsed.rawArgs },
+				{
+					workingDirectory: process.cwd(),
+					audit: this._audit,
+					signal: this._signals,
+					memory: {
+						get: async () => undefined,
+						set: async () => {},
+						delete: async () => {},
+						list: async () => [],
+					},
+					tools: new Map(),
+				},
+			);
+			return { output: result.summary, source: "protocol" };
 		}
 
 		const response = await this._cortex.chat(input);
@@ -133,6 +150,7 @@ export class FridayRuntime {
 	}
 
 	async shutdown(): Promise<void> {
+		if (!this._booted) throw new Error("Runtime not booted");
 		await this._signals.emit("session:end", "runtime");
 		for (const mod of this._modules) {
 			if (mod.onUnload) {

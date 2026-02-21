@@ -8,6 +8,10 @@ import {
 } from "../providers/index.ts";
 import type { FridayTool } from "../modules/types.ts";
 
+export interface CortexConfig extends Partial<FridayConfig> {
+  injectedProvider?: LLMProvider;
+}
+
 export class Cortex {
   private provider: LLMProvider;
   private model: string;
@@ -15,9 +19,9 @@ export class Cortex {
   private conversationHistory: ConversationMessage[];
   private tools: Map<string, FridayTool>;
 
-  constructor(config: Partial<FridayConfig> = {}) {
+  constructor(config: CortexConfig = {}) {
     const providerName = config.provider ?? DEFAULT_PROVIDER;
-    this.provider = createProvider(providerName);
+    this.provider = config.injectedProvider ?? createProvider(providerName);
     this.model = config.model ?? PROVIDER_DEFAULTS[providerName];
     this.maxTokens = config.maxTokens ?? 4096;
     this.conversationHistory = [];
@@ -43,11 +47,17 @@ export class Cortex {
   async chat(userMessage: string): Promise<string> {
     this.conversationHistory.push({ role: "user", content: userMessage });
 
-    const assistantMessage = await this.provider.chat(
-      SYSTEM_PROMPT,
-      this.conversationHistory,
-      { model: this.model, maxTokens: this.maxTokens },
-    );
+    let assistantMessage: string;
+    try {
+      assistantMessage = await this.provider.chat(
+        SYSTEM_PROMPT,
+        this.conversationHistory,
+        { model: this.model, maxTokens: this.maxTokens },
+      );
+    } catch (err) {
+      this.conversationHistory.pop();
+      throw err;
+    }
 
     this.conversationHistory.push({ role: "assistant", content: assistantMessage });
     return assistantMessage;
