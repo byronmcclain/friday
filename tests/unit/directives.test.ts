@@ -55,6 +55,22 @@ describe("DirectiveStore", () => {
     expect(store.get("d1")?.name).toBe("new");
   });
 
+  test("update fires onChange callback", () => {
+    let fired = false;
+    store.onStoreChange(() => { fired = true; });
+    store.add(makeDirective({ id: "d1" }));
+    fired = false;
+    store.update("d1", { name: "updated" });
+    expect(fired).toBe(true);
+  });
+
+  test("update on nonexistent ID does not fire onChange", () => {
+    let fired = false;
+    store.onStoreChange(() => { fired = true; });
+    store.update("nonexistent", { name: "nope" });
+    expect(fired).toBe(false);
+  });
+
   test("finds directives by signal trigger", () => {
     store.add(
       makeDirective({

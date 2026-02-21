@@ -27,6 +27,7 @@ export class DirectiveStore {
     const existing = this.directives.get(id);
     if (existing) {
       this.directives.set(id, { ...existing, ...updates });
+      this.onChange?.();
     }
   }
 
