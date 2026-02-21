@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Runtime**: Bun (not Node.js)
 - **Language**: TypeScript (strict mode)
-- **AI Provider**: Anthropic Claude via `@anthropic-ai/sdk`
+- **AI Providers**: Anthropic Claude (`@anthropic-ai/sdk`) and xAI Grok (`openai` SDK with xAI base URL)
 - **CLI Framework**: Commander.js
 - **Linter/Formatter**: Biome (not ESLint/Prettier)
 
@@ -92,6 +92,7 @@ Default to Bun APIs instead of Node.js equivalents or third-party packages:
 ## Environment
 
 Requires `ANTHROPIC_API_KEY` in `.env` (see `.env.example`). Bun loads this automatically.
+Optional: `XAI_API_KEY` for Grok provider (`--provider grok`).
 
 ## Docker
 
@@ -99,6 +100,17 @@ Requires `ANTHROPIC_API_KEY` in `.env` (see `.env.example`). Bun loads this auto
 docker build -t friday .
 docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 ```
+
+## Design Documents
+
+- Architecture design: `docs/plans/2026-02-21-friday-agent-runtime-design.md`
+- Implementation plan: `docs/plans/2026-02-21-friday-agent-runtime-implementation.md`
+- MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission
+
+## Worktrees
+
+Feature work uses git worktrees in `.worktrees/` (gitignored). Create with:
+`git worktree add .worktrees/<name> -b feature/<name>`
 
 ## Conventions
 
