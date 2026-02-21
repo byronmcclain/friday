@@ -1,0 +1,38 @@
+{
+  "name": "friday",
+  "version": "0.1.0",
+  "description": "F.R.I.D.A.Y. — AI personal assistant inspired by Tony Stark's assistant",
+  "module": "src/main.ts",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "friday": "src/main.ts"
+  },
+  "scripts": {
+    "start": "bun run src/main.ts",
+    "dev": "bun --watch run src/main.ts",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "lint": "bunx @biomejs/biome check src/ tests/",
+    "lint:fix": "bunx @biomejs/biome check --write src/ tests/",
+    "format": "bunx @biomejs/biome format --write src/ tests/",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "boxen": "^8.0.1",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "inquirer": "^13.2.5",
+    "openai": "^6.22.0",
+    "ora": "^9.3.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/inquirer": "^9.0.9",
+    "biome": "^0.3.3"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
