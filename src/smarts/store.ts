@@ -20,32 +20,44 @@ export class SmartsStore {
 
     const dir = resolve(config.smartsDir);
     await mkdir(dir, { recursive: true });
+    await this.memory.purgeNamespace(SMARTS_NAMESPACE);
 
     await this.scanAndIndex(dir);
   }
 
   private async scanAndIndex(dir: string): Promise<void> {
     const glob = new Bun.Glob("*.md");
+    const parsed: { entry: SmartEntry; embeddingContent: string }[] = [];
 
     for await (const match of glob.scan({ cwd: dir, onlyFiles: true })) {
       const filePath = `${dir}/${match}`;
       try {
         const file = Bun.file(filePath);
         const raw = await file.text();
-        const parsed = parseFrontmatter(raw);
-        if (parsed) {
-          const entry: SmartEntry = { ...parsed, filePath };
-          this.entries.set(entry.name, entry);
-          const embeddingId = await this.memory.embed(
-            SMARTS_NAMESPACE,
-            `${entry.name} ${entry.domain} ${entry.tags.join(" ")} ${entry.content}`,
-            { name: entry.name },
-          );
-          this.embeddingIds.set(entry.name, embeddingId);
+        const result = parseFrontmatter(raw);
+        if (result) {
+          const entry: SmartEntry = { ...result, filePath };
+          parsed.push({
+            entry,
+            embeddingContent: `${entry.name} ${entry.domain} ${entry.tags.join(" ")} ${entry.content}`,
+          });
         }
       } catch {
         // Skip files that can't be read or parsed
       }
+    }
+
+    if (parsed.length === 0) return;
+
+    const ids = await this.memory.embedBatch(
+      SMARTS_NAMESPACE,
+      parsed.map((p) => ({ content: p.embeddingContent, metadata: { name: p.entry.name } })),
+    );
+
+    for (let i = 0; i < parsed.length; i++) {
+      const { entry } = parsed[i]!;
+      this.entries.set(entry.name, entry);
+      this.embeddingIds.set(entry.name, ids[i]!);
     }
   }
 
@@ -122,10 +134,7 @@ export class SmartsStore {
   }
 
   async reindex(): Promise<void> {
-    for (const embeddingId of this.embeddingIds.values()) {
-      await this.memory.forget(SMARTS_NAMESPACE, embeddingId);
-    }
-
+    await this.memory.purgeNamespace(SMARTS_NAMESPACE);
     this.entries.clear();
     this.embeddingIds.clear();
     const dir = resolve(this.config.smartsDir);

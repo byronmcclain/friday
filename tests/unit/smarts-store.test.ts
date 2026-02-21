@@ -280,4 +280,26 @@ This was added by hand.`;
     expect(store.all()).toHaveLength(0);
     await rm(missingDir, { recursive: true });
   });
+
+  test("initialize called twice does not accumulate duplicate embeddings", async () => {
+    const config = { smartsDir: TEST_SMARTS_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 };
+    await store.initialize(config, memory);
+    await store.initialize(config, memory);
+    const results = await memory.search("smarts", "security injection owasp", 20);
+    const securityResults = results.filter(
+      (r) => (r.metadata as { name?: string })?.name === "security-basics",
+    );
+    expect(securityResults).toHaveLength(1);
+  });
+
+  test("reindex does not leave orphaned embeddings", async () => {
+    const config = { smartsDir: TEST_SMARTS_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 };
+    await store.initialize(config, memory);
+    await store.reindex();
+    const results = await memory.search("smarts", "security injection owasp", 20);
+    const securityResults = results.filter(
+      (r) => (r.metadata as { name?: string })?.name === "security-basics",
+    );
+    expect(securityResults).toHaveLength(1);
+  });
 });
