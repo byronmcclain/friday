@@ -230,6 +230,47 @@ This was added by hand.`;
     await rm(emptyDir, { recursive: true });
   });
 
+  test("update on nonexistent entry is a silent no-op", async () => {
+    await store.initialize(
+      { smartsDir: TEST_SMARTS_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },
+      memory,
+    );
+    const countBefore = store.all().length;
+    await store.update("nonexistent", "new content");
+    expect(store.all().length).toBe(countBefore);
+  });
+
+  test("create with duplicate name cleans up old embedding", async () => {
+    await store.initialize(
+      { smartsDir: TEST_SMARTS_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },
+      memory,
+    );
+    await store.create({
+      name: "docker-tips",
+      domain: "docker",
+      tags: ["docker"],
+      confidence: 0.8,
+      source: "manual",
+      content: "# Docker Tips v1\n\nOriginal content.",
+    });
+    await store.create({
+      name: "docker-tips",
+      domain: "docker",
+      tags: ["docker", "updated"],
+      confidence: 0.9,
+      source: "manual",
+      content: "# Docker Tips v2\n\nUpdated content.",
+    });
+    const all = store.all();
+    const dockerEntries = all.filter((e) => e.name === "docker-tips");
+    expect(dockerEntries).toHaveLength(1);
+    expect(dockerEntries[0]!.content).toContain("v2");
+
+    const results = await store.findRelevant("docker tips");
+    const dockerResults = results.filter((r) => r.name === "docker-tips");
+    expect(dockerResults).toHaveLength(1);
+  });
+
   test("initialize handles missing directory by creating it", async () => {
     const missingDir = "/tmp/friday-test-smarts-missing";
     await store.initialize(
