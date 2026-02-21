@@ -5,7 +5,8 @@ type ParsedSmart = Omit<SmartEntry, "filePath">;
 const VALID_SOURCES: SmartSource[] = ["manual", "auto", "conversation"];
 
 export function parseFrontmatter(raw: string): ParsedSmart | null {
-  const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  const normalized = raw.replace(/\r\n/g, "\n");
+  const match = normalized.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!match) return null;
 
   const [, yamlBlock, body] = match;
@@ -61,7 +62,7 @@ function parseYamlFields(yaml: string): Record<string, string> {
     const kvMatch = line.match(/^(\w[\w-]*)\s*:\s*(.*)$/);
     if (kvMatch) {
       currentKey = kvMatch[1]!;
-      fields[currentKey] = kvMatch[2]!.trim();
+      fields[currentKey] = kvMatch[2]!.trim().replace(/^(['"])(.*)\1$/, "$2");
     } else if (currentKey && line.match(/^\s+-\s+/)) {
       fields[currentKey] = `${fields[currentKey] || ""},${line.replace(/^\s+-\s+/, "").trim()}`;
     }

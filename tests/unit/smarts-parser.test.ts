@@ -77,6 +77,33 @@ updated: 2026-02-21
     expect(result!.source).toBe("manual");
   });
 
+  test("handles Windows-style line endings (CRLF)", () => {
+    const raw = "---\r\nname: crlf-test\r\ndomain: general\r\ntags: [test]\r\nconfidence: 0.8\r\nsource: manual\r\ncreated: 2026-02-21\r\nupdated: 2026-02-21\r\n---\r\n\r\n# CRLF Content\r\n\r\nWorks with Windows.";
+    const result = parseFrontmatter(raw);
+    expect(result).not.toBeNull();
+    expect(result!.name).toBe("crlf-test");
+    expect(result!.content).toContain("CRLF Content");
+  });
+
+  test("strips surrounding quotes from YAML values", () => {
+    const raw = `---
+name: "quoted-name"
+domain: 'quoted-domain'
+tags: [test]
+confidence: 0.9
+source: manual
+created: 2026-02-21
+updated: 2026-02-21
+---
+
+# Quoted`;
+
+    const result = parseFrontmatter(raw);
+    expect(result).not.toBeNull();
+    expect(result!.name).toBe("quoted-name");
+    expect(result!.domain).toBe("quoted-domain");
+  });
+
   test("trims whitespace from body", () => {
     const raw = `---
 name: trimmed
