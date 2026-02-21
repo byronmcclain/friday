@@ -2,12 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { FridayRuntime } from "../../src/core/runtime.ts";
 import type { LLMProvider } from "../../src/providers/types.ts";
 import { mkdir, writeFile, rm } from "node:fs/promises";
-
-const stubProvider: LLMProvider = {
-	name: "stub",
-	defaultModel: "stub-model",
-	chat: async () => "stub response",
-};
+import { stubProvider } from "../helpers/stubs.ts";
 
 describe("FridayRuntime", () => {
 	test("boots with default configuration", async () => {

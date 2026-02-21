@@ -6,18 +6,7 @@ import { PROVIDER_DEFAULTS } from "../../src/providers/index.ts";
 import { SmartsStore } from "../../src/smarts/store.ts";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 import { mkdir, writeFile, rm, unlink } from "node:fs/promises";
-
-const stubProvider: LLMProvider = {
-  name: "stub",
-  defaultModel: "stub-model",
-  chat: async () => "stub response",
-};
-
-const grokStub: LLMProvider = {
-  name: "grok",
-  defaultModel: "grok-4-1-fast-reasoning-latest",
-  chat: async () => "grok response",
-};
+import { stubProvider, grokStub } from "../helpers/stubs.ts";
 
 describe("Cortex", () => {
   test("system prompt is defined and non-empty", () => {
