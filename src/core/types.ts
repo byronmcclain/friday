@@ -16,18 +16,3 @@ export interface ConversationMessage {
   role: "user" | "assistant";
   content: string;
 }
-
-/** Represents a tool that Friday can use */
-export interface FridayTool {
-  name: string;
-  description: string;
-  execute: (args: Record<string, unknown>) => Promise<string>;
-}
-
-/** Represents a specialized agent that Friday can delegate to */
-export interface FridayAgent {
-  name: string;
-  description: string;
-  systemPrompt: string;
-  tools: FridayTool[];
-}
