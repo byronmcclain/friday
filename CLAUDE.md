@@ -33,6 +33,7 @@ src/
 ├── main.ts                # Entrypoint — CLI bootstrap
 ├── cli/
 │   ├── index.ts           # Commander program definition, command registration
+│   ├── render.ts           # renderMarkdown() — marked + marked-terminal ANSI output
 │   └── commands/          # One file per CLI command (e.g., chat.ts)
 ├── core/
 │   ├── cortex.ts          # Cortex — LLM brain, conversation state, tool registration
@@ -106,8 +107,8 @@ Default to Bun APIs instead of Node.js equivalents or third-party packages:
 
 ## Environment
 
-Requires `ANTHROPIC_API_KEY` in `.env` (see `.env.example`). Bun loads this automatically.
-Optional: `XAI_API_KEY` for Grok provider (`--provider grok`).
+Requires `XAI_API_KEY` in `.env` for the default Grok provider. Bun loads `.env` automatically.
+Optional: `ANTHROPIC_API_KEY` for Anthropic provider (`--provider anthropic`).
 
 ## Docker
 
@@ -120,7 +121,7 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 
 - Architecture design: `docs/plans/2026-02-21-friday-agent-runtime-design.md`
 - SMARTS design: `docs/plans/2026-02-21-smarts-dynamic-knowledge-design.md`
-- SMARTS implementation plan: `docs/plans/2026-02-21-smarts-implementation-plan.md`
+- CLI markdown rendering: `docs/plans/2026-02-21-cli-markdown-rendering-design.md`
 - MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge
 
 ## Worktrees
@@ -134,3 +135,4 @@ Feature work uses git worktrees in `.worktrees/` (gitignored). Create with:
 - The user is a 30+ year programming veteran — Friday should match that expertise level in generated code
 - CLI output uses chalk (colors), ora (spinners), and boxen (bordered boxes) for polish
 - Biome handles both linting and formatting — run `bun run lint:fix` before committing
+- LLM responses pass through `renderMarkdown()` in `src/cli/render.ts` (marked + marked-terminal) — includes workaround for marked-terminal text renderer bug and dedent for LLM whitespace
