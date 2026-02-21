@@ -1,8 +1,30 @@
+<div align="center">
+<br />
+
+<img src="friday-logo.jpeg" alt="Friday Logo" width="300" />
+
+<br />
+
 # F.R.I.D.A.Y.
 
 **Female Replacement Intelligent Digital Assistant Youth**
 
-A CLI-first personal AI assistant inspired by Tony Stark's companion from the MCU. Friday is an autonomous agent runtime that loads capabilities as Modules, executes Protocols on command, follows Directives within Clearance boundaries, and remembers everything through persistent Memory.
+An autonomous AI agent runtime inspired by Tony Stark's companion.
+CLI-first. Module-driven. Built to think, remember, and adapt.
+
+<br />
+
+[![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun)](https://bun.sh)
+[![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Tests](https://img.shields.io/badge/tests-270%20passing-brightgreen)]()
+[![Biome](https://img.shields.io/badge/lint-Biome-60a5fa?logo=biome)](https://biomejs.dev)
+
+<br />
+</div>
+
+---
+
+Friday is an **agent runtime**, not a chatbot wrapper. She loads capabilities as **Modules**, executes **Protocols** on command, follows **Directives** autonomously, learns through **SMARTS** dynamic knowledge, monitors her environment via **Sensorium**, and remembers everything through persistent **Memory** — all within **Clearance** boundaries and a full **Audit** trail.
 
 Built on [Bun](https://bun.sh) and TypeScript. Powered by Anthropic Claude and xAI Grok.
 
@@ -17,13 +39,43 @@ bun install
 
 # Configure your API key
 cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY
+# Edit .env — add ANTHROPIC_API_KEY or XAI_API_KEY
 
 # Start chatting
 bun run start chat
 ```
 
 Friday greets you and enters an interactive session. Type natural language to converse, `/command` to invoke a protocol, or `exit` to end the session.
+
+---
+
+## What's Inside
+
+### 🧠 Cortex — The Brain
+
+LLM reasoning engine with conversation memory, multi-provider support (Anthropic Claude, xAI Grok), and tool registration. Every module's capabilities flow through here.
+
+### 📚 SMARTS — Dynamic Knowledge
+
+Markdown files with YAML frontmatter, FTS5-indexed into SQLite. Knowledge is queried per-message to enrich the system prompt, and new insights are extracted from conversations automatically via the SmartsCurator.
+`/smart list` · `/smart search <query>` · `/smart domains`
+
+### 🌡️ Sensorium — Environmental Awareness
+
+Dual-cadence polling (30s fast / 5min slow) gathers machine stats, Docker containers, git status, open ports, and installed runtimes. Alert hysteresis fires on state transitions, not every tick. A compact context block is injected into every system prompt so Friday always knows her environment.
+`/env status` · `/env cpu` · `/env memory` · `/env docker` · `/env git`
+
+### 📁 Filesystem Module — Hands On the Keyboard
+
+Read, write, list, delete files and execute shell commands — Friday's first real module. Paged file reading for large files, clearance-gated execution, and full audit logging.
+
+### ⚡ SignalBus — Reactive Nervous System
+
+Typed events (`file:changed`, `test:failed`, `session:start`) flow through the bus, triggering directives and module behavior. Supports custom signals via `custom:*`.
+
+### 🛡️ Clearance & Audit — Trust but Verify
+
+Every tool call and directive execution passes through permission gates. Every action is logged with source, detail, success/failure, and metadata.
 
 ---
 
@@ -42,18 +94,19 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 | Security clearance | **Clearance** | Permission gate for tools, directives, and modules |
 | Mission log | **Audit Log** | Record of every action, reason, and result |
 | Alert system | **Notification** | Multi-channel alerts (terminal, Slack, webhook) |
+| Field knowledge | **SMARTS** | Dynamic knowledge base — learns from conversations |
+| Sensor suite | **Sensorium** | Environmental awareness — machine, Docker, dev tools |
 
 ---
 
 ## Architecture
 
-Friday is an **agent runtime**, not just a chatbot wrapper. The `FridayRuntime` orchestrator boots all subsystems, wires them together, and manages the full lifecycle.
-
 ### Boot Sequence
 
 ```
-SignalBus -> ClearanceManager -> AuditLogger -> NotificationManager
-  -> ProtocolRegistry -> DirectiveStore/Engine -> Cortex -> Module Discovery
+SignalBus → ClearanceManager → AuditLogger → NotificationManager
+  → ProtocolRegistry → DirectiveStore/Engine → Memory → SmartsStore
+  → Sensorium → Cortex → Module Discovery
 ```
 
 ### Process Loop
@@ -61,41 +114,46 @@ SignalBus -> ClearanceManager -> AuditLogger -> NotificationManager
 ```
 User Input
   |-- Starts with /command?
-  |     YES -> ProtocolRegistry -> Execute handler -> Return result
-  |     NO  -> Cortex (LLM) -> Reason with tools -> Generate response
+  |     YES → ProtocolRegistry → Execute handler → Return result
+  |     NO  → Cortex (LLM) → Reason with tools → Generate response
+  |-- Cortex enriches prompt with:
+  |     • Pinned + FTS5-matched SMARTS knowledge
+  |     • Sensorium environment context block
   |-- Emit signal: command:post-execute
   |-- Check directives triggered by result
   '-- Return response + audit entry
 ```
 
-Protocols bypass the LLM entirely for deterministic, fast execution. Everything else flows through the Cortex for reasoning.
-
 ### Subsystems
 
-- **Cortex** (`src/core/cortex.ts`) -- The LLM brain. Owns conversation history, delegates to providers (Anthropic or Grok), and exposes tool registration for modules.
+- **Cortex** (`src/core/cortex.ts`) — The LLM brain. Owns conversation history, delegates to providers (Anthropic or Grok), exposes tool registration, and enriches the system prompt with SMARTS knowledge and Sensorium context per message.
 
-- **SignalBus** (`src/core/events.ts`) -- Typed event system. Signals like `file:changed`, `test:failed`, and `session:start` flow through the bus, triggering directives and module behavior. Supports `on`, `off`, `once`, and custom signals via `custom:*`.
+- **SMARTS** (`src/smarts/`) — Dynamic knowledge system. Markdown files with YAML frontmatter are FTS5-indexed into SQLite, queried per-message to enrich prompts, and new knowledge is extracted from conversations on shutdown via SmartsCurator.
 
-- **Modules** (`src/modules/types.ts`) -- Discoverable capability bundles. Each module declares its tools, protocols, knowledge, signal triggers, and required clearances. Auto-loaded from the filesystem at boot.
+- **Sensorium** (`src/sensorium/`) — Environmental awareness. Pure sensor functions gather machine stats (`node:os`), Docker containers (`Bun.$`), and dev environment (git, ports, runtimes). Dual-cadence polling with alert hysteresis injects a compact context block into the system prompt.
 
-- **Protocols** (`src/protocols/registry.ts`) -- Slash-command routing with alias support. Input starting with `/` is parsed and dispatched directly to the matching protocol handler.
+- **SignalBus** (`src/core/events.ts`) — Typed event system. Signals like `file:changed`, `test:failed`, and `session:start` flow through the bus, triggering directives and module behavior.
 
-- **Directives** (`src/directives/engine.ts`) -- Autonomous rules. A directive binds a trigger (signal, schedule, pattern, or manual) to an action (tool, protocol, prompt, or sequence). The engine listens on the SignalBus and fires matching directives after clearance checks.
+- **Modules** (`src/modules/`) — Discoverable capability bundles. Each module declares tools, protocols, knowledge, signal triggers, and required clearances. Auto-loaded from the filesystem at boot. First module: **Filesystem** (read, write, list, delete, exec).
 
-- **Clearance** (`src/core/clearance.ts`) -- Permission gates. Every tool call and directive execution is checked against granted clearances (`read-fs`, `write-fs`, `exec-shell`, `network`, `git-read`, `git-write`, `provider`, `system`).
+- **Protocols** (`src/protocols/registry.ts`) — Slash-command routing with alias support. Input starting with `/` is dispatched directly to the matching handler.
 
-- **Memory** (`src/core/memory.ts`) -- SQLite-backed persistence via `bun:sqlite`. Namespaced key-value store, conversation history, and FTS5 full-text search. Modules get scoped memory instances.
+- **Directives** (`src/directives/engine.ts`) — Autonomous rules. A directive binds a trigger (signal, schedule, pattern, or manual) to an action (tool, protocol, prompt, or sequence). The engine fires matching directives after clearance checks.
 
-- **Audit** (`src/audit/logger.ts`) -- Action tracking with source, action type, detail, success/failure, and metadata. Filterable by source, action, and time range.
+- **Clearance** (`src/core/clearance.ts`) — Permission gates. Every tool call and directive execution is checked against granted clearances.
 
-- **Notifications** (`src/core/notifications.ts`) -- Multi-channel alert system. Built-in channels: Terminal, Log file, Slack (webhook), and generic Webhook. Notifications carry a level (`info`, `warning`, `alert`) and optional action buttons that map to protocols.
+- **Memory** (`src/core/memory.ts`) — SQLite-backed persistence via `bun:sqlite`. Namespaced KV store, conversation history, and FTS5 full-text search. Modules get scoped memory instances.
+
+- **Audit** (`src/audit/logger.ts`) — Action tracking with source, action type, detail, success/failure, and metadata.
+
+- **Notifications** (`src/core/notifications.ts`) — Multi-channel alerts: Terminal, Log file, Slack (webhook), and generic Webhook.
 
 ---
 
 ## CLI Usage
 
 ```bash
-# Start interactive chat (default: Anthropic Claude)
+# Start interactive chat (default provider)
 bun run start chat
 
 # Use a specific provider
@@ -114,7 +172,14 @@ bun run start chat --provider grok --model grok-3
 |---|---|
 | Natural language | Sent to Cortex for LLM reasoning |
 | `/command [args]` | Routed directly to a registered Protocol |
-| `exit`, `quit`, `bye` | Ends the session and shuts down the runtime |
+| `/smart list` | List all knowledge entries |
+| `/smart search <query>` | FTS5 search across SMARTS knowledge |
+| `/smart domains` | Show knowledge domains |
+| `/env status` | Full environment snapshot |
+| `/env cpu` / `/env memory` | System resource details |
+| `/env docker` | Running container status |
+| `/env git` | Git repository state |
+| `exit`, `quit`, `bye` | Ends the session |
 
 ### Provider Defaults
 
@@ -176,8 +241,6 @@ export default myModule;
 
 ## Environment Setup
 
-Copy the example environment file and add your API keys:
-
 ```bash
 cp .env.example .env
 ```
@@ -193,63 +256,67 @@ XAI_API_KEY=xai-...
 FRIDAY_MODEL=claude-sonnet-4-20250514
 ```
 
-Bun loads `.env` automatically -- no dotenv needed.
+Bun loads `.env` automatically — no dotenv needed.
 
 ---
 
 ## Development
 
 ```bash
-# Run with auto-restart on file changes
-bun run dev
-
-# Run all tests
-bun test
-
-# Run tests in watch mode
-bun test --watch
-
-# Run a single test file
-bun test tests/unit/friday.test.ts
-
-# Lint (check only)
-bun run lint
-
-# Lint and auto-fix
-bun run lint:fix
-
-# Format source files
-bun run format
-
-# TypeScript type checking
-bun run typecheck
+bun run dev              # Auto-restart on file changes
+bun test                 # Run all tests (270 tests across 25 files)
+bun test --watch         # Watch mode
+bun test tests/unit/cortex.test.ts  # Single test file
+bun run lint             # Lint check
+bun run lint:fix         # Lint and auto-fix
+bun run format           # Format source files
+bun run typecheck        # TypeScript type checking
 ```
 
 ### Project Structure
 
 ```
 src/
-├── main.ts              # Entrypoint -- CLI bootstrap
+├── main.ts                # Entrypoint — CLI bootstrap
 ├── cli/
-│   ├── index.ts         # Commander program definition
-│   └── commands/        # One file per CLI command
+│   ├── index.ts           # Commander program definition
+│   ├── render.ts          # Markdown → ANSI terminal rendering
+│   └── commands/          # One file per CLI command
 ├── core/
-│   ├── cortex.ts        # LLM brain and conversation state
-│   ├── runtime.ts       # Boot/shutdown orchestrator
-│   ├── events.ts        # SignalBus -- typed event system
-│   ├── clearance.ts     # Permission gates
-│   ├── memory.ts        # SQLite persistence and FTS5 search
-│   ├── notifications.ts # Multi-channel notification system
-│   ├── types.ts         # Core TypeScript interfaces
-│   └── prompts.ts       # Friday's personality
-├── audit/               # Action tracking and filtering
-├── modules/             # Module interface and loader
-├── protocols/           # Protocol registry and routing
-├── directives/          # Autonomous rule engine
-└── providers/           # LLM provider adapters
+│   ├── cortex.ts          # LLM brain and conversation state
+│   ├── runtime.ts         # Boot/shutdown orchestrator
+│   ├── events.ts          # SignalBus — typed event system
+│   ├── clearance.ts       # Permission gates
+│   ├── memory.ts          # SQLite persistence and FTS5 search
+│   ├── notifications.ts   # Multi-channel notification system
+│   ├── types.ts           # Core TypeScript interfaces
+│   └── prompts.ts         # Friday's personality
+├── audit/                 # Action tracking and filtering
+├── modules/
+│   ├── types.ts           # FridayModule, FridayTool interfaces
+│   ├── loader.ts          # Module discovery and validation
+│   └── filesystem/        # Read, write, list, delete, exec tools
+├── protocols/             # Protocol registry and routing
+├── directives/            # Autonomous rule engine
+├── smarts/
+│   ├── types.ts           # SmartEntry, SmartsConfig types
+│   ├── parser.ts          # YAML frontmatter parser/serializer
+│   ├── store.ts           # FTS5-indexed knowledge base
+│   ├── protocol.ts        # /smart protocol handler
+│   └── curator.ts         # Autonomous knowledge extraction
+├── sensorium/
+│   ├── types.ts           # SystemSnapshot, SensorConfig types
+│   ├── sensors.ts         # Pure sensor functions (machine, Docker, dev)
+│   ├── sensorium.ts       # Polling loop, alerts, context block
+│   ├── protocol.ts        # /env protocol handler
+│   └── tool.ts            # LLM-accessible environment tool
+├── providers/             # LLM provider adapters
+└── utils/                 # Shared utilities
+smarts/                    # Seed knowledge files (YAML + markdown)
 tests/
-├── unit/                # Unit tests (bun:test)
-└── integration/         # Integration tests (future)
+├── helpers/               # Shared test stubs
+├── unit/                  # 270 tests across 25 files
+└── integration/           # Integration tests — future
 ```
 
 ---
@@ -267,8 +334,6 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 docker run -e XAI_API_KEY=xai-... friday chat --provider grok
 ```
 
-The image uses `oven/bun:1` as the base and runs with `--frozen-lockfile --production` for reproducible builds.
-
 ---
 
 ## Tech Stack
@@ -280,8 +345,10 @@ The image uses `oven/bun:1` as the base and runs with `--frozen-lockfile --produ
 | AI Providers | Anthropic Claude (`@anthropic-ai/sdk`), xAI Grok (`openai` SDK) |
 | CLI Framework | [Commander.js](https://github.com/tj/commander.js) |
 | Database | SQLite via `bun:sqlite` (KV, conversations, FTS5 search) |
+| Knowledge | SMARTS — YAML frontmatter + FTS5-indexed markdown |
+| Monitoring | Sensorium — dual-cadence polling with alert hysteresis |
 | Linter/Formatter | [Biome](https://biomejs.dev) |
-| CLI UX | chalk (colors), ora (spinners), boxen (bordered boxes), inquirer (prompts) |
+| CLI UX | chalk, ora, boxen, inquirer, marked + marked-terminal |
 | Container | Docker (`oven/bun:1`) |
 
 ---
