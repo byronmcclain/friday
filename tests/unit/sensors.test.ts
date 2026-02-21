@@ -2,6 +2,7 @@ import { describe, test, expect } from "bun:test";
 import {
 	gatherMachine,
 	gatherContainers,
+	gatherDev,
 	type CpuTimes,
 } from "../../src/sensorium/sensors.ts";
 
@@ -48,6 +49,37 @@ describe("gatherContainers", () => {
 			expect(c.image).toBeTruthy();
 			expect(typeof c.cpu).toBe("number");
 			expect(typeof c.memory).toBe("number");
+		}
+	});
+});
+
+describe("gatherDev", () => {
+	test("returns valid dev snapshot", async () => {
+		const result = await gatherDev();
+		expect(Array.isArray(result.ports)).toBe(true);
+		expect(Array.isArray(result.runtimes)).toBe(true);
+	});
+
+	test("detects git repo when in one", async () => {
+		const result = await gatherDev();
+		expect(result.git).toBeDefined();
+		expect(result.git!.branch).toBeTruthy();
+		expect(typeof result.git!.dirty).toBe("boolean");
+	});
+
+	test("detects bun runtime", async () => {
+		const result = await gatherDev();
+		const bun = result.runtimes.find((r) => r.name === "bun");
+		expect(bun).toBeDefined();
+		expect(bun!.version).toBeTruthy();
+	});
+
+	test("port entries have required fields", async () => {
+		const result = await gatherDev();
+		for (const p of result.ports) {
+			expect(typeof p.port).toBe("number");
+			expect(typeof p.pid).toBe("number");
+			expect(typeof p.process).toBe("string");
 		}
 	});
 });
