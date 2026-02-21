@@ -144,4 +144,58 @@ This is test knowledge.`,
 		expect(runtime.smarts).toBeUndefined();
 		await runtime.shutdown();
 	});
+
+	test("shutdown triggers SMARTS extraction for long conversations", async () => {
+		let extractionTriggered = false;
+		const capturingProvider: LLMProvider = {
+			name: "capturing",
+			defaultModel: "capture",
+			chat: async (systemPrompt) => {
+				if (systemPrompt.includes("knowledge extraction")) {
+					extractionTriggered = true;
+				}
+				return "[]";
+			},
+		};
+
+		const runtime = new FridayRuntime();
+		await runtime.boot({
+			injectedProvider: capturingProvider,
+			smartsDir: TEST_SMARTS_DIR_RT,
+		});
+
+		// Build up 10+ messages in conversation history (5 user + 5 assistant = 10)
+		for (let i = 0; i < 5; i++) {
+			await runtime.process(`Message ${i} about security`);
+		}
+
+		await runtime.shutdown();
+		expect(extractionTriggered).toBe(true);
+	});
+
+	test("shutdown skips extraction for short conversations", async () => {
+		let extractionTriggered = false;
+		const capturingProvider: LLMProvider = {
+			name: "capturing",
+			defaultModel: "capture",
+			chat: async (systemPrompt) => {
+				if (systemPrompt.includes("knowledge extraction")) {
+					extractionTriggered = true;
+				}
+				return "[]";
+			},
+		};
+
+		const runtime = new FridayRuntime();
+		await runtime.boot({
+			injectedProvider: capturingProvider,
+			smartsDir: TEST_SMARTS_DIR_RT,
+		});
+
+		// Only 2 messages — below threshold
+		await runtime.process("Quick question");
+
+		await runtime.shutdown();
+		expect(extractionTriggered).toBe(false);
+	});
 });

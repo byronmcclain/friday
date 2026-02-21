@@ -37,6 +37,10 @@ export class Cortex {
     return this.provider.name;
   }
 
+  get llmProvider(): LLMProvider {
+    return this.provider;
+  }
+
   get modelName(): string {
     return this.model;
   }

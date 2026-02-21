@@ -14,6 +14,7 @@ import { SmartsStore } from "../smarts/store.ts";
 import { SQLiteMemory } from "./memory.ts";
 import { SMARTS_DEFAULTS } from "../smarts/types.ts";
 import { createSmartProtocol } from "../smarts/protocol.ts";
+import { SmartsCurator } from "../smarts/curator.ts";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
 	modulesDir?: string;
@@ -38,6 +39,7 @@ export class FridayRuntime {
 	private _modules: FridayModule[] = [];
 	private _smarts?: SmartsStore;
 	private _smartsMemory?: SQLiteMemory;
+	private _curator?: SmartsCurator;
 	private _booted = false;
 
 	get isBooted(): boolean {
@@ -107,6 +109,10 @@ export class FridayRuntime {
 				smartsStore: this._smarts,
 			});
 
+			if (this._smarts) {
+				this._curator = new SmartsCurator(this._smarts, this._cortex.llmProvider);
+			}
+
 			if (config.modulesDir) {
 				this._modules = await discoverModules(config.modulesDir);
 				for (const mod of this._modules) {
@@ -175,6 +181,12 @@ export class FridayRuntime {
 
 	async shutdown(): Promise<void> {
 		if (!this._booted) throw new Error("Runtime not booted");
+
+		if (this._curator) {
+			const history = this._cortex.getHistory();
+			await this._curator.extractFromConversation(history).catch(() => {});
+		}
+
 		await this._signals.emit("session:end", "runtime");
 		for (const mod of this._modules) {
 			if (mod.onUnload) {
