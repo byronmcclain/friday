@@ -84,6 +84,12 @@ export class SmartsStore {
   }
 
   async create(entry: Omit<SmartEntry, "filePath">): Promise<SmartEntry> {
+    // Clean up existing entry with same name to avoid orphaned FTS5 embeddings
+    const existingEmbeddingId = this.embeddingIds.get(entry.name);
+    if (existingEmbeddingId) {
+      await this.memory.forget(SMARTS_NAMESPACE, existingEmbeddingId);
+    }
+
     const dir = resolve(this.config.smartsDir);
     const filePath = `${dir}/${entry.name}.md`;
     const content = serializeSmartFile(entry);
