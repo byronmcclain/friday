@@ -140,6 +140,11 @@ export class FridayRuntime {
 		} catch (err) {
 			this._booted = false;
 			this._modules = [];
+			if (this._smartsMemory) {
+				this._smartsMemory.close();
+				this._smartsMemory = undefined;
+				this._smarts = undefined;
+			}
 			throw err;
 		}
 	}
