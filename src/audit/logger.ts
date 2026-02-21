@@ -3,9 +3,13 @@ import type { AuditEntry, AuditFilter } from "./types.ts";
 // TODO: Persist audit entries to SQLite for durability across sessions.
 // Currently in-memory only — entries are lost on shutdown.
 export class AuditLogger {
+  private static readonly MAX_ENTRIES = 10_000;
   private logEntries: AuditEntry[] = [];
 
   log(entry: Omit<AuditEntry, "timestamp">): void {
+    if (this.logEntries.length >= AuditLogger.MAX_ENTRIES) {
+      this.logEntries.shift();
+    }
     this.logEntries.push({ ...entry, timestamp: new Date() });
   }
 

@@ -37,6 +37,16 @@ describe("AuditLogger", () => {
     expect(filtered).toHaveLength(2);
   });
 
+  test("evicts oldest entries when exceeding max capacity", () => {
+    const logger = new AuditLogger();
+    for (let i = 0; i < 10_001; i++) {
+      logger.log({ action: `action-${i}`, source: "test", detail: "x", success: true });
+    }
+    const all = logger.entries();
+    expect(all.length).toBe(10_000);
+    expect(all[0]!.action).toBe("action-1");
+  });
+
   test("clears all entries", () => {
     const logger = new AuditLogger();
     logger.log({ action: "tool:execute", source: "core", detail: "x", success: true });
