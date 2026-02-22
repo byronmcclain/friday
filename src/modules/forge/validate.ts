@@ -168,7 +168,7 @@ export const forgeValidate: FridayTool = {
 		return {
 			success: allPassed,
 			output: `Validation ${allPassed ? "passed" : "FAILED"} for "${moduleName}":\n${report}${allPassed ? "\n\nReady for forge_restart." : "\n\nFix the errors and try again with forge_propose."}`,
-			artifacts: result,
+			artifacts: { ...result },
 		};
 	},
 };
