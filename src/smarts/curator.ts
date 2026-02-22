@@ -1,6 +1,6 @@
 import type { SmartsStore } from "./store.ts";
 import type { LLMProvider } from "../providers/types.ts";
-import type { ConversationMessage } from "../core/types.ts";
+import { type ConversationMessage, getTextContent } from "../core/types.ts";
 
 const MIN_MESSAGES_FOR_EXTRACTION = 10;
 
@@ -40,7 +40,7 @@ export class SmartsCurator {
 
     try {
       const conversationText = messages
-        .map((m) => `${m.role}: ${m.content}`)
+        .map((m) => `${m.role}: ${getTextContent(m.content)}`)
         .join("\n\n");
 
       const chatResponse = await this.provider.chat(
