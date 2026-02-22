@@ -6,7 +6,7 @@ import { PROVIDER_DEFAULTS } from "../../src/providers/index.ts";
 import { SmartsStore } from "../../src/smarts/store.ts";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 import { mkdir, writeFile, rm, unlink } from "node:fs/promises";
-import { stubProvider, grokStub } from "../helpers/stubs.ts";
+import { stubProvider, grokStub, textResponse } from "../helpers/stubs.ts";
 
 describe("Cortex", () => {
   test("system prompt is defined and non-empty", () => {
@@ -102,7 +102,7 @@ describe("Cortex — SMARTS integration", () => {
     defaultModel: "capture-model",
     chat: async (systemPrompt) => {
       capturedPrompt = systemPrompt;
-      return "response with smarts";
+      return textResponse("response with smarts");
     },
   };
 
@@ -203,7 +203,7 @@ describe("Cortex — Sensorium integration", () => {
       defaultModel: "capture",
       chat: async (systemPrompt) => {
         capturedPrompt = systemPrompt;
-        return "ok";
+        return textResponse("ok");
       },
     };
 
@@ -224,7 +224,7 @@ describe("Cortex — Sensorium integration", () => {
       defaultModel: "capture",
       chat: async (systemPrompt) => {
         capturedPrompt = systemPrompt;
-        return "ok";
+        return textResponse("ok");
       },
     };
 

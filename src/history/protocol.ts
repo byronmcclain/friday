@@ -1,5 +1,6 @@
 import type { FridayProtocol, ProtocolResult, ProtocolContext } from "../modules/types.ts";
 import type { SQLiteMemory } from "../core/memory.ts";
+import { getTextContent } from "../core/types.ts";
 
 export function createHistoryProtocol(memory: SQLiteMemory): FridayProtocol {
   return {
@@ -54,7 +55,10 @@ async function handleShow(memory: SQLiteMemory, id: string): Promise<ProtocolRes
 
   const header = `Session: ${session.id}\nStarted: ${session.startedAt.toISOString()}\nProvider: ${session.provider}/${session.model}\nMessages: ${session.messages.length}`;
   const messages = session.messages
-    .map((m) => `  [${m.role}] ${m.content.slice(0, 200)}${m.content.length > 200 ? "..." : ""}`)
+    .map((m) => {
+      const text = getTextContent(m.content);
+      return `  [${m.role}] ${text.slice(0, 200)}${text.length > 200 ? "..." : ""}`;
+    })
     .join("\n");
   return { success: true, summary: `${header}\n\n${messages}` };
 }
