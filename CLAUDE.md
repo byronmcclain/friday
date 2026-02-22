@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Friday** (F.R.I.D.A.Y. — Female Replacement Intelligent Digital Assistant Youth) is a personal AI assistant inspired by Tony Stark's assistant from the MCU. It is built as a CLI-first application with plans to add a UI/UX layer once the core is solid.
+**Friday** (F.R.I.D.A.Y. — Female Replacement Intelligent Digital Assistant Youth) is a personal AI assistant inspired by Tony Stark's assistant from the MCU. It features an interactive TUI (terminal UI) built with OpenTUI, a React-based web UI, and a modular agent runtime.
 
 - **Runtime**: Bun (not Node.js)
 - **Language**: TypeScript (strict mode)
@@ -36,8 +36,16 @@ src/
 ├── main.ts                # Entrypoint — CLI bootstrap
 ├── cli/
 │   ├── index.ts           # Commander program definition, command registration
-│   ├── render.ts           # renderMarkdown() — marked + marked-terminal ANSI output
-│   └── commands/          # One file per CLI command (e.g., chat.ts)
+│   ├── render.ts          # renderMarkdown() — marked + marked-terminal ANSI output (legacy, used by web)
+│   ├── commands/          # One file per CLI command (chat.ts delegates to TUI)
+│   └── tui/               # OpenTUI-based terminal interface (React for CLI)
+│       ├── app.tsx         # FridayApp root — lifecycle, boot phases, runtime integration
+│       ├── state.ts        # AppState reducer, Message types, phase state machine
+│       ├── theme.ts        # Friday amber palette, SyntaxStyle, shared text attributes
+│       ├── filter-commands.ts  # TypeaheadEntry and filterCommands() for /command suggestions
+│       ├── components/    # UI components (Header, ChatArea, InputBar, Message, Splash, etc.)
+│       ├── lib/           # ANSI parser, color utils, chafa logo processor
+│       └── channels/      # TuiChannel — notification bridge into TUI toasts
 ├── core/
 │   ├── cortex.ts          # Cortex — LLM brain, conversation state, tool registration
 │   ├── summarizer.ts      # ConversationSummarizer — generates session summaries via fast model
@@ -75,6 +83,8 @@ src/
 │   ├── sensorium.ts       # Sensorium class — polling loop, snapshot management, alert evaluation
 │   ├── protocol.ts        # /env protocol (status, cpu, memory, docker, ports, git)
 │   └── tool.ts            # getEnvironmentStatus FridayTool
+├── history/
+│   └── protocol.ts        # /history protocol (list, show, clear) — session persistence
 ├── server/
 │   ├── index.ts           # Bun.serve() HTTP + WebSocket server
 │   ├── protocol.ts        # Shared message types (ClientMessage, ServerMessage)
@@ -93,7 +103,7 @@ smarts/                    # Runtime-generated knowledge files (gitignored, user
 forge/                     # Friday-authored modules (gitignored, AI-generated)
 tests/
 ├── helpers/               # Shared test stubs (stubProvider, grokStub)
-├── unit/                  # Unit tests (bun:test) — 300 tests across 30 files
+├── unit/                  # Unit tests (bun:test) — 469 tests across 49 files
 └── integration/           # Integration tests — future
 ```
 
@@ -111,15 +121,19 @@ tests/
 - **Sensorium** (`src/sensorium/`) is Friday's environmental awareness. Pure sensor functions gather machine stats (`node:os`), Docker containers (`Bun.$`), and dev environment (git, ports, runtimes). The Sensorium class runs a dual-cadence polling loop (30s fast / 5min slow), evaluates alert thresholds with hysteresis, and injects a compact context block into the system prompt via `getContextBlock()`. The `/env` protocol provides CLI access; `getEnvironmentStatus` tool provides LLM access.
 - **Dual-Model Architecture** — FridayRuntime resolves two models per provider: a reasoning model (for Cortex conversations) and a fast model (for SmartsCurator knowledge extraction and ConversationSummarizer). Resolution priority: CLI flag > env var > `PROVIDER_DEFAULTS`. `FridayConfig.fastModel` carries the fast model through the config chain.
 - **The Forge** (`src/modules/forge/`) is Friday's self-improvement system. She can author new modules in `forge/` and patch existing forge modules, subject to human approval. The Forge validates modules (import, manifest, typecheck, lint) before triggering an in-process restart. Failed forge modules don't crash boot — errors are reported back so Friday can iterate. The filesystem module and Forge itself are core-protected.
+- **TUI** (`src/cli/tui/`) is Friday's interactive terminal interface, built with OpenTUI (React for CLI). The `chat` command delegates to `launchTui()` which renders a React component tree: Header (shimmer animation), ChatArea (messages + thinking indicator), InputBar (command typeahead). State is managed via a reducer with phases: `splash → fading → booting → active → shutting-down`. TuiChannel bridges NotificationManager into TUI toasts. The splash screen uses chafa to convert the logo image to ANSI art with a fade animation.
+- **History** (`src/history/protocol.ts`) provides the `/history` protocol (aliases: `/hist`) for browsing, viewing, and clearing past conversation sessions stored in SQLite.
 - **Prompts** live in `src/core/prompts.ts` as exported constants. Friday's personality is defined here — keep it consistent when modifying.
 
 ## Testing
 
+- 469 tests across 49 files (as of 2026-02-22)
 - Runtime/Cortex tests use `injectedProvider` (stub `LLMProvider`) to avoid needing `ANTHROPIC_API_KEY`
 - Shared test stubs live in `tests/helpers/stubs.ts` — import `stubProvider`/`grokStub` instead of defining inline
 - SQLite tests must clean up WAL files: unlink `db`, `db-wal`, and `db-shm` in afterEach
 - `bun:sqlite` transactions: `db.transaction(() => { ... })()` — must invoke the returned function
 - `node:fs/promises` `appendFile` is an accepted exception where Bun has no native append API
+- TUI tests (`tui-*.test.ts`) cover ANSI parser, color utils, logo processor, state reducer, theme, and notification channel
 
 ## Bun-Specific Rules
 
@@ -133,6 +147,14 @@ Default to Bun APIs instead of Node.js equivalents or third-party packages:
 - `Bun.$\`cmd\`` instead of execa for shell commands
 - `bun:sqlite` for SQLite (not better-sqlite3)
 - Bun auto-loads `.env` files — do not use dotenv
+
+## TUI (OpenTUI)
+
+- Terminal UI uses `@opentui/react` — React components rendered to the terminal
+- JSX is configured with `jsxImportSource: "@opentui/react"` in tsconfig.json (not React DOM)
+- TUI components live in `src/cli/tui/` — `.tsx` files use OpenTUI primitives (`<box>`, `<text>`)
+- The `web/` directory is excluded from tsconfig to avoid JSX runtime conflicts with the browser React app
+- `chat` command is a thin launcher: it calls `launchTui()` from `src/cli/tui/app.tsx`
 
 ## Environment
 
@@ -154,6 +176,11 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 - CLI markdown rendering: `docs/plans/2026-02-21-cli-markdown-rendering-design.md`
 - Sensorium design: `docs/plans/2026-02-21-sensorium-environment-awareness-design.md`
 - Web UI design: `docs/plans/2026-02-21-friday-web-ui-design.md`
+- Agentic tool loop: `docs/plans/2026-02-21-agentic-tool-loop-design.md`
+- OpenTUI TUI design: `docs/plans/2026-02-22-opentui-tui-design.md`
+- Hero header splash: `docs/plans/2026-02-22-hero-header-design.md`
+- Forge design: `docs/plans/2026-02-22-the-forge-self-improvement-design.md`
+- Forge implementation: `docs/plans/2026-02-22-the-forge-implementation-plan.md`
 - MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite
 
 ## Worktrees
@@ -169,6 +196,7 @@ Always use Context7 MCP (`resolve-library-id` then `query-docs`) to fetch up-to-
 
 - Friday's personality is defined in `src/core/prompts.ts` — changes there affect all interactions
 - The user is a 30+ year programming veteran — Friday should match that expertise level in generated code
-- CLI output uses chalk (colors), ora (spinners), and boxen (bordered boxes) for polish
+- Interactive chat uses the OpenTUI-based TUI (`src/cli/tui/`) — not the legacy marked-terminal renderer
+- `renderMarkdown()` in `src/cli/render.ts` is still used by the web server, not the primary CLI chat
+- CLI banner and non-TUI output uses chalk (colors) with Friday amber palette
 - Biome handles both linting and formatting — run `bun run lint:fix` before committing
-- LLM responses pass through `renderMarkdown()` in `src/cli/render.ts` (marked + marked-terminal) — includes workaround for marked-terminal text renderer bug and dedent for LLM whitespace

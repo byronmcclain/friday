@@ -10,13 +10,13 @@
 **Female Replacement Intelligent Digital Assistant Youth**
 
 An autonomous AI agent runtime inspired by Tony Stark's companion.
-CLI-first. Module-driven. Built to think, remember, and adapt.
+TUI-first. Module-driven. Built to think, remember, and adapt.
 
 <br />
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tests](https://img.shields.io/badge/tests-363%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-469%20passing-brightgreen)]()
 [![Biome](https://img.shields.io/badge/lint-Biome-60a5fa?logo=biome)](https://biomejs.dev)
 
 <br />
@@ -78,6 +78,11 @@ Friday can write her own modules. The Forge system lets her propose new capabili
 
 Typed events (`file:changed`, `test:failed`, `session:start`) flow through the bus, triggering directives and module behavior. Supports custom signals via `custom:*`.
 
+### 🖥️ TUI — Terminal Interface
+
+Full interactive terminal UI built with OpenTUI (React for CLI). Features an MCU-inspired splash screen with chafa-rendered logo art, a shimmer-animated header, chat area with syntax-highlighted responses, command typeahead with `/` suggestions, and a thinking indicator with braille spinner. State machine manages boot phases: splash → fading → booting → active → shutting-down.
+`bun run start chat`
+
 ### 🌐 Web UI — Browser Interface
 
 React-based web frontend (Vite + Tailwind) with real-time WebSocket connection to the Friday server. Features chat with markdown rendering, slash-command typeahead, collapsible sidebar with conversation history, SMARTS browser, notification panel, and a live Sensorium status bar.
@@ -112,6 +117,7 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 | Field knowledge | **SMARTS** | Dynamic knowledge base — learns from conversations |
 | Sensor suite | **Sensorium** | Environmental awareness — machine, Docker, dev tools |
 | The workshop | **Forge** | Self-improvement — Friday authors and patches her own modules |
+| Heads-up display | **TUI** | Interactive terminal interface — boot splash, shimmer header, chat |
 
 ---
 
@@ -165,6 +171,8 @@ User Input
 - **Notifications** (`src/core/notifications.ts`) — Multi-channel alerts: Terminal, Log file, Slack (webhook), and generic Webhook.
 
 - **Server** (`src/server/`) — Bun.serve() HTTP + WebSocket server. Routes WebSocket messages to FridayRuntime, pushes Sensorium updates and notifications to connected clients.
+
+- **TUI** (`src/cli/tui/`) — OpenTUI-based terminal interface. React component tree rendered to the terminal: FridayApp root manages lifecycle phases (splash → fading → booting → active → shutting-down), Header renders a shimmer-animated title, ChatArea displays messages with syntax highlighting, InputBar provides command typeahead, and Splash shows a chafa-rendered logo with fade animation.
 
 - **History** (`src/history/protocol.ts`) — Conversation persistence. Sessions are saved to SQLite on shutdown and can be browsed or resumed via the `/history` protocol.
 
@@ -304,7 +312,7 @@ Bun loads `.env` automatically — no dotenv needed.
 
 ```bash
 bun run dev              # Auto-restart on file changes
-bun test                 # Run all tests (363 tests across 35 files)
+bun test                 # Run all tests (469 tests across 49 files)
 bun test --watch         # Watch mode
 bun test tests/unit/cortex.test.ts  # Single test file
 bun run lint             # Lint check
@@ -323,10 +331,19 @@ src/
 ├── main.ts                # Entrypoint — CLI bootstrap
 ├── cli/
 │   ├── index.ts           # Commander program definition
-│   ├── render.ts          # Markdown → ANSI terminal rendering
-│   └── commands/          # One file per CLI command
+│   ├── render.ts          # Markdown → ANSI rendering (legacy, used by web server)
+│   ├── commands/          # One file per CLI command (chat.ts delegates to TUI)
+│   └── tui/               # OpenTUI terminal interface (React for CLI)
+│       ├── app.tsx         # FridayApp root — lifecycle, boot, runtime integration
+│       ├── state.ts        # AppState reducer, Message types, phase state machine
+│       ├── theme.ts        # Friday amber palette, SyntaxStyle definitions
+│       ├── filter-commands.ts  # Command typeahead filtering
+│       ├── components/    # Header, ChatArea, InputBar, Message, Splash, Thinking, Welcome
+│       ├── lib/           # ANSI parser, color utils, chafa logo processor
+│       └── channels/      # TuiChannel — notification bridge
 ├── core/
 │   ├── cortex.ts          # LLM brain and conversation state
+│   ├── summarizer.ts      # Session summaries via fast model
 │   ├── runtime.ts         # Boot/shutdown orchestrator
 │   ├── events.ts          # SignalBus — typed event system
 │   ├── clearance.ts       # Permission gates
@@ -354,13 +371,13 @@ src/
 │   ├── sensorium.ts       # Polling loop, alerts, context block
 │   ├── protocol.ts        # /env protocol handler
 │   └── tool.ts            # LLM-accessible environment tool
+├── history/
+│   └── protocol.ts        # /history protocol (list, show, clear)
 ├── server/
 │   ├── index.ts           # Bun.serve() HTTP + WebSocket server
 │   ├── protocol.ts        # Shared message types (ClientMessage, ServerMessage)
 │   ├── handler.ts         # WebSocket message routing to FridayRuntime
 │   └── ws-channel.ts      # WebSocket notification channel
-├── history/
-│   └── protocol.ts        # /history protocol (list, show, clear)
 ├── providers/             # LLM provider adapters
 └── utils/                 # Shared utilities
 web/                       # React web UI (Vite + Tailwind)
@@ -371,7 +388,7 @@ web/                       # React web UI (Vite + Tailwind)
 │   └── index.css          # Tailwind theme (Friday amber palette)
 tests/
 ├── helpers/               # Shared test stubs
-├── unit/                  # 363 tests across 35 files
+├── unit/                  # 469 tests across 49 files
 └── integration/           # Integration tests — future
 ```
 
@@ -400,12 +417,13 @@ docker run -e XAI_API_KEY=xai-... friday chat --provider grok
 | Language | TypeScript (strict mode) |
 | AI Providers | Anthropic Claude (`@anthropic-ai/sdk`), xAI Grok (`openai` SDK) |
 | CLI Framework | [Commander.js](https://github.com/tj/commander.js) |
+| Terminal UI | [OpenTUI](https://github.com/anthropics/claude-code-openui) (`@opentui/react`) — React for CLI |
 | Web UI | React + [Vite](https://vite.dev) + [Tailwind CSS](https://tailwindcss.com) |
 | Database | SQLite via `bun:sqlite` (KV, conversations, FTS5 search) |
 | Knowledge | SMARTS — YAML frontmatter + FTS5-indexed markdown |
 | Monitoring | Sensorium — dual-cadence polling with alert hysteresis |
 | Linter/Formatter | [Biome](https://biomejs.dev) |
-| CLI UX | chalk, ora, boxen, inquirer, marked + marked-terminal |
+| CLI UX | chalk (colors), OpenTUI components, chafa (logo art) |
 | Container | Docker (`oven/bun:1`) |
 
 ---
