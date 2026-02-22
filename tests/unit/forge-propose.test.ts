@@ -1,0 +1,80 @@
+import { describe, test, expect } from "bun:test";
+import { forgePropose } from "../../src/modules/forge/propose.ts";
+import type { ToolContext } from "../../src/modules/types.ts";
+import { AuditLogger } from "../../src/audit/logger.ts";
+import { SignalBus } from "../../src/core/events.ts";
+
+const stubMemory = {
+  get: async <T>(_key: string): Promise<T | undefined> => undefined,
+  set: async <T>(_key: string, _value: T): Promise<void> => {},
+  delete: async (_key: string): Promise<void> => {},
+  list: async (): Promise<string[]> => [],
+};
+
+const context: ToolContext = {
+  workingDirectory: "/tmp",
+  audit: new AuditLogger(),
+  signal: new SignalBus(),
+  memory: stubMemory,
+};
+
+describe("forge_propose tool", () => {
+  test("has correct name and clearance", () => {
+    expect(forgePropose.name).toBe("forge_propose");
+    expect(forgePropose.clearance).toContain("provider");
+  });
+
+  test("requires action parameter", async () => {
+    const result = await forgePropose.execute({ moduleName: "test", description: "test" }, context);
+    expect(result.success).toBe(false);
+    expect(result.output).toContain("action");
+  });
+
+  test("requires moduleName parameter", async () => {
+    const result = await forgePropose.execute({ action: "create", description: "test" }, context);
+    expect(result.success).toBe(false);
+    expect(result.output).toContain("moduleName");
+  });
+
+  test("requires description parameter", async () => {
+    const result = await forgePropose.execute({ action: "create", moduleName: "test" }, context);
+    expect(result.success).toBe(false);
+    expect(result.output).toContain("description");
+  });
+
+  test("rejects invalid action", async () => {
+    const result = await forgePropose.execute(
+      { action: "delete", moduleName: "test", description: "test" },
+      context,
+    );
+    expect(result.success).toBe(false);
+    expect(result.output).toContain("action");
+  });
+
+  test("generates proposal with unique ID and stores in memory", async () => {
+    let storedKey = "";
+    let storedValue: unknown;
+    const trackingMemory = {
+      ...stubMemory,
+      set: async <T>(key: string, value: T): Promise<void> => {
+        storedKey = key;
+        storedValue = value;
+      },
+    };
+
+    const result = await forgePropose.execute(
+      {
+        action: "create",
+        moduleName: "weather",
+        description: "Weather lookups via API",
+      },
+      { ...context, memory: trackingMemory },
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.output).toContain("weather");
+    expect(result.artifacts?.proposalId).toBeDefined();
+    expect(storedKey).toContain("proposal:");
+    expect(storedValue).toBeDefined();
+  });
+});
