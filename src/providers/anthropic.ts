@@ -81,10 +81,11 @@ export function parseAnthropicResponse(response: AnthropicResponseLike): ChatRes
   }
 
   // Text response — join all text blocks
-  const text = response.content
-    .filter((block) => block.type === "text")
-    .map((block) => block.text as string)
-    .join("");
+  const textBlocks = response.content.filter((block) => block.type === "text");
+  if (textBlocks.length === 0) {
+    throw new Error("Anthropic response contained no text blocks");
+  }
+  const text = textBlocks.map((block) => block.text as string).join("");
 
   return { type: "text", text };
 }

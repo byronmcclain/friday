@@ -154,6 +154,7 @@ export class FridayRuntime {
 				clearance: this._clearance,
 				audit: this._audit,
 				signals: this._signals,
+				toolMemory: this._memory?.scoped("tools"),
 			});
 
 			// Register sensorium tool on Cortex (needs Cortex to exist)

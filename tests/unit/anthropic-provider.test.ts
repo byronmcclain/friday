@@ -350,4 +350,17 @@ describe("parseAnthropicResponse", () => {
 
     expect(() => parseAnthropicResponse(response)).toThrow();
   });
+
+  test("throws when response has content but no text blocks", () => {
+    const response = {
+      content: [
+        { type: "thinking", thinking: "Let me consider..." },
+      ],
+      stop_reason: "end_turn" as const,
+    };
+
+    expect(() => parseAnthropicResponse(response)).toThrow(
+      "Anthropic response contained no text blocks",
+    );
+  });
 });
