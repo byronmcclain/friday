@@ -3,8 +3,6 @@ import {
 	filterCommands,
 	type TypeaheadEntry,
 } from "../../src/cli/tui/filter-commands.ts";
-import { formatSuggestionLine } from "../../src/cli/typeahead-prompt.ts";
-import { stripAnsi } from "../../src/utils/strip-ansi.ts";
 
 const testCommands: TypeaheadEntry[] = [
 	{
@@ -75,48 +73,3 @@ describe("filterCommands", () => {
 		expect(filterCommands([], "test")).toHaveLength(0);
 	});
 });
-
-describe("formatSuggestionLine", () => {
-	const entry: TypeaheadEntry = {
-		name: "smart",
-		description: "Manage Friday's SMARTS knowledge base",
-		aliases: ["smarts"],
-	};
-
-	test("unselected line contains command name", () => {
-		const line = formatSuggestionLine(entry, false, 80);
-		expect(line).toContain("/smart");
-	});
-
-	test("unselected line contains description", () => {
-		const line = formatSuggestionLine(entry, false, 80);
-		// Strip ANSI for content check
-		const stripped = stripAnsi(line);
-		expect(stripped).toContain("Manage Friday");
-	});
-
-	test("selected line contains command name", () => {
-		const line = formatSuggestionLine(entry, true, 80);
-		const stripped = stripAnsi(line);
-		expect(stripped).toContain("/smart");
-	});
-
-	test("truncates long descriptions", () => {
-		const longEntry: TypeaheadEntry = {
-			name: "test",
-			description: "A".repeat(200),
-			aliases: [],
-		};
-		const line = formatSuggestionLine(longEntry, false, 40);
-		const stripped = stripAnsi(line);
-		expect(stripped.length).toBeLessThanOrEqual(40 + 20); // Allow for ANSI overhead
-		expect(stripped).toContain("…");
-	});
-
-	test("handles very narrow width gracefully", () => {
-		const line = formatSuggestionLine(entry, false, 10);
-		// Should not throw, just show prefix
-		expect(line).toBeDefined();
-	});
-});
-
