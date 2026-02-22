@@ -30,9 +30,10 @@ export const dockerPs: FridayTool = {
 			const all = (args.all as boolean) ?? false;
 			const filter = args.filter as string | undefined;
 
-			const cmdParts = ["docker", "ps", "--format", "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"];
-			if (all) cmdParts.splice(2, 0, "-a");
-			if (filter) cmdParts.splice(2, 0, "--filter", filter);
+			const cmdParts = ["docker", "ps"];
+			if (all) cmdParts.push("-a");
+			if (filter) cmdParts.push("--filter", filter);
+			cmdParts.push("--format", "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}");
 
 			const result = await Bun.$`${cmdParts}`.quiet().nothrow();
 

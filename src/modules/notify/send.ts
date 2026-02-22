@@ -95,26 +95,7 @@ export const notifySend: FridayTool = {
 						text: `${emoji[level]} *${title}*\n${body}`,
 					};
 
-					const result = await sendWebhook(webhookUrl, payload);
-					if (!result.ok) {
-						return {
-							success: false,
-							output: `Slack webhook failed: ${result.status} ${result.statusText}`,
-						};
-					}
-
-					await context.audit.log({
-						action: "tool:notify.send",
-						source: "notify.send",
-						detail: `Sent Slack notification: ${title}`,
-						success: true,
-					});
-
-					return {
-						success: true,
-						output: `Slack notification sent: ${title}`,
-						artifacts: { channel, level, title },
-					};
+					return dispatchNotification("Slack", webhookUrl, payload, title, level, context);
 				}
 
 				case "webhook": {
@@ -138,26 +119,7 @@ export const notifySend: FridayTool = {
 						timestamp: new Date().toISOString(),
 					};
 
-					const result = await sendWebhook(webhookUrl, payload);
-					if (!result.ok) {
-						return {
-							success: false,
-							output: `Webhook failed: ${result.status} ${result.statusText}`,
-						};
-					}
-
-					await context.audit.log({
-						action: "tool:notify.send",
-						source: "notify.send",
-						detail: `Sent webhook notification: ${title}`,
-						success: true,
-					});
-
-					return {
-						success: true,
-						output: `Webhook notification sent: ${title}`,
-						artifacts: { channel, level, title },
-					};
+					return dispatchNotification("Webhook", webhookUrl, payload, title, level, context);
 				}
 
 				case "email": {
@@ -181,26 +143,7 @@ export const notifySend: FridayTool = {
 						timestamp: new Date().toISOString(),
 					};
 
-					const result = await sendWebhook(emailWebhookUrl, payload);
-					if (!result.ok) {
-						return {
-							success: false,
-							output: `Email webhook failed: ${result.status} ${result.statusText}`,
-						};
-					}
-
-					await context.audit.log({
-						action: "tool:notify.send",
-						source: "notify.send",
-						detail: `Sent email notification: ${title}`,
-						success: true,
-					});
-
-					return {
-						success: true,
-						output: `Email notification sent: ${title}`,
-						artifacts: { channel, level, title },
-					};
+					return dispatchNotification("Email", emailWebhookUrl, payload, title, level, context);
 				}
 
 				default:
@@ -221,6 +164,36 @@ export const notifySend: FridayTool = {
 		}
 	},
 };
+
+async function dispatchNotification(
+	channel: string,
+	webhookUrl: string,
+	payload: Record<string, unknown>,
+	title: string,
+	level: string,
+	context: ToolContext,
+): Promise<ToolResult> {
+	const result = await sendWebhook(webhookUrl, payload);
+	if (!result.ok) {
+		return {
+			success: false,
+			output: `${channel} webhook failed: ${result.status} ${result.statusText}`,
+		};
+	}
+
+	context.audit.log({
+		action: "tool:notify.send",
+		source: "notify.send",
+		detail: `Sent ${channel} notification: ${title}`,
+		success: true,
+	});
+
+	return {
+		success: true,
+		output: `${channel} notification sent: ${title}`,
+		artifacts: { channel, level, title },
+	};
+}
 
 async function sendWebhook(
 	url: string,
