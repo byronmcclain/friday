@@ -16,7 +16,10 @@
     "lint": "bunx @biomejs/biome check src/ tests/",
     "lint:fix": "bunx @biomejs/biome check --write src/ tests/",
     "format": "bunx @biomejs/biome format --write src/ tests/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "web:dev": "cd web && bunx vite",
+    "web:build": "cd web && bunx vite build",
+    "serve": "bun run src/main.ts serve"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

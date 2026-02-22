@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@theme {
+  --color-friday-deep: #0B0E14;
+  --color-friday-bg: #111620;
+  --color-friday-surface: #1A1F2E;
+  --color-friday-elevated: #232A3B;
+
+  --color-friday-amber: #F5A623;
+  --color-friday-amber-light: #FFCC66;
+  --color-friday-amber-dim: #8B6914;
+  --color-friday-copper: #E8852A;
+
+  --color-friday-text: #E8E0D4;
+  --color-friday-text-dim: #7A7262;
+  --color-friday-text-muted: #4A4438;
+
+  --color-friday-success: #4ADE80;
+  --color-friday-warning: #FBBF24;
+  --color-friday-error: #F87171;
+}
+
+body {
+  margin: 0;
+  font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
+  -webkit-font-smoothing: antialiased;
+  background-color: var(--color-friday-deep);
+  color: var(--color-friday-text);
+}
+
+/* Amber glow keyframes */
+@keyframes amber-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(245, 166, 35, 0.2); }
+  50% { box-shadow: 0 0 40px rgba(245, 166, 35, 0.4); }
+}
+
+.friday-glow {
+  animation: amber-pulse 2s ease-in-out infinite;
+}
