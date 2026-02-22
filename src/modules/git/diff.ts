@@ -75,11 +75,12 @@ export const gitDiff: FridayTool = {
 			let output = result.stdout.toString();
 			let truncated = false;
 			if (output.length > MAX_OUTPUT_BYTES) {
-				output = `${output.slice(0, MAX_OUTPUT_BYTES)}\n... (truncated, ${output.length} total bytes)`;
+				const totalBytes = output.length;
+				output = `${output.slice(0, MAX_OUTPUT_BYTES).trim()}\n... (truncated, ${totalBytes} total bytes)`;
 				truncated = true;
+			} else {
+				output = output.trim();
 			}
-
-			output = output.trim();
 
 			await context.audit.log({
 				action: "tool:git.diff",

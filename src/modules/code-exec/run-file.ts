@@ -59,8 +59,13 @@ export const codeRunFile: FridayTool = {
 		if (!containment.ok) {
 			return { success: false, output: containment.reason };
 		}
+		const realPath = containment.resolved;
 
-		const ext = filePath.substring(filePath.lastIndexOf(".")).toLowerCase();
+		const lastDot = realPath.lastIndexOf(".");
+		if (lastDot === -1) {
+			return { success: false, output: "File has no extension; cannot detect runtime." };
+		}
+		const ext = realPath.substring(lastDot).toLowerCase();
 		const cmdFactory = EXTENSION_MAP[ext];
 		if (!cmdFactory) {
 			return {
@@ -69,9 +74,9 @@ export const codeRunFile: FridayTool = {
 			};
 		}
 
-		const exists = await Bun.file(resolved).exists();
+		const exists = await Bun.file(realPath).exists();
 		if (!exists) {
-			return { success: false, output: `File not found: ${resolved}` };
+			return { success: false, output: `File not found: ${realPath}` };
 		}
 
 		const timeout = Math.min(
@@ -81,7 +86,7 @@ export const codeRunFile: FridayTool = {
 		const scriptArgs = (args.args as string[]) ?? [];
 
 		try {
-			const cmd = [...cmdFactory(resolved), ...scriptArgs];
+			const cmd = [...cmdFactory(realPath), ...scriptArgs];
 
 			const proc = Bun.spawn(cmd, {
 				cwd: context.workingDirectory,
@@ -118,19 +123,19 @@ export const codeRunFile: FridayTool = {
 			if (stderr.trim()) parts.push(`[stderr]\n${stderr.trim()}`);
 			if (parts.length === 0) parts.push("(no output)");
 
-			const output = `[exit ${exitCode}] ${resolved}\n${parts.join("\n")}`;
+			const output = `[exit ${exitCode}] ${realPath}\n${parts.join("\n")}`;
 
 			await context.audit.log({
 				action: "tool:code.run_file",
 				source: "code.run_file",
-				detail: `Ran ${resolved} (exit ${exitCode})`,
+				detail: `Ran ${realPath} (exit ${exitCode})`,
 				success: exitCode === 0,
 			});
 
 			return {
 				success: exitCode === 0,
 				output,
-				artifacts: { exitCode, path: resolved, ext, truncated },
+				artifacts: { exitCode, path: realPath, ext, truncated },
 			};
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : String(err);

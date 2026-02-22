@@ -80,7 +80,10 @@ export const dockerLogs: FridayTool = {
 				stdout = `${stdout.slice(0, MAX_OUTPUT_BYTES)}\n... (truncated)`;
 			}
 
-			const output = stdout.trim() || stderr || "(no logs)";
+			const parts: string[] = [];
+			if (stdout.trim()) parts.push(stdout.trim());
+			if (stderr) parts.push(stderr);
+			const output = parts.join("\n") || "(no logs)";
 
 			await context.audit.log({
 				action: "tool:docker.logs",

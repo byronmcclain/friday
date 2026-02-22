@@ -86,10 +86,12 @@ export const webFetch: FridayTool = {
 				signal: controller.signal,
 			});
 
-			let responseBody = await response.text();
+			const rawBody = await response.text();
+			const originalLength = rawBody.length;
+			let responseBody = rawBody;
 			let truncated = false;
-			if (responseBody.length > MAX_BODY_BYTES) {
-				responseBody = `${responseBody.slice(0, MAX_BODY_BYTES)}\n... (truncated, ${responseBody.length} total bytes)`;
+			if (originalLength > MAX_BODY_BYTES) {
+				responseBody = `${rawBody.slice(0, MAX_BODY_BYTES)}\n... (truncated, ${originalLength} total chars)`;
 				truncated = true;
 			}
 
@@ -120,7 +122,7 @@ export const webFetch: FridayTool = {
 					statusText: response.statusText,
 					headers: responseHeaders,
 					truncated,
-					contentLength: responseBody.length,
+					contentLength: originalLength,
 				},
 			};
 		} catch (err) {
