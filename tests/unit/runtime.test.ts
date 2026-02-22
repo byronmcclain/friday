@@ -121,6 +121,19 @@ describe("FridayRuntime", () => {
 		await runtime.boot({ injectedProvider: stubProvider });
 		expect(runtime.isBooted).toBe(true);
 	});
+
+	test("restartRequested defaults to false", async () => {
+		runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider });
+		expect(runtime.restartRequested).toBe(false);
+	});
+
+	test("restartRequested can be set to true", async () => {
+		runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider });
+		runtime.restartRequested = true;
+		expect(runtime.restartRequested).toBe(true);
+	});
 });
 
 const TEST_SMARTS_DIR_RT = "/tmp/friday-test-runtime-smarts";

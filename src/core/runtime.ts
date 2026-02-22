@@ -56,9 +56,18 @@ export class FridayRuntime {
 	private _sessionId?: string;
 	private _sessionStartedAt?: Date;
 	private _booted = false;
+	private _restartRequested = false;
 
 	get isBooted(): boolean {
 		return this._booted;
+	}
+
+	get restartRequested(): boolean {
+		return this._restartRequested;
+	}
+
+	set restartRequested(value: boolean) {
+		this._restartRequested = value;
 	}
 
 	get cortex(): Cortex {
