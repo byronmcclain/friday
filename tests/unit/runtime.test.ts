@@ -303,6 +303,17 @@ describe("FridayRuntime — conversation persistence", () => {
 		expect(runtime2.cortex.historyLength).toBe(0);
 		await runtime2.shutdown();
 	});
+
+	test("shutdown reports conversation step via onProgress", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider, dataDir });
+		await runtime.process("Hello Friday");
+		const steps: string[] = [];
+		await runtime.shutdown((step) => {
+			steps.push(step);
+		});
+		expect(steps).toContain("conversation");
+	});
 });
 
 describe("FridayRuntime — Sensorium integration", () => {
@@ -360,5 +371,15 @@ describe("FridayRuntime — Sensorium integration", () => {
 		expect(capturedPrompt).toContain("cores");
 
 		await runtime.shutdown();
+	});
+
+	test("shutdown reports sensorium step via onProgress", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider });
+		const steps: string[] = [];
+		await runtime.shutdown((step) => {
+			steps.push(step);
+		});
+		expect(steps).toContain("sensorium");
 	});
 });
