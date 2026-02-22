@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { AuditLogger } from "../../src/audit/logger.ts";
@@ -15,8 +15,10 @@ let testDir: string;
 let ctx: ToolContext;
 
 beforeEach(() => {
-  testDir = resolve(tmpdir(), `friday-fs-test-${Date.now()}`);
-  mkdirSync(testDir, { recursive: true });
+  const rawDir = resolve(tmpdir(), `friday-fs-test-${Date.now()}`);
+  mkdirSync(rawDir, { recursive: true });
+  // Resolve symlinks so assertContained() matches (e.g., /tmp → /private/tmp on macOS)
+  testDir = realpathSync(rawDir);
   ctx = {
     workingDirectory: testDir,
     audit: new AuditLogger(),

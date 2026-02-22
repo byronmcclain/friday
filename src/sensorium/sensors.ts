@@ -8,7 +8,6 @@ import {
 	arch,
 	hostname,
 	version,
-	platform as osPlatform,
 } from "node:os";
 import type {
 	MachineSnapshot,
@@ -120,7 +119,8 @@ export async function gatherContainers(): Promise<ContainerSnapshot> {
 					.filter(Boolean)) {
 					try {
 						const stat = JSON.parse(line);
-						statsMap.set(stat.Name || stat.Names || stat.ID || stat.Container, {
+						const statName = (stat.Name || stat.Names || stat.ID || stat.Container || "").replace(/^\//, "");
+						statsMap.set(statName, {
 							cpu: Number.parseFloat(stat.CPUPerc) || 0,
 							memory: Number.parseFloat(stat.MemPerc) || 0,
 						});
@@ -134,11 +134,11 @@ export async function gatherContainers(): Promise<ContainerSnapshot> {
 				try {
 					const c = JSON.parse(line);
 					const id = c.ID ?? "";
-					const name = c.Names ?? "";
+					const name = (c.Names ?? "").replace(/^\//, "");
 					const stats = statsMap.get(name) ?? statsMap.get(id) ?? { cpu: 0, memory: 0 };
 					running.push({
 						id,
-						name: c.Names ?? "",
+						name,
 						image: c.Image ?? "",
 						cpu: stats.cpu,
 						memory: stats.memory,
@@ -217,7 +217,7 @@ async function gatherGit(): Promise<DevSnapshot["git"]> {
 async function gatherPorts(): Promise<DevSnapshot["ports"]> {
 	try {
 		const ports: DevSnapshot["ports"] = [];
-		const plat = osPlatform();
+		const plat = platform();
 
 		if (plat === "darwin") {
 			const result =

@@ -35,11 +35,14 @@ export class WebSocketHandler {
 		try {
 			switch (msg.type) {
 				case "session:boot":
-					return this.handleBoot(msg, send);
+					await this.handleBoot(msg, send);
+					return;
 				case "session:shutdown":
-					return this.handleShutdown(msg, send);
+					await this.handleShutdown(msg, send);
+					return;
 				default:
-					return this.handleRuntimeMessage(msg, send);
+					await this.handleRuntimeMessage(msg, send);
+					return;
 			}
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
@@ -144,7 +147,7 @@ export class WebSocketHandler {
 		if (!this.runtime.isBooted) {
 			send({
 				type: "error",
-				requestId: (msg as any).id,
+				requestId: msg.id,
 				code: "NOT_BOOTED",
 				message: "Runtime not booted. Send session:boot first.",
 			});
@@ -165,10 +168,10 @@ export class WebSocketHandler {
 			case "protocol": {
 				const result = await this.runtime.process(msg.command);
 				send({
-					type: "chat:response",
+					type: "protocol:response",
 					requestId: msg.id,
 					content: result.output,
-					source: result.source,
+					success: result.source === "protocol",
 				});
 				break;
 			}

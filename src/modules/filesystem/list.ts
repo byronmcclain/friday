@@ -1,6 +1,7 @@
 import { readdir, stat } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertContained } from "./containment.ts";
 
 export const fsList: FridayTool = {
   name: "fs.list",
@@ -34,8 +35,9 @@ export const fsList: FridayTool = {
     const recursive = (args.recursive as boolean) ?? false;
     const glob = args.glob as string | undefined;
     const resolved = resolve(context.workingDirectory, dirPath);
-    if (!resolved.startsWith(`${context.workingDirectory}/`) && resolved !== context.workingDirectory) {
-      return { success: false, output: "Access denied: path escapes working directory" };
+    const containment = await assertContained(resolved, context.workingDirectory);
+    if (!containment.ok) {
+      return { success: false, output: containment.reason };
     }
 
     try {

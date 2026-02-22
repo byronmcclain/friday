@@ -1,6 +1,7 @@
 import type { SmartsStore } from "./store.ts";
 import type { LLMProvider } from "../providers/types.ts";
 import { type ConversationMessage, getTextContent } from "../core/types.ts";
+import { withTimeout } from "../utils/timeout.ts";
 
 const MIN_MESSAGES_FOR_EXTRACTION = 10;
 
@@ -48,10 +49,14 @@ export class SmartsCurator {
         .map((m) => `${m.role}: ${getTextContent(m.content)}`)
         .join("\n\n");
 
-      const chatResponse = await this.provider.chat(
-        EXTRACTION_PROMPT,
-        [{ role: "user", content: conversationText }],
-        { model: this.model, maxTokens: 4096 },
+      const chatResponse = await withTimeout(
+        this.provider.chat(
+          EXTRACTION_PROMPT,
+          [{ role: "user", content: conversationText }],
+          { model: this.model, maxTokens: 4096 },
+        ),
+        30_000,
+        "SMARTS knowledge extraction",
       );
       const response = chatResponse.type === "text" ? chatResponse.text : "";
 
@@ -61,7 +66,7 @@ export class SmartsCurator {
           name: smart.name,
           domain: smart.domain,
           tags: smart.tags,
-          confidence: Math.min(smart.confidence, 0.7),
+          confidence: Math.max(0, Math.min(smart.confidence, 0.7)),
           source: "conversation",
           content: smart.content,
         });

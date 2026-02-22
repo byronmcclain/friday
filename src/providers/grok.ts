@@ -112,7 +112,7 @@ interface GrokChoiceLike {
 
 /** Parse OpenAI-compatible response choice into Friday's ChatResponse */
 export function parseGrokResponse(choice: GrokChoiceLike): ChatResponse {
-  if (choice.finish_reason === "tool_calls" && choice.message.tool_calls) {
+  if (choice.message.tool_calls && choice.message.tool_calls.length > 0) {
     const toolCalls = choice.message.tool_calls.map((tc) => {
       let input: Record<string, unknown>;
       try {
@@ -154,6 +154,8 @@ export class GrokProvider implements LLMProvider {
     this.client = new OpenAI({
       apiKey,
       baseURL: "https://api.x.ai/v1",
+      timeout: 60_000,
+      maxRetries: 2,
     });
   }
 

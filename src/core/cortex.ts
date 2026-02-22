@@ -88,6 +88,7 @@ export class Cortex {
   async chat(userMessage: string): Promise<string> {
     const startLength = this.conversationHistory.length;
     this.conversationHistory.push({ role: "user", content: userMessage });
+    let toolsExecuted = false;
 
     try {
       const systemPrompt = await this.buildSystemPrompt(userMessage);
@@ -131,6 +132,7 @@ export class Cortex {
         const results = await Promise.all(
           response.toolCalls.map((tc) => this.executeToolCall(tc)),
         );
+        toolsExecuted = true;
 
         // Record results as user message with tool_result blocks
         const resultBlocks: ContentBlock[] = results.map((r) => ({
@@ -149,8 +151,13 @@ export class Cortex {
         `Max tool iterations (${this.maxToolIterations}) exceeded`,
       );
     } catch (err) {
-      // Roll back all messages added during this call
-      this.conversationHistory.length = startLength;
+      if (toolsExecuted) {
+        // Tools already executed with side effects — preserve partial conversation state
+        console.warn("Cortex chat() failed after tool executions; preserving partial history");
+      } else {
+        // No tools ran — safe to roll back all messages added during this call
+        this.conversationHistory.length = startLength;
+      }
       throw err;
     }
   }
@@ -177,7 +184,15 @@ export class Cortex {
       };
     }
 
-    if (this.clearance && tool.clearance.length > 0) {
+    if (tool.clearance.length > 0) {
+      if (!this.clearance) {
+        console.warn(`Clearance check unavailable — denying tool: ${call.name}`);
+        return {
+          toolCallId: call.id,
+          output: `Clearance denied for tool: ${call.name} (clearance manager not configured)`,
+          isError: true,
+        };
+      }
       const check = this.clearance.checkAll(tool.clearance);
       if (!check.granted) {
         return {

@@ -100,11 +100,16 @@ export const forgeValidate: FridayTool = {
 					stderr: "pipe",
 				},
 			);
+			// Consume I/O before awaiting exit to prevent pipe buffer deadlock
+			const [, stderrBuf] = await Promise.all([
+				new Response(proc.stdout).arrayBuffer(),
+				new Response(proc.stderr).arrayBuffer(),
+			]);
 			const exitCode = await proc.exited;
 			if (exitCode === 0) {
 				steps.push({ name: "typecheck", passed: true });
 			} else {
-				const stderr = await new Response(proc.stderr).text();
+				const stderr = new TextDecoder().decode(stderrBuf);
 				steps.push({
 					name: "typecheck",
 					passed: false,
@@ -122,11 +127,16 @@ export const forgeValidate: FridayTool = {
 				stdout: "pipe",
 				stderr: "pipe",
 			});
+			// Consume I/O before awaiting exit to prevent pipe buffer deadlock
+			const [stdoutBuf] = await Promise.all([
+				new Response(proc.stdout).arrayBuffer(),
+				new Response(proc.stderr).arrayBuffer(),
+			]);
 			const exitCode = await proc.exited;
 			if (exitCode === 0) {
 				steps.push({ name: "lint", passed: true });
 			} else {
-				const stdout = await new Response(proc.stdout).text();
+				const stdout = new TextDecoder().decode(stdoutBuf);
 				steps.push({
 					name: "lint",
 					passed: false,

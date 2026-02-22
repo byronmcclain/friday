@@ -68,6 +68,26 @@ export const forgeApply: FridayTool = {
 		}
 
 		try {
+			// Enforce protection before patching
+			if (proposal.action === "patch") {
+				const patchManifest = new ForgeManifestManager(resolvedForge);
+				if (await patchManifest.isProtected(proposal.moduleName)) {
+					return {
+						success: false,
+						output: `Module "${proposal.moduleName}" is protected and cannot be patched`,
+					};
+				}
+
+				// Verify manifest entry exists before writing files
+				const patchEntry = await patchManifest.getEntry(proposal.moduleName);
+				if (!patchEntry) {
+					return {
+						success: false,
+						output: `Module "${proposal.moduleName}" not found in forge manifest. Cannot patch a module that doesn't exist.`,
+					};
+				}
+			}
+
 			// Backup existing module for patches
 			if (proposal.action === "patch") {
 				const backupDir = resolve(
@@ -113,9 +133,12 @@ export const forgeApply: FridayTool = {
 			} else {
 				const entry = await manifest.getEntry(proposal.moduleName);
 				const currentVersion = entry?.version ?? "1.0.0";
-				const parts = currentVersion.split(".");
-				parts[2] = String(Number(parts[2]) + 1);
-				const newVersion = parts.join(".");
+				const rawParts = currentVersion.split(".");
+				// Ensure at least 3 parts and clamp NaN to 0
+				const major = Number.parseInt(rawParts[0] ?? "1", 10) || 0;
+				const minor = Number.parseInt(rawParts[1] ?? "0", 10) || 0;
+				const patch = (Number.parseInt(rawParts[2] ?? "0", 10) || 0) + 1;
+				const newVersion = `${major}.${minor}.${patch}`;
 				await manifest.updateModule(
 					proposal.moduleName,
 					newVersion,

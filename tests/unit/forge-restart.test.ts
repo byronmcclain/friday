@@ -37,7 +37,7 @@ describe("forge_restart tool", () => {
   test("sets restartRequested on the provided runtime ref", async () => {
     const runtimeRef = { restartRequested: false };
     const result = await forgeRestart.execute(
-      { reason: "Load new module", runtimeRef },
+      { reason: "Load new module", moduleName: "test-mod", runtimeRef },
       context,
     );
     expect(result.success).toBe(true);
@@ -47,10 +47,36 @@ describe("forge_restart tool", () => {
 
   test("fails without runtimeRef", async () => {
     const result = await forgeRestart.execute(
-      { reason: "Load new module" },
+      { reason: "Load new module", moduleName: "test-mod" },
       context,
     );
     expect(result.success).toBe(false);
     expect(result.output).toContain("runtime");
+  });
+
+  test("fails without moduleName", async () => {
+    const result = await forgeRestart.execute(
+      { reason: "Load new module" },
+      context,
+    );
+    expect(result.success).toBe(false);
+    expect(result.output).toContain("moduleName");
+  });
+
+  test("fails without validation receipt", async () => {
+    const noReceiptMemory = {
+      get: async () => undefined,
+      set: async () => {},
+      delete: async () => {},
+      list: async () => [],
+    };
+    const noReceiptCtx = { ...context, memory: noReceiptMemory };
+    const runtimeRef = { restartRequested: false };
+    const result = await forgeRestart.execute(
+      { reason: "Load", moduleName: "unvalidated", runtimeRef },
+      noReceiptCtx,
+    );
+    expect(result.success).toBe(false);
+    expect(result.output).toContain("validation");
   });
 });

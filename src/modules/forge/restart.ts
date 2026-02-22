@@ -13,6 +13,12 @@ export const forgeRestart: FridayTool = {
 			required: true,
 		},
 		{
+			name: "moduleName",
+			type: "string",
+			description: "Name of the forge module that was validated",
+			required: true,
+		},
+		{
 			name: "runtimeRef",
 			type: "object",
 			description:
@@ -27,6 +33,7 @@ export const forgeRestart: FridayTool = {
 		context: ToolContext,
 	): Promise<ToolResult> {
 		const reason = args.reason as string;
+		const moduleName = args.moduleName as string;
 		const runtimeRef = args.runtimeRef as
 			| { restartRequested: boolean }
 			| undefined;
@@ -37,10 +44,25 @@ export const forgeRestart: FridayTool = {
 				output: "Missing required parameter: reason",
 			};
 		}
+		if (!moduleName) {
+			return {
+				success: false,
+				output: "Missing required parameter: moduleName",
+			};
+		}
 		if (!runtimeRef) {
 			return {
 				success: false,
 				output: "Missing runtime reference — cannot trigger restart",
+			};
+		}
+
+		// Verify validation receipt exists
+		const receipt = await context.memory.get(`validation:${moduleName}`);
+		if (!receipt) {
+			return {
+				success: false,
+				output: `No validation receipt found for "${moduleName}". Run forge_validate first.`,
 			};
 		}
 

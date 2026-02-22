@@ -266,23 +266,33 @@ export class FridayRuntime {
 			});
 		} catch (err) {
 			this._booted = false;
+			// Unload any successfully-loaded modules
+			for (const mod of this._modules) {
+				try {
+					if (mod.onUnload) await mod.onUnload();
+				} catch { /* best-effort cleanup */ }
+			}
 			this._modules = [];
-			if (this._directiveEngine) {
-				this._directiveEngine.stop();
-			}
-			if (this._sensorium) {
-				this._sensorium.stop();
-				this._sensorium = undefined;
-			}
-			if (this._smartsMemory) {
-				this._smartsMemory.close();
-				this._smartsMemory = undefined;
-				this._smarts = undefined;
-			}
-			if (this._memory) {
-				this._memory.close();
-				this._memory = undefined;
-			}
+			try { this._directiveEngine?.stop(); } catch { /* best-effort */ }
+			try {
+				if (this._sensorium) {
+					this._sensorium.stop();
+					this._sensorium = undefined;
+				}
+			} catch { /* best-effort */ }
+			try {
+				if (this._smartsMemory) {
+					this._smartsMemory.close();
+					this._smartsMemory = undefined;
+					this._smarts = undefined;
+				}
+			} catch { /* best-effort */ }
+			try {
+				if (this._memory) {
+					this._memory.close();
+					this._memory = undefined;
+				}
+			} catch { /* best-effort */ }
 			throw err;
 		}
 	}
@@ -323,64 +333,81 @@ export class FridayRuntime {
 	}
 
 	async shutdown(onProgress?: (step: ShutdownStep, label: string) => void): Promise<void> {
-		if (!this._booted) throw new Error("Runtime not booted");
+		if (!this._booted) {
+			console.warn("Runtime.shutdown() called but not booted — allowing graceful re-entry");
+			return;
+		}
 		this._booted = false;
 
 		// Stop sensorium polling before cleanup
-		if (this._sensorium) {
-			onProgress?.("sensorium", "Stopping environment sensors...");
-			this._sensorium.stop();
-			this._sensorium = undefined;
-		}
-
-		if (this._memory && this._sessionId && this._sessionStartedAt) {
-			onProgress?.("conversation", "Saving conversation history...");
-			const history = this._cortex.getHistory();
-			if (history.length > 0) {
-				let summary: string | undefined;
-				if (this._summarizer) {
-					summary = await this._summarizer.summarize(history);
-				}
-				await this._memory.saveConversation({
-					id: this._sessionId,
-					startedAt: this._sessionStartedAt,
-					endedAt: new Date(),
-					provider: this._cortex.providerName,
-					model: this._cortex.modelName,
-					messages: history,
-					summary,
-				});
+		try {
+			if (this._sensorium) {
+				onProgress?.("sensorium", "Stopping environment sensors...");
+				this._sensorium.stop();
+				this._sensorium = undefined;
 			}
+		} catch (err) {
+			console.warn("Sensorium shutdown failed:", err instanceof Error ? err.message : err);
 		}
 
-		if (this._curator) {
-			onProgress?.("knowledge", "Extracting knowledge from conversation...");
-			const history = this._cortex.getHistory();
-			await this._curator.extractFromConversation(history);
+		try {
+			if (this._memory && this._sessionId && this._sessionStartedAt) {
+				onProgress?.("conversation", "Saving conversation history...");
+				const history = this._cortex.getHistory();
+				if (history.length > 0) {
+					let summary: string | undefined;
+					if (this._summarizer) {
+						summary = await this._summarizer.summarize(history);
+					}
+					await this._memory.saveConversation({
+						id: this._sessionId,
+						startedAt: this._sessionStartedAt,
+						endedAt: new Date(),
+						provider: this._cortex.providerName,
+						model: this._cortex.modelName,
+						messages: history,
+						summary,
+					});
+				}
+			}
+		} catch (err) {
+			console.warn("Conversation save failed:", err instanceof Error ? err.message : err);
+		}
+
+		try {
+			if (this._curator) {
+				onProgress?.("knowledge", "Extracting knowledge from conversation...");
+				const history = this._cortex.getHistory();
+				await this._curator.extractFromConversation(history);
+			}
+		} catch (err) {
+			console.warn("Knowledge extraction failed:", err instanceof Error ? err.message : err);
 		}
 
 		this._forgeHealthReport = undefined;
 
 		onProgress?.("modules", "Unloading modules...");
-		await this._signals.emit("session:end", "runtime");
+		try { await this._signals.emit("session:end", "runtime"); } catch { /* best-effort */ }
 		for (const mod of this._modules) {
-			if (mod.onUnload) {
-				await mod.onUnload();
-			}
+			try {
+				if (mod.onUnload) await mod.onUnload();
+			} catch { /* best-effort module cleanup */ }
 		}
 		onProgress?.("cleanup", "Closing databases...");
-		if (this._smartsMemory) {
-			this._smartsMemory.close();
-			this._smartsMemory = undefined;
-			this._smarts = undefined;
-		}
-		if (this._memory) {
-			this._memory.close();
-			this._memory = undefined;
-		}
-		if (this._directiveEngine) {
-			this._directiveEngine.stop();
-		}
+		try {
+			if (this._smartsMemory) {
+				this._smartsMemory.close();
+				this._smartsMemory = undefined;
+				this._smarts = undefined;
+			}
+		} catch { /* best-effort */ }
+		try {
+			if (this._memory) {
+				this._memory.close();
+				this._memory = undefined;
+			}
+		} catch { /* best-effort */ }
+		try { this._directiveEngine?.stop(); } catch { /* best-effort */ }
 		this._audit.log({
 			action: "runtime:shutdown",
 			source: "runtime",

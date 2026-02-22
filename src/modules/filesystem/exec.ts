@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertContained } from "./containment.ts";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_TIMEOUT_MS = 300_000;
@@ -44,6 +45,12 @@ export const bashExec: FridayTool = {
     const cwd = args.cwd
       ? resolve(context.workingDirectory, args.cwd as string)
       : context.workingDirectory;
+
+    // Validate cwd is contained within working directory
+    const cwdCheck = await assertContained(cwd, context.workingDirectory);
+    if (!cwdCheck.ok) {
+      return { success: false, output: `Access denied: cwd escapes working directory` };
+    }
 
     const timeout = Math.min(
       MAX_TIMEOUT_MS,

@@ -70,7 +70,7 @@ describe("WebSocketHandler", () => {
 			mockSend,
 		);
 		expect(sent).toHaveLength(1);
-		expect(sent[0]!.type).toBe("chat:response");
+		expect(sent[0]!.type).toBe("protocol:response");
 		expect((sent[0] as any).content).toContain("Test OK");
 	});
 

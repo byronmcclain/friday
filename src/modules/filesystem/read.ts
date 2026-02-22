@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertContained } from "./containment.ts";
 
 const DEFAULT_LIMIT = 200;
 const MAX_LIMIT = 2000;
@@ -39,8 +40,9 @@ export const fsRead: FridayTool = {
     }
 
     const resolved = resolve(context.workingDirectory, filePath);
-    if (!resolved.startsWith(`${context.workingDirectory}/`)) {
-      return { success: false, output: "Access denied: path escapes working directory" };
+    const containment = await assertContained(resolved, context.workingDirectory);
+    if (!containment.ok) {
+      return { success: false, output: containment.reason };
     }
     const offset = Math.max(1, (args.offset as number) ?? 1);
     const limit = Math.min(MAX_LIMIT, Math.max(1, (args.limit as number) ?? DEFAULT_LIMIT));

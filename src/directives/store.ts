@@ -11,8 +11,12 @@ export class DirectiveStore {
   }
 
   private notifyChange(): void {
-    for (const listener of this.changeListeners) {
-      listener();
+    for (const listener of [...this.changeListeners]) {
+      try {
+        listener();
+      } catch (err) {
+        console.error("DirectiveStore change listener error:", err);
+      }
     }
   }
 
@@ -33,7 +37,7 @@ export class DirectiveStore {
   update(id: string, updates: Partial<FridayDirective>): void {
     const existing = this.directives.get(id);
     if (existing) {
-      this.directives.set(id, { ...existing, ...updates });
+      this.directives.set(id, { ...existing, ...updates, id });
       this.notifyChange();
     }
   }

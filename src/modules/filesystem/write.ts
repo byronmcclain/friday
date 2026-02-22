@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertContained } from "./containment.ts";
 
 export const fsWrite: FridayTool = {
   name: "fs.write",
@@ -45,8 +46,9 @@ export const fsWrite: FridayTool = {
     }
 
     const resolved = resolve(context.workingDirectory, filePath);
-    if (!resolved.startsWith(`${context.workingDirectory}/`)) {
-      return { success: false, output: "Access denied: path escapes working directory" };
+    const containment = await assertContained(resolved, context.workingDirectory);
+    if (!containment.ok) {
+      return { success: false, output: containment.reason };
     }
 
     try {

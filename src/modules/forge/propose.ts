@@ -12,8 +12,8 @@ function generateModuleTemplate(
 			content: `import type { FridayModule } from "../../src/modules/types.ts";
 
 const ${toolName}Module: FridayModule = {
-  name: "${moduleName}",
-  description: "${description}",
+  name: ${JSON.stringify(moduleName)},
+  description: ${JSON.stringify(description)},
   version: "1.0.0",
   tools: [],
   protocols: [],
@@ -91,9 +91,27 @@ export const forgePropose: FridayTool = {
 			};
 		}
 
-		const files: ForgeFile[] =
-			(args.files as ForgeFile[]) ??
-			generateModuleTemplate(moduleName, description);
+		let files: ForgeFile[];
+		if (args.files) {
+			if (!Array.isArray(args.files)) {
+				return { success: false, output: "Parameter 'files' must be an array" };
+			}
+			for (const f of args.files) {
+				if (
+					typeof f !== "object" || f === null ||
+					typeof (f as ForgeFile).path !== "string" ||
+					typeof (f as ForgeFile).content !== "string"
+				) {
+					return {
+						success: false,
+						output: "Each file in 'files' must have 'path' (string) and 'content' (string)",
+					};
+				}
+			}
+			files = args.files as ForgeFile[];
+		} else {
+			files = generateModuleTemplate(moduleName, description);
+		}
 
 		const proposalId = crypto.randomUUID();
 		const proposal: ForgeProposal = {

@@ -108,7 +108,10 @@ export class AnthropicProvider implements LLMProvider {
           "Get your API key at https://console.anthropic.com",
       );
     }
-    this.client = new Anthropic();
+    this.client = new Anthropic({
+      timeout: 60_000,
+      maxRetries: 2,
+    });
   }
 
   async chat(

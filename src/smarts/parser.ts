@@ -5,7 +5,7 @@ type ParsedSmart = Omit<SmartEntry, "filePath">;
 const VALID_SOURCES: SmartSource[] = ["manual", "auto", "conversation"];
 
 export function parseFrontmatter(raw: string): ParsedSmart | null {
-  const normalized = raw.replace(/\r\n/g, "\n");
+  const normalized = raw.replace(/\r\n?/g, "\n");
   const match = normalized.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!match) return null;
 
@@ -33,6 +33,10 @@ export function parseFrontmatter(raw: string): ParsedSmart | null {
     source,
     content: body.trim(),
   };
+}
+
+function unescapeYaml(s: string): string {
+  return s.replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
 }
 
 function quoteYaml(s: string): string {
@@ -66,7 +70,7 @@ function parseYamlFields(yaml: string): Record<string, string> {
     const kvMatch = line.match(/^(\w[\w-]*)\s*:\s*(.*)$/);
     if (kvMatch) {
       currentKey = kvMatch[1]!;
-      fields[currentKey] = kvMatch[2]!.trim().replace(/^(['"])(.*)\1$/, "$2");
+      fields[currentKey] = unescapeYaml(kvMatch[2]!.trim().replace(/^(['"])(.*)\1$/, "$2"));
     } else if (currentKey && line.match(/^\s+-\s+/)) {
       fields[currentKey] = `${fields[currentKey] || ""},${line.replace(/^\s+-\s+/, "").trim()}`;
     }
@@ -76,7 +80,7 @@ function parseYamlFields(yaml: string): Record<string, string> {
 }
 
 function stripQuotes(s: string): string {
-  return s.replace(/^(['"])(.*)\1$/, "$2");
+  return unescapeYaml(s.replace(/^(['"])(.*)\1$/, "$2"));
 }
 
 function parseYamlArray(value: string): string[] {

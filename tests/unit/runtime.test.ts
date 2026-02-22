@@ -92,9 +92,10 @@ describe("FridayRuntime", () => {
 		await expect(runtime.process("hello")).rejects.toThrow("Runtime not booted");
 	});
 
-	test("shutdown throws when not booted", async () => {
+	test("shutdown is graceful when not booted", async () => {
 		runtime = new FridayRuntime();
-		await expect(runtime.shutdown()).rejects.toThrow("Runtime not booted");
+		// Should resolve without error (warns instead of throwing)
+		await runtime.shutdown();
 	});
 
 	test("protocol handler receives rawArgs", async () => {

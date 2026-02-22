@@ -1,5 +1,6 @@
 import type { LLMProvider } from "../providers/types.ts";
 import { type ConversationMessage, getTextContent } from "./types.ts";
+import { withTimeout } from "../utils/timeout.ts";
 
 const MIN_MESSAGES_FOR_SUMMARY = 4;
 
@@ -25,10 +26,14 @@ export class ConversationSummarizer {
 				.map((m) => `${m.role}: ${getTextContent(m.content)}`)
 				.join("\n\n");
 
-			const response = await this.provider.chat(
-				SUMMARY_PROMPT,
-				[{ role: "user", content: conversationText }],
-				{ model: this.fastModel, maxTokens: 256 },
+			const response = await withTimeout(
+				this.provider.chat(
+					SUMMARY_PROMPT,
+					[{ role: "user", content: conversationText }],
+					{ model: this.fastModel, maxTokens: 256 },
+				),
+				30_000,
+				"conversation summarization",
 			);
 
 			if (response.type !== "text") return undefined;

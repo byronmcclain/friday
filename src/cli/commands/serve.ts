@@ -45,12 +45,14 @@ export function serveCommand(program: Command): void {
 				),
 			);
 
-			const shutdown = () => {
+			const shutdown = async () => {
 				console.log(chalk.hex("#8B6914")("\nShutting down server..."));
 				server.stop(true);
+				// Give in-flight WebSocket handlers a moment to drain
+				await new Promise((r) => setTimeout(r, 1000));
 				process.exit(0);
 			};
-			process.on("SIGINT", shutdown);
-			process.on("SIGTERM", shutdown);
+			process.on("SIGINT", () => void shutdown());
+			process.on("SIGTERM", () => void shutdown());
 		});
 }

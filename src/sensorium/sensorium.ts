@@ -25,6 +25,7 @@ export class Sensorium {
 	private _fastTimer?: ReturnType<typeof setInterval>;
 	private _slowTimer?: ReturnType<typeof setInterval>;
 	private _running = false;
+	private _polling = false;
 
 	// Hysteresis state
 	private _alertStates = {
@@ -50,44 +51,56 @@ export class Sensorium {
 	}
 
 	async poll(): Promise<void> {
-		const machineResult = await gatherMachine(this._prevCpuTimes);
-		this._prevCpuTimes = machineResult.cpuTimes;
+		if (this._polling) return;
+		this._polling = true;
+		try {
+			const machineResult = await gatherMachine(this._prevCpuTimes);
+			this._prevCpuTimes = machineResult.cpuTimes;
 
-		const { cpuTimes: _, ...machine } = machineResult;
+			const { cpuTimes: _, ...machine } = machineResult;
 
-		const [containers, dev] = await Promise.all([
-			gatherContainers(),
-			gatherDev(),
-		]);
+			const [containers, dev] = await Promise.all([
+				gatherContainers(),
+				gatherDev(),
+			]);
 
-		this._snapshot = {
-			timestamp: new Date(),
-			machine,
-			containers,
-			dev,
-		};
+			this._snapshot = {
+				timestamp: new Date(),
+				machine,
+				containers,
+				dev,
+			};
 
-		this.evaluateAlerts(this._snapshot);
+			this.evaluateAlerts(this._snapshot);
+		} finally {
+			this._polling = false;
+		}
 	}
 
 	async pollFast(): Promise<void> {
+		if (this._polling) return;
 		if (!this._snapshot) {
 			await this.poll();
 			return;
 		}
 
-		const machineResult = await gatherMachine(this._prevCpuTimes);
-		this._prevCpuTimes = machineResult.cpuTimes;
+		this._polling = true;
+		try {
+			const machineResult = await gatherMachine(this._prevCpuTimes);
+			this._prevCpuTimes = machineResult.cpuTimes;
 
-		const { cpuTimes: _, ...machine } = machineResult;
+			const { cpuTimes: _, ...machine } = machineResult;
 
-		this._snapshot = {
-			...this._snapshot,
-			timestamp: new Date(),
-			machine,
-		};
+			this._snapshot = {
+				...this._snapshot,
+				timestamp: new Date(),
+				machine,
+			};
 
-		this.evaluateAlerts(this._snapshot);
+			this.evaluateAlerts(this._snapshot);
+		} finally {
+			this._polling = false;
+		}
 	}
 
 	start(): void {

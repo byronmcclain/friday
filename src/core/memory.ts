@@ -245,7 +245,8 @@ export class SQLiteMemory {
         similarity: Math.abs(r.rank),
         metadata: r.metadata ? JSON.parse(r.metadata) : undefined,
       }));
-    } catch {
+    } catch (err) {
+      console.warn("FTS5 search failed:", err instanceof Error ? err.message : err);
       return [];
     }
   }

@@ -16,7 +16,10 @@ interface WSData {
 	pushInterval?: ReturnType<typeof setInterval>;
 }
 
+const MAX_CONNECTIONS = 10;
+
 export function createFridayServer(config: FridayServerConfig) {
+	let activeConnections = 0;
 	const staticDir = config.staticDir ?? resolve("web/dist");
 	const allowedOrigins = new Set([
 		`http://localhost:${config.port}`,
@@ -36,6 +39,12 @@ export function createFridayServer(config: FridayServerConfig) {
 				if (origin && !allowedOrigins.has(origin)) {
 					return new Response("Forbidden: invalid origin", {
 						status: 403,
+					});
+				}
+
+				if (activeConnections >= MAX_CONNECTIONS) {
+					return new Response("Service Unavailable: connection limit reached", {
+						status: 503,
 					});
 				}
 
@@ -73,13 +82,17 @@ export function createFridayServer(config: FridayServerConfig) {
 		},
 		websocket: {
 			open(_ws: ServerWebSocket<WSData>) {
-				// Connection opened — nothing to do until client sends session:boot
+				activeConnections++;
 			},
 			async message(ws: ServerWebSocket<WSData>, message: string | Buffer) {
 				const raw =
 					typeof message === "string" ? message : message.toString();
 				const send: SendFn = (msg: ServerMessage) => {
-					ws.send(JSON.stringify(msg));
+					try {
+						if (ws.readyState === 1) {
+							ws.send(JSON.stringify(msg));
+						}
+					} catch { /* connection may have closed */ }
 				};
 				await ws.data.handler.handle(raw, send);
 
@@ -105,6 +118,7 @@ export function createFridayServer(config: FridayServerConfig) {
 				}
 			},
 			close(ws: ServerWebSocket<WSData>) {
+				activeConnections--;
 				// Clean up Sensorium push interval
 				if (ws.data.pushInterval) {
 					clearInterval(ws.data.pushInterval);

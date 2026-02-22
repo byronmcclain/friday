@@ -54,7 +54,7 @@ export class SignalBus implements SignalEmitter {
     const signal: Signal = { name, timestamp: new Date(), source, data };
     const handlers = this.listeners.get(name);
     if (!handlers) return;
-    for (const handler of handlers) {
+    for (const handler of [...handlers]) {
       try {
         await handler(signal);
       } catch (err) {
