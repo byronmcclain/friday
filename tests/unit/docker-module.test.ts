@@ -108,6 +108,11 @@ describe("docker.run", () => {
 		expect(names).toContain("volumes");
 		expect(names).toContain("detach");
 	});
+
+	test("command parameter is type array", () => {
+		const cmdParam = dockerRun.parameters.find((p) => p.name === "command");
+		expect(cmdParam?.type).toBe("array");
+	});
 });
 
 // ─── docker.stop ────────────────────────────────────────────────────

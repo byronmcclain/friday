@@ -1,4 +1,5 @@
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertInteger } from "../validation.ts";
 
 export const gitStash: FridayTool = {
 	name: "git.stash",
@@ -76,7 +77,9 @@ export const gitStash: FridayTool = {
 				}
 
 				case "pop": {
-					const index = (args.index as number) ?? 0;
+					const indexResult = assertInteger(args.index ?? 0, "index");
+					if ("success" in indexResult) return indexResult;
+					const index = indexResult.value;
 					const result =
 						await Bun.$`git -C ${context.workingDirectory} stash pop stash@{${index}}`
 							.quiet()
@@ -129,7 +132,9 @@ export const gitStash: FridayTool = {
 				}
 
 				case "drop": {
-					const index = (args.index as number) ?? 0;
+					const indexResult = assertInteger(args.index ?? 0, "index");
+					if ("success" in indexResult) return indexResult;
+					const index = indexResult.value;
 					const result =
 						await Bun.$`git -C ${context.workingDirectory} stash drop stash@{${index}}`
 							.quiet()

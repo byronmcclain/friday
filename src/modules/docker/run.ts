@@ -55,8 +55,8 @@ export const dockerRun: FridayTool = {
 		},
 		{
 			name: "command",
-			type: "string",
-			description: "Command to run inside the container",
+			type: "array",
+			description: 'Command to run inside the container as array (e.g., ["npm", "start"])',
 			required: false,
 		},
 	],
@@ -81,7 +81,7 @@ export const dockerRun: FridayTool = {
 			const volumes = (args.volumes as string[]) ?? [];
 			const detach = (args.detach as boolean) ?? true;
 			const rm = (args.rm as boolean) ?? false;
-			const command = args.command as string | undefined;
+			const command = args.command as string[] | undefined;
 
 			const cmdParts = ["docker", "run"];
 			if (detach) cmdParts.push("-d");
@@ -102,8 +102,8 @@ export const dockerRun: FridayTool = {
 
 			cmdParts.push(image);
 
-			if (command) {
-				cmdParts.push(...command.split(" "));
+			if (command && command.length > 0) {
+				cmdParts.push(...command);
 			}
 
 			const proc = Bun.spawn(cmdParts, {

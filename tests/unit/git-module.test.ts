@@ -283,6 +283,15 @@ describe("git.stash", () => {
 		expect(result.success).toBe(true);
 	});
 
+	test("rejects non-numeric stash index", async () => {
+		const result = await gitStash.execute(
+			{ action: "pop", index: "not-a-number" },
+			ctx,
+		);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Invalid");
+	});
+
 	test("declares git-write clearance", () => {
 		expect(gitStash.clearance).toEqual(["git-write"]);
 	});
