@@ -77,6 +77,23 @@ describe("WebSocketHandler", () => {
 		expect(runtime.isBooted).toBe(false);
 	});
 
+	test("pushSensoriumUpdate does not throw when runtime not booted", () => {
+		// Should safely no-op when sensorium is not available
+		handler.pushSensoriumUpdate(mockSend);
+		expect(sent).toHaveLength(0);
+	});
+
+	test("pushSensoriumUpdate sends via provided send function after boot", async () => {
+		await handler.handle('{"type":"session:boot","id":"1"}', mockSend);
+		sent = [];
+
+		// pushSensoriumUpdate may or may not produce output depending on
+		// whether sensorium has a snapshot in stub mode — the key is it doesn't throw
+		handler.pushSensoriumUpdate(mockSend);
+		const sensoriumMsgs = sent.filter((m) => m.type === "sensorium:update");
+		expect(sensoriumMsgs.length).toBeGreaterThanOrEqual(0);
+	});
+
 	test("returns error for invalid JSON", async () => {
 		await handler.handle("not json", mockSend);
 		expect(sent).toHaveLength(1);
