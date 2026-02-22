@@ -151,6 +151,9 @@ export class FridayRuntime {
 				injectedProvider: config.injectedProvider,
 				smartsStore: this._smarts,
 				sensorium: this._sensorium,
+				clearance: this._clearance,
+				audit: this._audit,
+				signals: this._signals,
 			});
 
 			// Register sensorium tool on Cortex (needs Cortex to exist)

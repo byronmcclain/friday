@@ -11,6 +11,9 @@ import type { FridayTool } from "../modules/types.ts";
 import type { ClearanceManager } from "./clearance.ts";
 import type { SmartsStore } from "../smarts/store.ts";
 import type { Sensorium } from "../sensorium/sensorium.ts";
+import type { AuditLogger } from "../audit/logger.ts";
+import type { SignalBus, SignalEmitter } from "./events.ts";
+import type { ScopedMemory } from "./memory.ts";
 
 export interface CortexConfig extends Partial<FridayConfig> {
   injectedProvider?: LLMProvider;
@@ -18,6 +21,9 @@ export interface CortexConfig extends Partial<FridayConfig> {
   maxToolIterations?: number;
   smartsStore?: SmartsStore;
   sensorium?: Sensorium;
+  audit?: AuditLogger;
+  signals?: SignalBus;
+  toolMemory?: ScopedMemory;
 }
 
 export class Cortex {
@@ -30,6 +36,9 @@ export class Cortex {
   private maxToolIterations: number;
   private smartsStore?: SmartsStore;
   private sensorium?: Sensorium;
+  private audit?: AuditLogger;
+  private signals?: SignalBus;
+  private toolMemory?: ScopedMemory;
   private pinnedSmarts = new Set<string>();
 
   constructor(config: CortexConfig = {}) {
@@ -43,6 +52,9 @@ export class Cortex {
     this.maxToolIterations = config.maxToolIterations ?? 10;
     this.smartsStore = config.smartsStore;
     this.sensorium = config.sensorium;
+    this.audit = config.audit;
+    this.signals = config.signals;
+    this.toolMemory = config.toolMemory;
   }
 
   get providerName(): string {
@@ -180,9 +192,9 @@ export class Cortex {
     try {
       const result = await tool.execute(call.input, {
         workingDirectory: process.cwd(),
-        audit: { log: async () => {} } as any,
-        signal: { emit: async () => {} } as any,
-        memory: {
+        audit: this.audit ?? ({ log: () => {} } as unknown as AuditLogger),
+        signal: this.signals ?? ({ emit: async () => {} } as SignalEmitter),
+        memory: this.toolMemory ?? {
           get: async () => undefined,
           set: async () => {},
           delete: async () => {},
