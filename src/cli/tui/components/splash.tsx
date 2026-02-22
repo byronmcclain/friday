@@ -1,9 +1,18 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useKeyboard, useTimeline } from "@opentui/react";
+import { useState, useEffect, useRef } from "react";
+import { useKeyboard } from "@opentui/react";
 import { PALETTE } from "../theme.ts";
 import { lerpColor } from "../lib/color-utils.ts";
 import type { LogoData } from "../lib/logo-processor.ts";
 import type { ParsedLine } from "../lib/ansi-parser.ts";
+
+const HOLD_MS = 2000;
+const FADE_MS = 1500;
+const TICK_MS = 50;
+
+// outQuad easing: decelerating curve
+function outQuad(t: number): number {
+	return t * (2 - t);
+}
 
 interface SplashScreenProps {
 	logoData: LogoData;
@@ -36,47 +45,36 @@ function FadedLine({
 
 export function SplashScreen({ logoData, onComplete }: SplashScreenProps) {
 	const [fadeProgress, setFadeProgress] = useState(0);
-	const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const fadingRef = useRef(false);
+	const onCompleteRef = useRef(onComplete);
+	onCompleteRef.current = onComplete;
 	const bg = PALETTE.background;
 
-	const timeline = useTimeline();
-
-	const startFade = useCallback(() => {
-		if (fadingRef.current) return;
-		fadingRef.current = true;
-
-		if (holdTimerRef.current) {
-			clearTimeout(holdTimerRef.current);
-			holdTimerRef.current = null;
-		}
-
-		const target = { progress: 0 };
-		timeline.add(target, {
-			duration: 1500,
-			progress: 1,
-			ease: "outQuad",
-			onUpdate: () => {
-				setFadeProgress(target.progress);
-			},
-			onComplete: () => {
-				onComplete();
-			},
-		});
-		timeline.play();
-	}, [timeline, onComplete]);
-
-	// Start 2s hold timer on mount
+	// Hold for HOLD_MS, then fade over FADE_MS using setInterval
 	useEffect(() => {
-		holdTimerRef.current = setTimeout(startFade, 2000);
+		let fadeInterval: ReturnType<typeof setInterval> | null = null;
+
+		const holdTimer = setTimeout(() => {
+			const start = Date.now();
+			fadeInterval = setInterval(() => {
+				const elapsed = Date.now() - start;
+				const t = Math.min(1, elapsed / FADE_MS);
+				setFadeProgress(outQuad(t));
+				if (t >= 1) {
+					if (fadeInterval) clearInterval(fadeInterval);
+					onCompleteRef.current();
+				}
+			}, TICK_MS);
+		}, HOLD_MS);
+
 		return () => {
-			if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+			clearTimeout(holdTimer);
+			if (fadeInterval) clearInterval(fadeInterval);
 		};
-	}, [startFade]);
+	}, []);
 
 	// Any keypress skips to chat
 	useKeyboard(() => {
-		onComplete();
+		onCompleteRef.current();
 	});
 
 	// Fade the ASCIIFont title color

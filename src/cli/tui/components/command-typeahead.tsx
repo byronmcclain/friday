@@ -177,6 +177,8 @@ export function CommandTypeahead({
 					onInput={handleInput}
 					focused={!disabled}
 					flexGrow={1}
+					textColor={PALETTE.textPrimary}
+					backgroundColor={PALETTE.background}
 				/>
 			</box>
 		</box>
