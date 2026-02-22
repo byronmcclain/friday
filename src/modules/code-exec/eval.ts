@@ -1,5 +1,4 @@
 import { resolve } from "node:path";
-import { mkdirSync } from "node:fs";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -93,9 +92,7 @@ export const codeEval: FridayTool = {
 		);
 
 		try {
-			mkdirSync(sandboxDir, { recursive: true });
-
-			// Write the code to a temp file
+			// Write the code to a temp file (Bun.write creates parent dirs)
 			const filePath = resolve(sandboxDir, `script${langConfig.extension}`);
 			await Bun.write(filePath, code);
 
@@ -154,10 +151,8 @@ export const codeEval: FridayTool = {
 			const msg = err instanceof Error ? err.message : String(err);
 			return { success: false, output: `Code execution failed: ${msg}` };
 		} finally {
-			// Clean up sandbox
 			try {
-				const { rmSync } = await import("node:fs");
-				rmSync(sandboxDir, { recursive: true, force: true });
+				await Bun.$`rm -rf ${sandboxDir}`.quiet().nothrow();
 			} catch {
 				/* best-effort cleanup */
 			}

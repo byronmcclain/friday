@@ -1,7 +1,7 @@
 import type { FridayModule } from "../types.ts";
 import { notifySend } from "./send.ts";
 
-const notifyModule: FridayModule = {
+const notifyModule = {
 	name: "notify",
 	description:
 		"Multi-channel notifications — send alerts via Slack webhooks, generic webhooks, or email relay. Integrates with directives for automated alerting.",
@@ -11,6 +11,6 @@ const notifyModule: FridayModule = {
 	knowledge: [],
 	triggers: ["error:unhandled"],
 	clearance: ["network"],
-};
+} satisfies FridayModule;
 
 export default notifyModule;

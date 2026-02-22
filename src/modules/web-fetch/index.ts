@@ -2,7 +2,7 @@ import type { FridayModule } from "../types.ts";
 import { webFetch } from "./fetch.ts";
 import { webSearch } from "./search.ts";
 
-const webFetchModule: FridayModule = {
+const webFetchModule = {
 	name: "web-fetch",
 	description:
 		"Web data retrieval — HTTP fetch for APIs and web pages, plus web search for fresh information.",
@@ -12,6 +12,6 @@ const webFetchModule: FridayModule = {
 	knowledge: [],
 	triggers: [],
 	clearance: ["network"],
-};
+} satisfies FridayModule;
 
 export default webFetchModule;

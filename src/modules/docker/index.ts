@@ -5,7 +5,7 @@ import { dockerPs } from "./ps.ts";
 import { dockerRun } from "./run.ts";
 import { dockerStop } from "./stop.ts";
 
-const dockerModule: FridayModule = {
+const dockerModule = {
 	name: "docker",
 	description:
 		"Docker container management — list, build, run, stop, and view logs for containers.",
@@ -15,6 +15,6 @@ const dockerModule: FridayModule = {
 	knowledge: [],
 	triggers: ["custom:container-down"],
 	clearance: ["exec-shell", "network"],
-};
+} satisfies FridayModule;
 
 export default dockerModule;

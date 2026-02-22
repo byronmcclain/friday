@@ -5,7 +5,7 @@ import { fsList } from "./list.ts";
 import { fsRead } from "./read.ts";
 import { fsWrite } from "./write.ts";
 
-const filesystemModule: FridayModule = {
+const filesystemModule = {
   name: "filesystem",
   description: "File system operations (read, list, write, delete) and general shell execution",
   version: "1.0.0",
@@ -14,6 +14,6 @@ const filesystemModule: FridayModule = {
   knowledge: [],
   triggers: ["file:changed", "file:created", "file:deleted"],
   clearance: ["read-fs", "write-fs", "delete-fs", "exec-shell"],
-};
+} satisfies FridayModule;
 
 export default filesystemModule;
