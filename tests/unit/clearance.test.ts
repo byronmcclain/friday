@@ -45,4 +45,9 @@ describe("ClearanceManager", () => {
     const manager = new ClearanceManager(["read-fs", "git-read"]);
     expect(manager.granted).toEqual(["read-fs", "git-read"]);
   });
+
+  test("grants and checks forge-modify clearance", () => {
+    const mgr = new ClearanceManager(["forge-modify"]);
+    expect(mgr.check("forge-modify").granted).toBe(true);
+  });
 });
