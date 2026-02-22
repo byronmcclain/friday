@@ -15,6 +15,12 @@ export function toJsonSchema(params: ToolParameter[]): JsonSchema {
       type: param.type,
       description: param.description,
     };
+    if (param.type === "array") {
+      prop.items = {};
+    }
+    if (param.type === "object") {
+      prop.additionalProperties = true;
+    }
     if (param.default !== undefined) {
       prop.default = param.default;
     }

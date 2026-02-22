@@ -5,9 +5,10 @@ import type { ChatMessage } from "../../hooks/useChat.ts";
 export function MessageList({ messages }: { messages: ChatMessage[] }) {
 	const bottomRef = useRef<HTMLDivElement>(null);
 
+	const lastMessageId = messages[messages.length - 1]?.id;
 	useEffect(() => {
 		bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, [messages]);
+	}, [lastMessageId]);
 
 	if (messages.length === 0) {
 		return (

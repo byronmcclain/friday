@@ -11,6 +11,13 @@ export function AutoBoot() {
 		connect();
 	}, [connect]);
 
+	// Reset boot flag when disconnected so re-connect triggers a fresh boot
+	useEffect(() => {
+		if (sessionState === "disconnected") {
+			bootedRef.current = false;
+		}
+	}, [sessionState]);
+
 	useEffect(() => {
 		if (
 			wsState === "connected" &&

@@ -1,3 +1,4 @@
+import { realpath } from "node:fs/promises";
 import type { FridayModule } from "./types.ts";
 
 export interface ValidationResult {
@@ -28,7 +29,10 @@ export async function discoverModules(modulesDir: string): Promise<FridayModule[
     for await (const match of glob.scan({ cwd: resolvedDir, onlyFiles: true })) {
       const indexPath = `${resolvedDir}/${match}`;
 
-      if (!resolve(indexPath).startsWith(`${resolvedDir}/`)) {
+      // Resolve symlinks before checking containment
+      const realIndexPath = await realpath(indexPath).catch(() => indexPath);
+      const realDir = await realpath(resolvedDir).catch(() => resolvedDir);
+      if (!realIndexPath.startsWith(`${realDir}/`)) {
         console.warn(`Skipping module with path traversal: ${match}`);
         continue;
       }

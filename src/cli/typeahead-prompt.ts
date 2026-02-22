@@ -1,5 +1,6 @@
 import * as readline from "node:readline";
 import chalk from "chalk";
+import { stripAnsi } from "../utils/strip-ansi.ts";
 
 export interface TypeaheadEntry {
 	name: string;
@@ -167,11 +168,16 @@ export function typeaheadPrompt(
 					if (selected) {
 						input = `/${selected.name} `;
 						cursorPos = input.length;
+						render();
+						return;
 					}
 				}
 				const value = input.trim();
 				if (value.length > 0) {
 					submit(value);
+				} else {
+					// Re-render prompt on empty enter to provide visual feedback
+					render();
 				}
 				return;
 			}
@@ -330,10 +336,3 @@ export function typeaheadPrompt(
 	});
 }
 
-function stripAnsi(str: string): string {
-	return str.replace(
-		// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape code stripping requires matching control characters
-		/[\u001B\u009B][[\]()#;?]*(?:(?:(?:[a-zA-Z\d]*(?:;[-a-zA-Z\d/#&.:=?%@~_]*)*)?\u0007)|(?:(?:\d{1,4}(?:;\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g,
-		"",
-	);
-}

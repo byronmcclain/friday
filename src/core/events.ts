@@ -40,7 +40,10 @@ export class SignalBus implements SignalEmitter {
   }
 
   once(name: SignalName, handler: SignalHandler): void {
+    let fired = false;
     const wrapper: SignalHandler = async (signal) => {
+      if (fired) return;
+      fired = true;
       this.off(name, wrapper);
       await handler(signal);
     };

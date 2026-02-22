@@ -20,6 +20,7 @@ export function TypeaheadDropdown({
 		<div className="absolute bottom-full left-0 right-0 mb-1 bg-friday-elevated border border-friday-amber-dim/40 rounded-lg overflow-hidden shadow-lg">
 			{entries.map((entry, i) => (
 				<button
+					type="button"
 					key={entry.name}
 					onClick={() => onSelect(entry)}
 					className={`w-full text-left px-3 py-2 text-sm flex items-center gap-3 transition-colors ${

@@ -45,6 +45,9 @@ export const fsWrite: FridayTool = {
     }
 
     const resolved = resolve(context.workingDirectory, filePath);
+    if (!resolved.startsWith(`${context.workingDirectory}/`)) {
+      return { success: false, output: "Access denied: path escapes working directory" };
+    }
 
     try {
       await mkdir(dirname(resolved), { recursive: true });

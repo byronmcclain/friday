@@ -5,13 +5,14 @@ import {
 	type SessionState,
 } from "../hooks/useSession.ts";
 import type { ConnectionState } from "../hooks/useWebSocket.ts";
+import type { ProviderName } from "@friday/core/types.ts";
 
 interface SessionContextValue {
 	sessionState: SessionState;
 	sessionInfo: SessionInfo | null;
 	wsState: ConnectionState;
 	boot: (options?: {
-		provider?: string;
+		provider?: ProviderName;
 		model?: string;
 		fresh?: boolean;
 	}) => void;

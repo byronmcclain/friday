@@ -18,6 +18,12 @@ interface WSData {
 
 export function createFridayServer(config: FridayServerConfig) {
 	const staticDir = config.staticDir ?? resolve("web/dist");
+	const allowedOrigins = new Set([
+		`http://localhost:${config.port}`,
+		"http://localhost:5173",
+		`http://127.0.0.1:${config.port}`,
+		"http://127.0.0.1:5173",
+	]);
 
 	const server = Bun.serve<WSData>({
 		port: config.port,
@@ -26,6 +32,13 @@ export function createFridayServer(config: FridayServerConfig) {
 
 			// WebSocket upgrade
 			if (url.pathname === "/ws") {
+				const origin = req.headers.get("origin");
+				if (origin && !allowedOrigins.has(origin)) {
+					return new Response("Forbidden: invalid origin", {
+						status: 403,
+					});
+				}
+
 				const runtime = new FridayRuntime();
 				const handler = new WebSocketHandler(runtime, config.runtimeConfig);
 				const upgraded = server.upgrade(req, {
@@ -35,15 +48,19 @@ export function createFridayServer(config: FridayServerConfig) {
 				return new Response("WebSocket upgrade failed", { status: 400 });
 			}
 
-			// Static file serving (SPA)
+			// Static file serving (SPA) — guard against path traversal
 			const filePath = url.pathname === "/" ? "/index.html" : url.pathname;
-			const file = Bun.file(resolve(staticDir + filePath));
+			const resolvedPath = resolve(staticDir, `.${filePath}`);
+			if (!resolvedPath.startsWith(`${staticDir}/`)) {
+				return new Response("Forbidden", { status: 403 });
+			}
+			const file = Bun.file(resolvedPath);
 			if (await file.exists()) {
 				return new Response(file);
 			}
 
 			// SPA fallback: serve index.html for all non-file routes
-			const index = Bun.file(resolve(staticDir + "/index.html"));
+			const index = Bun.file(resolve(staticDir, "index.html"));
 			if (await index.exists()) {
 				return new Response(index);
 			}
@@ -73,9 +90,17 @@ export function createFridayServer(config: FridayServerConfig) {
 					!ws.data.pushInterval
 				) {
 					ws.data.pushInterval = setInterval(() => {
-						ws.data.handler.pushSensoriumUpdate((msg: ServerMessage) => {
-							ws.send(JSON.stringify(msg));
-						});
+						try {
+							if (ws.readyState === 1) {
+								ws.data.handler.pushSensoriumUpdate(
+									(msg: ServerMessage) => {
+										ws.send(JSON.stringify(msg));
+									},
+								);
+							}
+						} catch {
+							// Connection may have closed between check and send
+						}
 					}, 5000);
 				}
 			},

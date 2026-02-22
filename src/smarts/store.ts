@@ -95,6 +95,10 @@ export class SmartsStore {
     return this.entries.get(name);
   }
 
+  private sanitizeName(name: string): string {
+    return name.replace(/[^a-zA-Z0-9_-]/g, "-").replace(/^-+|-+$/g, "");
+  }
+
   async create(entry: Omit<SmartEntry, "filePath">): Promise<SmartEntry> {
     // Clean up existing entry with same name to avoid orphaned FTS5 embeddings
     const existingEmbeddingId = this.embeddingIds.get(entry.name);
@@ -103,7 +107,13 @@ export class SmartsStore {
     }
 
     const dir = resolve(this.config.smartsDir);
-    const filePath = `${dir}/${entry.name}.md`;
+    const safeName = this.sanitizeName(entry.name);
+    if (!safeName) throw new Error("Invalid SMART entry name");
+    const filePath = `${dir}/${safeName}.md`;
+    const resolvedFilePath = resolve(filePath);
+    if (!resolvedFilePath.startsWith(`${dir}/`)) {
+      throw new Error("Invalid SMART entry name: path escape");
+    }
     const content = serializeSmartFile(entry);
 
     await Bun.write(filePath, content);
@@ -130,7 +140,15 @@ export class SmartsStore {
     await Bun.write(existing.filePath, serialized);
 
     this.entries.set(name, updated);
-    await this.reindex();
+
+    // In-place FTS5 update: forget old embedding, embed new one
+    const oldEmbeddingId = this.embeddingIds.get(name);
+    if (oldEmbeddingId) {
+      await this.memory.forget(SMARTS_NAMESPACE, oldEmbeddingId);
+    }
+    const embeddingContent = `${updated.name} ${updated.domain} ${updated.tags.join(" ")} ${updated.content}`;
+    const newId = await this.memory.embed(SMARTS_NAMESPACE, embeddingContent, { name });
+    this.embeddingIds.set(name, newId);
   }
 
   async reindex(): Promise<void> {

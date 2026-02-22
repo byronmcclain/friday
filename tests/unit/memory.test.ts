@@ -2,21 +2,21 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 import { unlink } from "node:fs/promises";
 
-const TEST_DB = "/tmp/friday-test-memory.db";
-
 describe("SQLiteMemory — Key-Value", () => {
   let memory: SQLiteMemory;
+  let dbPath: string;
 
   beforeEach(() => {
-    memory = new SQLiteMemory(TEST_DB);
+    dbPath = `/tmp/friday-test-memory-kv-${Date.now()}-${Math.random().toString(36).slice(2)}.db`;
+    memory = new SQLiteMemory(dbPath);
   });
 
   afterEach(async () => {
     memory.close();
     await Promise.allSettled([
-      unlink(TEST_DB),
-      unlink(`${TEST_DB}-wal`),
-      unlink(`${TEST_DB}-shm`),
+      unlink(dbPath),
+      unlink(`${dbPath}-wal`),
+      unlink(`${dbPath}-shm`),
     ]);
   });
 
@@ -69,17 +69,19 @@ describe("SQLiteMemory — Key-Value", () => {
 
 describe("SQLiteMemory — Conversation History", () => {
   let memory: SQLiteMemory;
+  let dbPath: string;
 
   beforeEach(() => {
-    memory = new SQLiteMemory(TEST_DB);
+    dbPath = `/tmp/friday-test-memory-conv-${Date.now()}-${Math.random().toString(36).slice(2)}.db`;
+    memory = new SQLiteMemory(dbPath);
   });
 
   afterEach(async () => {
     memory.close();
     await Promise.allSettled([
-      unlink(TEST_DB),
-      unlink(`${TEST_DB}-wal`),
-      unlink(`${TEST_DB}-shm`),
+      unlink(dbPath),
+      unlink(`${dbPath}-wal`),
+      unlink(`${dbPath}-shm`),
     ]);
   });
 
@@ -176,17 +178,19 @@ describe("SQLiteMemory — Conversation History", () => {
 
 describe("SQLiteMemory — Semantic Search", () => {
   let memory: SQLiteMemory;
+  let dbPath: string;
 
   beforeEach(() => {
-    memory = new SQLiteMemory(TEST_DB);
+    dbPath = `/tmp/friday-test-memory-search-${Date.now()}-${Math.random().toString(36).slice(2)}.db`;
+    memory = new SQLiteMemory(dbPath);
   });
 
   afterEach(async () => {
     memory.close();
     await Promise.allSettled([
-      unlink(TEST_DB),
-      unlink(`${TEST_DB}-wal`),
-      unlink(`${TEST_DB}-shm`),
+      unlink(dbPath),
+      unlink(`${dbPath}-wal`),
+      unlink(`${dbPath}-shm`),
     ]);
   });
 

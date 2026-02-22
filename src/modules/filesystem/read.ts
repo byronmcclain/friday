@@ -39,6 +39,9 @@ export const fsRead: FridayTool = {
     }
 
     const resolved = resolve(context.workingDirectory, filePath);
+    if (!resolved.startsWith(`${context.workingDirectory}/`)) {
+      return { success: false, output: "Access denied: path escapes working directory" };
+    }
     const offset = Math.max(1, (args.offset as number) ?? 1);
     const limit = Math.min(MAX_LIMIT, Math.max(1, (args.limit as number) ?? DEFAULT_LIMIT));
 

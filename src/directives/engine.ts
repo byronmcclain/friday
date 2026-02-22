@@ -38,7 +38,18 @@ export class DirectiveEngine {
 
   start(): void {
     this.syncSubscriptions();
-    this.store.onStoreChange(() => this.syncSubscriptions());
+    this._storeUnsub = this.store.onStoreChange(() => this.syncSubscriptions());
+  }
+
+  private _storeUnsub?: () => void;
+
+  stop(): void {
+    for (const signal of this.subscribedSignals) {
+      this.signals.off(signal, this.boundHandler);
+    }
+    this.subscribedSignals.clear();
+    this._storeUnsub?.();
+    this._storeUnsub = undefined;
   }
 
   private syncSubscriptions(): void {
@@ -92,19 +103,19 @@ export class DirectiveEngine {
       }
     }
 
-    if (this.actionHandler) {
-      try {
-        await this.actionHandler(directive, directive.action);
-      } catch (err) {
-        this.audit.log({
-          action: "directive:error",
-          source: directive.name,
-          detail: `Handler failed: ${err instanceof Error ? err.message : String(err)}`,
-          success: false,
-          metadata: { signal: signal.name, directiveId: directive.id },
-        });
-        return;
-      }
+    if (!this.actionHandler) return;
+
+    try {
+      await this.actionHandler(directive, directive.action);
+    } catch (err) {
+      this.audit.log({
+        action: "directive:error",
+        source: directive.name,
+        detail: `Handler failed: ${err instanceof Error ? err.message : String(err)}`,
+        success: false,
+        metadata: { signal: signal.name, directiveId: directive.id },
+      });
+      return;
     }
 
     this.store.update(directive.id, {

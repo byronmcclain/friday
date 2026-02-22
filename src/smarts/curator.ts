@@ -80,6 +80,8 @@ export class SmartsCurator {
           typeof (item as ExtractedSmart).name === "string" &&
           typeof (item as ExtractedSmart).domain === "string" &&
           Array.isArray((item as ExtractedSmart).tags) &&
+          typeof (item as ExtractedSmart).confidence === "number" &&
+          Number.isFinite((item as ExtractedSmart).confidence) &&
           typeof (item as ExtractedSmart).content === "string",
       );
     } catch {
