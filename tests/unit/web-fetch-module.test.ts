@@ -62,6 +62,18 @@ describe("web.fetch", () => {
 		expect(names).toContain("body");
 		expect(names).toContain("timeout");
 	});
+
+	test("rejects file: protocol (SSRF)", async () => {
+		const result = await webFetch.execute({ url: "file:///etc/passwd" }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Disallowed protocol");
+	});
+
+	test("rejects data: protocol (SSRF)", async () => {
+		const result = await webFetch.execute({ url: "data:text/html,hello" }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Disallowed protocol");
+	});
 });
 
 // ─── web.search ─────────────────────────────────────────────────────

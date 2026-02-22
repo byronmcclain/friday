@@ -105,4 +105,13 @@ describe("notify.send", () => {
 		expect(names).toContain("channel");
 		expect(names).toContain("url");
 	});
+
+	test("rejects non-http webhook URL (SSRF)", async () => {
+		const result = await notifySend.execute(
+			{ title: "test", body: "test", channel: "webhook", url: "file:///etc/passwd" },
+			ctx,
+		);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Disallowed protocol");
+	});
 });

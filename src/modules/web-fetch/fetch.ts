@@ -1,4 +1,5 @@
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertAllowedProtocol } from "../validation.ts";
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const MAX_TIMEOUT_MS = 60_000;
@@ -53,11 +54,8 @@ export const webFetch: FridayTool = {
 			return { success: false, output: "Missing required parameter: url" };
 		}
 
-		try {
-			new URL(url);
-		} catch {
-			return { success: false, output: `Invalid URL: ${url}` };
-		}
+		const protocolCheck = assertAllowedProtocol(url);
+		if (protocolCheck) return protocolCheck;
 
 		const method = ((args.method as string) ?? "GET").toUpperCase();
 		const headers = (args.headers as Record<string, string>) ?? {};

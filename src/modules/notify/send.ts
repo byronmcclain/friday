@@ -1,4 +1,5 @@
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertAllowedProtocol } from "../validation.ts";
 
 const WEBHOOK_TIMEOUT_MS = 10_000;
 
@@ -81,6 +82,8 @@ export const notifySend: FridayTool = {
 								"No Slack webhook URL. Provide 'url' parameter or set FRIDAY_SLACK_WEBHOOK_URL env var.",
 						};
 					}
+					const slackProtocolCheck = assertAllowedProtocol(webhookUrl);
+					if (slackProtocolCheck) return slackProtocolCheck;
 
 					const emoji: Record<string, string> = {
 						info: ":information_source:",
@@ -124,6 +127,8 @@ export const notifySend: FridayTool = {
 								"No webhook URL. Provide 'url' parameter or set FRIDAY_WEBHOOK_URL env var.",
 						};
 					}
+					const webhookProtocolCheck = assertAllowedProtocol(webhookUrl);
+					if (webhookProtocolCheck) return webhookProtocolCheck;
 
 					const payload = {
 						level,
@@ -165,6 +170,8 @@ export const notifySend: FridayTool = {
 								"No email webhook URL. Provide 'url' parameter or set FRIDAY_EMAIL_WEBHOOK_URL env var.",
 						};
 					}
+					const emailProtocolCheck = assertAllowedProtocol(emailWebhookUrl);
+					if (emailProtocolCheck) return emailProtocolCheck;
 
 					const payload = {
 						subject: `[Friday ${level.toUpperCase()}] ${title}`,
