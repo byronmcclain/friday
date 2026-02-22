@@ -1,4 +1,4 @@
-import { useReducer, useEffect, useCallback, useRef } from "react";
+import { useReducer, useEffect, useState, useCallback, useRef } from "react";
 import { createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
 import { toast, ToasterRenderable } from "@opentui-ui/toast";
@@ -39,6 +39,7 @@ function FridayApp({ options }: FridayAppProps) {
 	const commandsRef = useRef<TypeaheadEntry[]>([]);
 	const processingRef = useRef(false);
 	const logoDataRef = useRef<LogoData | null>(null);
+	const [bootComplete, setBootComplete] = useState(false);
 
 	const projectRoot = resolve(
 		dirname(fileURLToPath(import.meta.url)),
@@ -117,7 +118,7 @@ function FridayApp({ options }: FridayAppProps) {
 						`Friday online. (${providerLabel}: ${modelLabel})`,
 					),
 				});
-				dispatch({ type: "set-phase", phase: "active" });
+				setBootComplete(true);
 			} catch (error) {
 				const msg =
 					error instanceof Error
@@ -130,6 +131,13 @@ function FridayApp({ options }: FridayAppProps) {
 			}
 		})();
 	}, [bootConfig]);
+
+	// Activate when both splash is done and boot is complete
+	useEffect(() => {
+		if (state.phase === "booting" && bootComplete) {
+			dispatch({ type: "set-phase", phase: "active" });
+		}
+	}, [state.phase, bootComplete]);
 
 	// Shutdown handler
 	const handleShutdown = useCallback(async () => {
@@ -301,6 +309,16 @@ function FridayApp({ options }: FridayAppProps) {
 				</box>
 			);
 		}
+		// Logo still loading — show blank dark screen to prevent chat flash
+		return (
+			<box
+				style={{
+					width: "100%",
+					height: "100%",
+					backgroundColor: PALETTE.background,
+				}}
+			/>
+		);
 	}
 
 	// Determine input state
