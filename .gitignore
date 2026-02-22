@@ -46,3 +46,6 @@ data
 
 # Git worktrees
 .worktrees
+
+# SMARTS knowledge files (user-specific, auto-generated)
+smarts
