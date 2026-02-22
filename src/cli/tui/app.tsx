@@ -12,6 +12,12 @@ import { PALETTE } from "./theme.ts";
 import { Header } from "./components/header.tsx";
 import { ChatArea } from "./components/chat-area.tsx";
 import { InputBar } from "./components/input-bar.tsx";
+import { SplashScreen } from "./components/splash.tsx";
+import {
+	processLogo,
+	checkChafa,
+	type LogoData,
+} from "./lib/logo-processor.ts";
 import type { TypeaheadEntry } from "./filter-commands.ts";
 
 // Module-level renderer reference so shutdown can call destroy()
@@ -32,6 +38,7 @@ function FridayApp({ options }: FridayAppProps) {
 	const runtimeRef = useRef<FridayRuntime | null>(null);
 	const commandsRef = useRef<TypeaheadEntry[]>([]);
 	const processingRef = useRef(false);
+	const logoDataRef = useRef<LogoData | null>(null);
 
 	const projectRoot = resolve(
 		dirname(fileURLToPath(import.meta.url)),
@@ -58,6 +65,17 @@ function FridayApp({ options }: FridayAppProps) {
 		runtimeRef.current = runtime;
 
 		(async () => {
+			// Process logo during splash phase
+			if (checkChafa()) {
+				const logoPath = resolve(projectRoot, "friday-logo.jpeg");
+				logoDataRef.current = await processLogo(logoPath, 80, 40);
+			}
+
+			// If logo failed to load, skip splash and go straight to booting
+			if (!logoDataRef.current) {
+				dispatch({ type: "set-phase", phase: "booting" });
+			}
+
 			dispatch({
 				type: "add-message",
 				message: createMessage("system", "Booting Friday..."),
@@ -262,6 +280,28 @@ function FridayApp({ options }: FridayAppProps) {
 		},
 		[state.phase, bootConfig, handleShutdown],
 	);
+
+	// Gate chat behind splash completion
+	if (state.phase === "splash" || state.phase === "fading") {
+		if (logoDataRef.current) {
+			return (
+				<box
+					style={{
+						width: "100%",
+						height: "100%",
+						backgroundColor: PALETTE.background,
+					}}
+				>
+					<SplashScreen
+						logoData={logoDataRef.current}
+						onComplete={() =>
+							dispatch({ type: "set-phase", phase: "booting" })
+						}
+					/>
+				</box>
+			);
+		}
+	}
 
 	// Determine input state
 	const inputDisabled = state.phase !== "active" || state.isThinking;
