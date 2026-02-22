@@ -24,6 +24,9 @@ bun run lint           # Lint check (no changes)
 bun run lint:fix       # Lint and auto-fix
 bun run format         # Format all source files
 bun run typecheck      # TypeScript type checking (tsc --noEmit)
+bun run serve          # Start Friday web UI server (default port 3000)
+bun run web:dev        # Start Vite dev server for frontend (port 5173)
+bun run web:build      # Build frontend for production
 ```
 
 ## Architecture
@@ -70,13 +73,24 @@ src/
 │   ├── sensorium.ts       # Sensorium class — polling loop, snapshot management, alert evaluation
 │   ├── protocol.ts        # /env protocol (status, cpu, memory, docker, ports, git)
 │   └── tool.ts            # getEnvironmentStatus FridayTool
+├── server/
+│   ├── index.ts           # Bun.serve() HTTP + WebSocket server
+│   ├── protocol.ts        # Shared message types (ClientMessage, ServerMessage)
+│   ├── handler.ts         # WebSocketHandler — message routing to FridayRuntime
+│   └── ws-channel.ts      # WebSocket notification channel
 ├── providers/             # LLM provider adapters (Anthropic, Grok)
 ├── config/                # Runtime configuration loading — future
 └── utils/                 # Shared utilities — future
+web/                       # React web UI (Vite + Tailwind)
+├── src/
+│   ├── components/        # React components (layout, chat, sidebar, input)
+│   ├── hooks/             # useWebSocket, useChat, useSession, useSensorium, useSmarts, useHistory, useNotifications
+│   ├── contexts/          # WebSocket, Chat, Session providers
+│   └── index.css          # Tailwind theme (Friday amber palette)
 smarts/                    # Seed knowledge files (YAML frontmatter + markdown)
 tests/
 ├── helpers/               # Shared test stubs (stubProvider, grokStub)
-├── unit/                  # Unit tests (bun:test) — 270 tests across 25 files
+├── unit/                  # Unit tests (bun:test) — 300 tests across 30 files
 └── integration/           # Integration tests — future
 ```
 
@@ -133,6 +147,7 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 - SMARTS design: `docs/plans/2026-02-21-smarts-dynamic-knowledge-design.md`
 - CLI markdown rendering: `docs/plans/2026-02-21-cli-markdown-rendering-design.md`
 - Sensorium design: `docs/plans/2026-02-21-sensorium-environment-awareness-design.md`
+- Web UI design: `docs/plans/2026-02-21-friday-web-ui-design.md`
 - MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite
 
 ## Worktrees
