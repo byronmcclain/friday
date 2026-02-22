@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { SmartsCurator, EXTRACTION_PROMPT } from "../../src/smarts/curator.ts";
+import { SmartsCurator, EXTRACTION_PROMPT, buildExtractionPrompt } from "../../src/smarts/curator.ts";
 import { SmartsStore } from "../../src/smarts/store.ts";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 import type { LLMProvider } from "../../src/providers/types.ts";
@@ -11,182 +11,346 @@ import { unlink, mkdir, rm } from "node:fs/promises";
 const TEST_DB = "/tmp/friday-test-curator.db";
 const TEST_DIR = "/tmp/friday-test-curator-smarts";
 
+function makeMessages(count: number, topic = "TypeScript"): ConversationMessage[] {
+	return Array.from({ length: count }, (_, i) => ({
+		role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
+		content: `Message ${i} about ${topic}`,
+	}));
+}
+
 describe("SmartsCurator", () => {
-  let store: SmartsStore;
-  let memory: SQLiteMemory;
+	let store: SmartsStore;
+	let memory: SQLiteMemory;
 
-  beforeEach(async () => {
-    await mkdir(TEST_DIR, { recursive: true });
-    memory = new SQLiteMemory(TEST_DB);
-    store = new SmartsStore();
-    await store.initialize(
-      { smartsDir: TEST_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },
-      memory,
-    );
-  });
+	beforeEach(async () => {
+		await mkdir(TEST_DIR, { recursive: true });
+		memory = new SQLiteMemory(TEST_DB);
+		store = new SmartsStore();
+		await store.initialize(
+			{ smartsDir: TEST_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },
+			memory,
+		);
+	});
 
-  afterEach(async () => {
-    memory.close();
-    await Promise.allSettled([
-      unlink(TEST_DB),
-      unlink(`${TEST_DB}-wal`),
-      unlink(`${TEST_DB}-shm`),
-      rm(TEST_DIR, { recursive: true }),
-    ]);
-  });
+	afterEach(async () => {
+		memory.close();
+		await Promise.allSettled([
+			unlink(TEST_DB),
+			unlink(`${TEST_DB}-wal`),
+			unlink(`${TEST_DB}-shm`),
+			rm(TEST_DIR, { recursive: true }),
+		]);
+	});
 
-  test("EXTRACTION_PROMPT is defined and non-empty", () => {
-    expect(EXTRACTION_PROMPT).toBeDefined();
-    expect(EXTRACTION_PROMPT.length).toBeGreaterThan(0);
-  });
+	test("EXTRACTION_PROMPT is defined and non-empty", () => {
+		expect(EXTRACTION_PROMPT).toBeDefined();
+		expect(EXTRACTION_PROMPT.length).toBeGreaterThan(0);
+	});
 
-  test("skips extraction for short conversations (< 10 messages)", async () => {
-    const stubProvider: LLMProvider = {
-      name: "stub",
-      defaultModel: "stub",
-      defaultFastModel: "stub-fast",
-      chat: async () => textResponse("should not be called"),
-    };
-    const curator = new SmartsCurator(store, stubProvider);
-    const messages: ConversationMessage[] = [
-      { role: "user", content: "Hi" },
-      { role: "assistant", content: "Hello!" },
-    ];
-    await curator.extractFromConversation(messages);
-    expect(store.all()).toHaveLength(0);
-  });
+	test("skips extraction for short conversations (< 4 messages)", async () => {
+		const stubProvider: LLMProvider = {
+			name: "stub",
+			defaultModel: "stub",
+			defaultFastModel: "stub-fast",
+			chat: async () => textResponse("should not be called"),
+		};
+		const curator = new SmartsCurator(store, stubProvider);
+		const messages: ConversationMessage[] = [
+			{ role: "user", content: "Hi" },
+			{ role: "assistant", content: "Hello!" },
+		];
+		await curator.extractFromConversation(messages);
+		expect(store.all()).toHaveLength(0);
+	});
 
-  test("calls provider with extraction prompt for long conversations", async () => {
-    let calledWith = "";
-    const mockProvider: LLMProvider = {
-      name: "mock",
-      defaultModel: "mock",
-      defaultFastModel: "mock-fast",
-      chat: async (_system, messages) => {
-        calledWith = getTextContent(messages[messages.length - 1]?.content ?? "");
-        return textResponse(JSON.stringify([
-          {
-            name: "docker-networking",
-            domain: "docker",
-            tags: ["docker", "networking", "bridge"],
-            confidence: 0.7,
-            content: "# Docker Networking\n\nUse bridge networks for container isolation.",
-          },
-        ]));
-      },
-    };
-    const curator = new SmartsCurator(store, mockProvider);
-    const messages: ConversationMessage[] = [
-      { role: "user", content: "How does Docker networking work?" },
-      { role: "assistant", content: "Docker uses several network drivers..." },
-      { role: "user", content: "What about bridge networks?" },
-      { role: "assistant", content: "Bridge networks provide container isolation..." },
-      { role: "user", content: "How do I create a custom bridge?" },
-      { role: "assistant", content: "Use docker network create..." },
-      { role: "user", content: "And how do I connect containers to it?" },
-      { role: "assistant", content: "Use --network flag or docker network connect..." },
-      { role: "user", content: "What about DNS resolution between containers?" },
-      { role: "assistant", content: "Docker provides automatic DNS resolution..." },
-    ];
-    await curator.extractFromConversation(messages);
-    expect(calledWith).toContain("Docker");
-    expect(store.all()).toHaveLength(1);
-    expect(store.all()[0]!.name).toBe("docker-networking");
-    expect(store.all()[0]!.source).toBe("conversation");
-  });
+	test("calls provider with extraction prompt for long conversations", async () => {
+		let calledWith = "";
+		const mockProvider: LLMProvider = {
+			name: "mock",
+			defaultModel: "mock",
+			defaultFastModel: "mock-fast",
+			chat: async (_system, messages) => {
+				calledWith = getTextContent(messages[messages.length - 1]?.content ?? "");
+				return textResponse(JSON.stringify([
+					{
+						action: "create",
+						name: "docker-networking",
+						domain: "docker",
+						tags: ["docker", "networking", "bridge"],
+						confidence: 0.7,
+						content: "# Docker Networking\n\nUse bridge networks for container isolation.",
+					},
+				]));
+			},
+		};
+		const curator = new SmartsCurator(store, mockProvider);
+		const messages: ConversationMessage[] = [
+			{ role: "user", content: "How does Docker networking work?" },
+			{ role: "assistant", content: "Docker uses several network drivers..." },
+			{ role: "user", content: "What about bridge networks?" },
+			{ role: "assistant", content: "Bridge networks provide container isolation..." },
+			{ role: "user", content: "How do I create a custom bridge?" },
+			{ role: "assistant", content: "Use docker network create..." },
+			{ role: "user", content: "And how do I connect containers to it?" },
+			{ role: "assistant", content: "Use --network flag or docker network connect..." },
+			{ role: "user", content: "What about DNS resolution between containers?" },
+			{ role: "assistant", content: "Docker provides automatic DNS resolution..." },
+		];
+		await curator.extractFromConversation(messages);
+		expect(calledWith).toContain("Docker");
+		expect(store.all()).toHaveLength(1);
+		expect(store.all()[0]!.name).toBe("docker-networking");
+		expect(store.all()[0]!.source).toBe("conversation");
+	});
 
-  test("handles malformed provider response gracefully", async () => {
-    const badProvider: LLMProvider = {
-      name: "bad",
-      defaultModel: "bad",
-      defaultFastModel: "bad-fast",
-      chat: async () => textResponse("this is not JSON"),
-    };
-    const curator = new SmartsCurator(store, badProvider);
-    const messages: ConversationMessage[] = Array.from({ length: 10 }, (_, i) => ({
-      role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
-      content: `Message ${i} about TypeScript`,
-    }));
-    await curator.extractFromConversation(messages);
-    expect(store.all()).toHaveLength(0);
-  });
+	test("handles malformed provider response gracefully", async () => {
+		const badProvider: LLMProvider = {
+			name: "bad",
+			defaultModel: "bad",
+			defaultFastModel: "bad-fast",
+			chat: async () => textResponse("this is not JSON"),
+		};
+		const curator = new SmartsCurator(store, badProvider);
+		await curator.extractFromConversation(makeMessages(10));
+		expect(store.all()).toHaveLength(0);
+	});
 
-  test("handles JSON wrapped in markdown code fences", async () => {
-    const fencedProvider: LLMProvider = {
-      name: "fenced",
-      defaultModel: "fenced",
-      defaultFastModel: "fenced-fast",
-      chat: async () => textResponse(`Here are the results:
+	test("handles JSON wrapped in markdown code fences", async () => {
+		const fencedProvider: LLMProvider = {
+			name: "fenced",
+			defaultModel: "fenced",
+			defaultFastModel: "fenced-fast",
+			chat: async () => textResponse(`Here are the results:
 
 \`\`\`json
-[{"name": "fenced-knowledge", "domain": "test", "tags": ["fenced"], "confidence": 0.8, "content": "# Fenced\\n\\nExtracted from fences."}]
+[{"action": "create", "name": "fenced-knowledge", "domain": "test", "tags": ["fenced"], "confidence": 0.8, "content": "# Fenced\\n\\nExtracted from fences."}]
 \`\`\`
 
 That's what I found.`),
-    };
-    const curator = new SmartsCurator(store, fencedProvider);
-    const messages: ConversationMessage[] = Array.from({ length: 10 }, (_, i) => ({
-      role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
-      content: `Message ${i}`,
-    }));
-    await curator.extractFromConversation(messages);
-    expect(store.all()).toHaveLength(1);
-    expect(store.all()[0]!.name).toBe("fenced-knowledge");
-  });
+		};
+		const curator = new SmartsCurator(store, fencedProvider);
+		await curator.extractFromConversation(makeMessages(10));
+		expect(store.all()).toHaveLength(1);
+		expect(store.all()[0]!.name).toBe("fenced-knowledge");
+	});
 
-  test("uses provided fast model in chat call", async () => {
-    let usedModel = "";
-    const modelCapture: LLMProvider = {
-      name: "model-capture",
-      defaultModel: "default-reasoning",
-      defaultFastModel: "default-fast",
-      chat: async (_system, _messages, options) => {
-        usedModel = options.model;
-        return textResponse("[]");
-      },
-    };
-    const curator = new SmartsCurator(store, modelCapture, "custom-fast-model");
-    const messages: ConversationMessage[] = Array.from({ length: 10 }, (_, i) => ({
-      role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
-      content: `Message ${i}`,
-    }));
-    await curator.extractFromConversation(messages);
-    expect(usedModel).toBe("custom-fast-model");
-  });
+	test("uses provided fast model in chat call", async () => {
+		let usedModel = "";
+		const modelCapture: LLMProvider = {
+			name: "model-capture",
+			defaultModel: "default-reasoning",
+			defaultFastModel: "default-fast",
+			chat: async (_system, _messages, options) => {
+				usedModel = options.model;
+				return textResponse("[]");
+			},
+		};
+		const curator = new SmartsCurator(store, modelCapture, "custom-fast-model");
+		await curator.extractFromConversation(makeMessages(10));
+		expect(usedModel).toBe("custom-fast-model");
+	});
 
-  test("falls back to defaultModel when no fast model given", async () => {
-    let usedModel = "";
-    const modelCapture: LLMProvider = {
-      name: "model-capture",
-      defaultModel: "default-reasoning",
-      defaultFastModel: "default-fast",
-      chat: async (_system, _messages, options) => {
-        usedModel = options.model;
-        return textResponse("[]");
-      },
-    };
-    const curator = new SmartsCurator(store, modelCapture);
-    const messages: ConversationMessage[] = Array.from({ length: 10 }, (_, i) => ({
-      role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
-      content: `Message ${i}`,
-    }));
-    await curator.extractFromConversation(messages);
-    expect(usedModel).toBe("default-reasoning");
-  });
+	test("falls back to defaultModel when no fast model given", async () => {
+		let usedModel = "";
+		const modelCapture: LLMProvider = {
+			name: "model-capture",
+			defaultModel: "default-reasoning",
+			defaultFastModel: "default-fast",
+			chat: async (_system, _messages, options) => {
+				usedModel = options.model;
+				return textResponse("[]");
+			},
+		};
+		const curator = new SmartsCurator(store, modelCapture);
+		await curator.extractFromConversation(makeMessages(10));
+		expect(usedModel).toBe("default-reasoning");
+	});
 
-  test("handles provider error gracefully", async () => {
-    const failingProvider: LLMProvider = {
-      name: "failing",
-      defaultModel: "failing",
-      defaultFastModel: "failing-fast",
-      chat: async () => { throw new Error("API down"); },
-    };
-    const curator = new SmartsCurator(store, failingProvider);
-    const messages: ConversationMessage[] = Array.from({ length: 10 }, (_, i) => ({
-      role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
-      content: `Message ${i} about Go programming`,
-    }));
-    await curator.extractFromConversation(messages);
-    expect(store.all()).toHaveLength(0);
-  });
+	test("handles provider error gracefully", async () => {
+		const failingProvider: LLMProvider = {
+			name: "failing",
+			defaultModel: "failing",
+			defaultFastModel: "failing-fast",
+			chat: async () => { throw new Error("API down"); },
+		};
+		const curator = new SmartsCurator(store, failingProvider);
+		await curator.extractFromConversation(makeMessages(10, "Go programming"));
+		expect(store.all()).toHaveLength(0);
+	});
+
+	describe("buildExtractionPrompt", () => {
+		test("returns base prompt when no existing names", () => {
+			const prompt = buildExtractionPrompt([]);
+			expect(prompt).toContain("knowledge extraction system");
+			expect(prompt).not.toContain("Existing knowledge entries");
+		});
+
+		test("appends existing names to prompt", () => {
+			const prompt = buildExtractionPrompt(["docker-networking", "bun-sqlite-gotchas"]);
+			expect(prompt).toContain("Existing knowledge entries");
+			expect(prompt).toContain("- docker-networking");
+			expect(prompt).toContain("- bun-sqlite-gotchas");
+		});
+
+		test("includes project context", () => {
+			const prompt = buildExtractionPrompt([]);
+			expect(prompt).toContain("Friday project");
+			expect(prompt).toContain("Bun and TypeScript");
+		});
+
+		test("includes quality bar guidance", () => {
+			const prompt = buildExtractionPrompt([]);
+			expect(prompt).toContain("Non-obvious");
+			expect(prompt).toContain("DO NOT extract");
+		});
+
+		test("includes all four extraction categories", () => {
+			const prompt = buildExtractionPrompt([]);
+			expect(prompt).toContain("Technical knowledge");
+			expect(prompt).toContain("Decisions and rationale");
+			expect(prompt).toContain("User preferences and working style");
+			expect(prompt).toContain("Project evolution and context");
+		});
+	});
+
+	describe("update action", () => {
+		test("updates existing entry instead of creating duplicate", async () => {
+			// Seed an existing entry
+			await store.create({
+				name: "docker-networking",
+				domain: "docker",
+				tags: ["docker", "networking"],
+				confidence: 0.6,
+				source: "conversation",
+				content: "# Docker Networking\n\nOriginal content.",
+			});
+			expect(store.all()).toHaveLength(1);
+
+			const mockProvider: LLMProvider = {
+				name: "mock",
+				defaultModel: "mock",
+				defaultFastModel: "mock-fast",
+				chat: async () => textResponse(JSON.stringify([
+					{
+						action: "update",
+						name: "docker-networking",
+						domain: "docker",
+						tags: ["docker", "networking", "overlay"],
+						confidence: 0.7,
+						content: "# Docker Networking\n\nUpdated with overlay network insights.",
+					},
+				])),
+			};
+			const curator = new SmartsCurator(store, mockProvider);
+			await curator.extractFromConversation(makeMessages(10, "Docker"));
+
+			expect(store.all()).toHaveLength(1);
+			const entry = await store.getByName("docker-networking");
+			expect(entry!.content).toContain("overlay network insights");
+		});
+
+		test("falls back to create when update target does not exist", async () => {
+			const mockProvider: LLMProvider = {
+				name: "mock",
+				defaultModel: "mock",
+				defaultFastModel: "mock-fast",
+				chat: async () => textResponse(JSON.stringify([
+					{
+						action: "update",
+						name: "nonexistent-entry",
+						domain: "test",
+						tags: ["test"],
+						confidence: 0.7,
+						content: "# Fallback\n\nCreated because target didn't exist.",
+					},
+				])),
+			};
+			const curator = new SmartsCurator(store, mockProvider);
+			await curator.extractFromConversation(makeMessages(10));
+
+			expect(store.all()).toHaveLength(1);
+			expect(store.all()[0]!.name).toBe("nonexistent-entry");
+		});
+
+		test("entries without action field default to create", async () => {
+			const mockProvider: LLMProvider = {
+				name: "mock",
+				defaultModel: "mock",
+				defaultFastModel: "mock-fast",
+				chat: async () => textResponse(JSON.stringify([
+					{
+						name: "no-action-field",
+						domain: "test",
+						tags: ["test"],
+						confidence: 0.6,
+						content: "# No Action\n\nShould be created.",
+					},
+				])),
+			};
+			const curator = new SmartsCurator(store, mockProvider);
+			await curator.extractFromConversation(makeMessages(10));
+
+			expect(store.all()).toHaveLength(1);
+			expect(store.all()[0]!.name).toBe("no-action-field");
+		});
+	});
+
+	test("passes existing SMART names in prompt to provider", async () => {
+		let capturedSystem = "";
+		// Seed existing entries
+		await store.create({
+			name: "existing-one",
+			domain: "test",
+			tags: ["test"],
+			confidence: 0.5,
+			source: "conversation",
+			content: "First entry.",
+		});
+		await store.create({
+			name: "existing-two",
+			domain: "test",
+			tags: ["test"],
+			confidence: 0.5,
+			source: "conversation",
+			content: "Second entry.",
+		});
+
+		const mockProvider: LLMProvider = {
+			name: "mock",
+			defaultModel: "mock",
+			defaultFastModel: "mock-fast",
+			chat: async (system) => {
+				capturedSystem = system;
+				return textResponse("[]");
+			},
+		};
+		const curator = new SmartsCurator(store, mockProvider);
+		await curator.extractFromConversation(makeMessages(10));
+
+		expect(capturedSystem).toContain("- existing-one");
+		expect(capturedSystem).toContain("- existing-two");
+	});
+
+	test("caps confidence at 0.7 for extracted entries", async () => {
+		const mockProvider: LLMProvider = {
+			name: "mock",
+			defaultModel: "mock",
+			defaultFastModel: "mock-fast",
+			chat: async () => textResponse(JSON.stringify([
+				{
+					action: "create",
+					name: "high-confidence",
+					domain: "test",
+					tags: ["test"],
+					confidence: 0.95,
+					content: "# High Confidence\n\nShould be capped.",
+				},
+			])),
+		};
+		const curator = new SmartsCurator(store, mockProvider);
+		await curator.extractFromConversation(makeMessages(10));
+
+		const entry = await store.getByName("high-confidence");
+		expect(entry!.confidence).toBe(0.7);
+	});
 });
