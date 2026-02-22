@@ -3,7 +3,8 @@ import { AnthropicProvider } from "./anthropic.ts";
 import { GrokProvider } from "./grok.ts";
 import type { LLMProvider } from "./types.ts";
 
-export type { LLMProvider, ChatOptions } from "./types.ts";
+export type { LLMProvider, ChatOptions, ChatResponse, ToolCallRequest, ToolDefinition } from "./types.ts";
+export { toJsonSchema } from "./tool-schema.ts";
 
 export const DEFAULT_PROVIDER: ProviderName = "grok";
 
