@@ -36,6 +36,8 @@ export interface ProcessResult {
 	source: "protocol" | "cortex";
 }
 
+export type ShutdownStep = "sensorium" | "conversation" | "knowledge" | "modules" | "cleanup";
+
 export class FridayRuntime {
 	private _cortex!: Cortex;
 	private _signals!: SignalBus;
@@ -129,6 +131,7 @@ export class FridayRuntime {
 			}
 
 			if (config.smartsDir) {
+				await mkdir(config.smartsDir, { recursive: true });
 				const dbPath = `${config.smartsDir}/.smarts-index.db`;
 				this._smartsMemory = new SQLiteMemory(dbPath);
 				this._smarts = new SmartsStore();
@@ -260,17 +263,19 @@ export class FridayRuntime {
 		return { output: response, source: "cortex" };
 	}
 
-	async shutdown(): Promise<void> {
+	async shutdown(onProgress?: (step: ShutdownStep, label: string) => void): Promise<void> {
 		if (!this._booted) throw new Error("Runtime not booted");
 		this._booted = false;
 
 		// Stop sensorium polling before cleanup
 		if (this._sensorium) {
+			onProgress?.("sensorium", "Stopping environment sensors...");
 			this._sensorium.stop();
 			this._sensorium = undefined;
 		}
 
 		if (this._memory && this._sessionId && this._sessionStartedAt) {
+			onProgress?.("conversation", "Saving conversation history...");
 			const history = this._cortex.getHistory();
 			if (history.length > 0) {
 				await this._memory.saveConversation({
@@ -285,16 +290,19 @@ export class FridayRuntime {
 		}
 
 		if (this._curator) {
+			onProgress?.("knowledge", "Extracting knowledge from conversation...");
 			const history = this._cortex.getHistory();
 			await this._curator.extractFromConversation(history);
 		}
 
+		onProgress?.("modules", "Unloading modules...");
 		await this._signals.emit("session:end", "runtime");
 		for (const mod of this._modules) {
 			if (mod.onUnload) {
 				await mod.onUnload();
 			}
 		}
+		onProgress?.("cleanup", "Closing databases...");
 		if (this._smartsMemory) {
 			this._smartsMemory.close();
 			this._smartsMemory = undefined;

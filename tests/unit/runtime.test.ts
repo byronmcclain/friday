@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { FridayRuntime } from "../../src/core/runtime.ts";
+import { FridayRuntime, type ShutdownStep } from "../../src/core/runtime.ts";
 import type { LLMProvider } from "../../src/providers/types.ts";
 import { mkdir, writeFile, rm, unlink } from "node:fs/promises";
 import { mkdirSync } from "node:fs";
@@ -66,6 +66,24 @@ describe("FridayRuntime", () => {
 		await runtime.boot({ injectedProvider: stubProvider });
 		await runtime.shutdown();
 		expect(runtime.isBooted).toBe(false);
+	});
+
+	test("shutdown calls onProgress callback for each step", async () => {
+		runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider });
+		const validSteps: ShutdownStep[] = ["sensorium", "conversation", "knowledge", "modules", "cleanup"];
+		const captured: Array<{ step: string; label: string }> = [];
+		await runtime.shutdown((step, label) => {
+			captured.push({ step, label });
+		});
+		expect(captured.length).toBeGreaterThan(0);
+		for (const { step, label } of captured) {
+			expect(validSteps).toContain(step);
+			expect(label.length).toBeGreaterThan(0);
+		}
+		const stepNames = captured.map((c) => c.step);
+		expect(stepNames).toContain("modules");
+		expect(stepNames).toContain("cleanup");
 	});
 
 	test("process throws when not booted", async () => {
