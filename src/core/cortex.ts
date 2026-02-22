@@ -1,4 +1,4 @@
-import type { FridayConfig, ConversationMessage } from "./types.ts";
+import type { FridayConfig, ConversationMessage, ContentBlock } from "./types.ts";
 import { SYSTEM_PROMPT } from "./prompts.ts";
 import {
   createProvider,
@@ -6,12 +6,16 @@ import {
   PROVIDER_DEFAULTS,
   type LLMProvider,
 } from "../providers/index.ts";
+import type { ToolDefinition } from "../providers/types.ts";
 import type { FridayTool } from "../modules/types.ts";
+import type { ClearanceManager } from "./clearance.ts";
 import type { SmartsStore } from "../smarts/store.ts";
 import type { Sensorium } from "../sensorium/sensorium.ts";
 
 export interface CortexConfig extends Partial<FridayConfig> {
   injectedProvider?: LLMProvider;
+  clearance?: ClearanceManager;
+  maxToolIterations?: number;
   smartsStore?: SmartsStore;
   sensorium?: Sensorium;
 }
@@ -22,6 +26,8 @@ export class Cortex {
   private maxTokens: number;
   private conversationHistory: ConversationMessage[];
   private tools: Map<string, FridayTool>;
+  private clearance?: ClearanceManager;
+  private maxToolIterations: number;
   private smartsStore?: SmartsStore;
   private sensorium?: Sensorium;
   private pinnedSmarts = new Set<string>();
@@ -33,6 +39,8 @@ export class Cortex {
     this.maxTokens = config.maxTokens ?? 4096;
     this.conversationHistory = [];
     this.tools = new Map();
+    this.clearance = config.clearance;
+    this.maxToolIterations = config.maxToolIterations ?? 10;
     this.smartsStore = config.smartsStore;
     this.sensorium = config.sensorium;
   }
@@ -66,24 +74,134 @@ export class Cortex {
   }
 
   async chat(userMessage: string): Promise<string> {
+    const startLength = this.conversationHistory.length;
     this.conversationHistory.push({ role: "user", content: userMessage });
 
-    let assistantMessage: string;
     try {
       const systemPrompt = await this.buildSystemPrompt(userMessage);
-      const response = await this.provider.chat(
-        systemPrompt,
-        this.conversationHistory,
-        { model: this.model, maxTokens: this.maxTokens },
+      const toolDefs = this.toToolDefinitions();
+      const options = {
+        model: this.model,
+        maxTokens: this.maxTokens,
+        ...(toolDefs.length > 0 ? { tools: toolDefs } : {}),
+      };
+
+      for (let i = 0; i < this.maxToolIterations; i++) {
+        const response = await this.provider.chat(
+          systemPrompt,
+          this.conversationHistory,
+          options,
+        );
+
+        if (response.type === "text") {
+          this.conversationHistory.push({
+            role: "assistant",
+            content: response.text,
+          });
+          return response.text;
+        }
+
+        // tool_use response — record assistant's tool calls
+        const assistantBlocks: ContentBlock[] = response.toolCalls.map(
+          (tc) => ({
+            type: "tool_use" as const,
+            id: tc.id,
+            name: tc.name,
+            input: tc.input,
+          }),
+        );
+        this.conversationHistory.push({
+          role: "assistant",
+          content: assistantBlocks,
+        });
+
+        // Execute all tool calls in parallel
+        const results = await Promise.all(
+          response.toolCalls.map((tc) => this.executeToolCall(tc)),
+        );
+
+        // Record results as user message with tool_result blocks
+        const resultBlocks: ContentBlock[] = results.map((r) => ({
+          type: "tool_result" as const,
+          toolCallId: r.toolCallId,
+          content: r.output,
+          isError: r.isError,
+        }));
+        this.conversationHistory.push({
+          role: "user",
+          content: resultBlocks,
+        });
+      }
+
+      throw new Error(
+        `Max tool iterations (${this.maxToolIterations}) exceeded`,
       );
-      assistantMessage = response.type === "text" ? response.text : "";
     } catch (err) {
-      this.conversationHistory.pop();
+      // Roll back all messages added during this call
+      this.conversationHistory.length = startLength;
       throw err;
     }
+  }
 
-    this.conversationHistory.push({ role: "assistant", content: assistantMessage });
-    return assistantMessage;
+  private toToolDefinitions(): ToolDefinition[] {
+    return [...this.tools.values()].map((t) => ({
+      name: t.name,
+      description: t.description,
+      parameters: t.parameters,
+    }));
+  }
+
+  private async executeToolCall(call: {
+    id: string;
+    name: string;
+    input: Record<string, unknown>;
+  }): Promise<{ toolCallId: string; output: string; isError: boolean }> {
+    const tool = this.tools.get(call.name);
+    if (!tool) {
+      return {
+        toolCallId: call.id,
+        output: `Unknown tool: ${call.name}`,
+        isError: true,
+      };
+    }
+
+    if (this.clearance && tool.clearance.length > 0) {
+      const check = this.clearance.checkAll(tool.clearance);
+      if (!check.granted) {
+        return {
+          toolCallId: call.id,
+          output:
+            check.reason ?? `Clearance denied for tool: ${call.name}`,
+          isError: true,
+        };
+      }
+    }
+
+    try {
+      const result = await tool.execute(call.input, {
+        workingDirectory: process.cwd(),
+        audit: { log: async () => {} } as any,
+        signal: { emit: async () => {} } as any,
+        memory: {
+          get: async () => undefined,
+          set: async () => {},
+          delete: async () => {},
+          list: async () => [],
+        },
+      });
+      return {
+        toolCallId: call.id,
+        output: result.output,
+        isError: !result.success,
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return {
+        toolCallId: call.id,
+        output: `Tool execution error: ${msg}`,
+        isError: true,
+      };
+    }
   }
 
   clearHistory(): void {
