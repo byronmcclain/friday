@@ -40,13 +40,13 @@ export function serveCommand(program: Command): void {
 
 			console.log(
 				boxen(
-					`${chalk.cyan.bold("F.R.I.D.A.Y. Web UI")}\n${chalk.dim(`http://localhost:${server.port}`)}`,
-					{ padding: 1, borderColor: "cyan", borderStyle: "round" },
+					`${chalk.hex("#F0A030").bold("F.R.I.D.A.Y. Web UI")}\n${chalk.hex("#8B6914")(`http://localhost:${server.port}`)}`,
+					{ padding: 1, borderColor: "#C07020", borderStyle: "round" },
 				),
 			);
 
 			const shutdown = () => {
-				console.log(chalk.dim("\nShutting down server..."));
+				console.log(chalk.hex("#8B6914")("\nShutting down server..."));
 				server.stop(true);
 				process.exit(0);
 			};

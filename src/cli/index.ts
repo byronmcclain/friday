@@ -17,9 +17,9 @@ program
     if (bannerShown) return;
     bannerShown = true;
     console.log(
-      boxen(chalk.cyan.bold("F.R.I.D.A.Y.") + "\n" + chalk.dim("Female Replacement Intelligent Digital Assistant Youth"), {
+      boxen(chalk.hex("#F0A030").bold("F.R.I.D.A.Y.") + "\n" + chalk.hex("#8B6914")("Female Replacement Intelligent Digital Assistant Youth"), {
         padding: 1,
-        borderColor: "cyan",
+        borderColor: "#C07020",
         borderStyle: "round",
       })
     );
