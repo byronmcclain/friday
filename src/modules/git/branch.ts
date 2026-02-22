@@ -1,4 +1,5 @@
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertSafeArg } from "../validation.ts";
 
 export const gitBranch: FridayTool = {
 	name: "git.branch",
@@ -37,6 +38,15 @@ export const gitBranch: FridayTool = {
 		const action = (args.action as string) ?? "list";
 		const name = args.name as string | undefined;
 		const from = args.from as string | undefined;
+
+		if (name) {
+			const nameCheck = assertSafeArg(name, "name");
+			if (nameCheck) return nameCheck;
+		}
+		if (from) {
+			const fromCheck = assertSafeArg(from, "from");
+			if (fromCheck) return fromCheck;
+		}
 
 		try {
 			switch (action) {

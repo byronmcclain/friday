@@ -1,4 +1,5 @@
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertSafeArg } from "../validation.ts";
 
 export const gitPush: FridayTool = {
 	name: "git.push",
@@ -39,15 +40,26 @@ export const gitPush: FridayTool = {
 			const setUpstream = (args.setUpstream as boolean) ?? false;
 			let branch = args.branch as string | undefined;
 
+			const remoteCheck = assertSafeArg(remote, "remote");
+			if (remoteCheck) return remoteCheck;
+			if (branch) {
+				const branchCheck = assertSafeArg(branch, "branch");
+				if (branchCheck) return branchCheck;
+			}
+
 			// Get current branch if not specified
 			if (!branch) {
 				const branchResult =
 					await Bun.$`git -C ${context.workingDirectory} rev-parse --abbrev-ref HEAD`
 						.quiet()
 						.nothrow();
-				if (branchResult.exitCode === 0) {
-					branch = branchResult.stdout.toString().trim();
+				if (branchResult.exitCode !== 0 || branchResult.stdout.toString().trim() === "HEAD") {
+					return {
+						success: false,
+						output: "Could not determine current branch. Specify branch explicitly.",
+					};
 				}
+				branch = branchResult.stdout.toString().trim();
 			}
 
 			const cmdParts = [

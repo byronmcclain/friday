@@ -10,6 +10,8 @@ import { gitLog } from "../../src/modules/git/log.ts";
 import { gitCommit } from "../../src/modules/git/commit.ts";
 import { gitBranch } from "../../src/modules/git/branch.ts";
 import { gitStash } from "../../src/modules/git/stash.ts";
+import { gitPush } from "../../src/modules/git/push.ts";
+import { gitPull } from "../../src/modules/git/pull.ts";
 import type { ToolContext } from "../../src/modules/types.ts";
 
 let testDir: string;
@@ -131,6 +133,12 @@ describe("git.diff", () => {
 		expect(result.success).toBe(true);
 	});
 
+	test("rejects ref starting with dash (flag injection)", async () => {
+		const result = await gitDiff.execute({ ref: "--upload-pack=evil" }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Invalid");
+	});
+
 	test("declares git-read clearance", () => {
 		expect(gitDiff.clearance).toEqual(["git-read"]);
 	});
@@ -160,6 +168,12 @@ describe("git.log", () => {
 		const result = await gitLog.execute({ oneline: false }, ctx);
 		expect(result.success).toBe(true);
 		expect(result.output).toContain("initial commit");
+	});
+
+	test("rejects ref starting with dash (flag injection)", async () => {
+		const result = await gitLog.execute({ ref: "--exec=evil" }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Invalid");
 	});
 
 	test("declares git-read clearance", () => {
@@ -241,6 +255,15 @@ describe("git.branch", () => {
 		expect(result.output).toContain("Missing");
 	});
 
+	test("rejects branch name starting with dash (flag injection)", async () => {
+		const result = await gitBranch.execute(
+			{ action: "create", name: "--option=evil" },
+			ctx,
+		);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Invalid");
+	});
+
 	test("declares clearances", () => {
 		expect(gitBranch.clearance).toContain("git-read");
 		expect(gitBranch.clearance).toContain("git-write");
@@ -262,5 +285,54 @@ describe("git.stash", () => {
 
 	test("declares git-write clearance", () => {
 		expect(gitStash.clearance).toEqual(["git-write"]);
+	});
+});
+
+// ─── git.push ───────────────────────────────────────────────────────
+describe("git.push", () => {
+	test("rejects remote starting with dash", async () => {
+		const result = await gitPush.execute({ remote: "--receive-pack=evil" }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Invalid");
+	});
+
+	test("rejects branch starting with dash", async () => {
+		const result = await gitPush.execute({ branch: "--force" }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Invalid");
+	});
+
+	test("fails on detached HEAD without explicit branch", async () => {
+		const hash = await Bun.$`git -C ${testDir} rev-parse HEAD`.quiet();
+		await Bun.$`git -C ${testDir} checkout ${hash.stdout.toString().trim()}`.quiet().nothrow();
+
+		const result = await gitPush.execute({}, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Could not determine current branch");
+	});
+
+	test("declares clearances", () => {
+		expect(gitPush.clearance).toContain("git-write");
+		expect(gitPush.clearance).toContain("network");
+	});
+});
+
+// ─── git.pull ───────────────────────────────────────────────────────
+describe("git.pull", () => {
+	test("rejects remote starting with dash", async () => {
+		const result = await gitPull.execute({ remote: "--upload-pack=evil" }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Invalid");
+	});
+
+	test("rejects branch starting with dash", async () => {
+		const result = await gitPull.execute({ branch: "--recurse-submodules" }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Invalid");
+	});
+
+	test("declares clearances", () => {
+		expect(gitPull.clearance).toContain("git-write");
+		expect(gitPull.clearance).toContain("network");
 	});
 });

@@ -1,4 +1,5 @@
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertSafeArg } from "../validation.ts";
 
 const DEFAULT_COUNT = 10;
 const MAX_COUNT = 100;
@@ -49,6 +50,11 @@ export const gitLog: FridayTool = {
 			const oneline = (args.oneline as boolean) ?? true;
 			const ref = args.ref as string | undefined;
 			const path = args.path as string | undefined;
+
+			if (ref) {
+				const refCheck = assertSafeArg(ref, "ref");
+				if (refCheck) return refCheck;
+			}
 
 			const cmdParts = [
 				"git",

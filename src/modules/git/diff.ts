@@ -1,4 +1,5 @@
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertSafeArg } from "../validation.ts";
 
 const MAX_OUTPUT_BYTES = 500_000;
 
@@ -46,6 +47,11 @@ export const gitDiff: FridayTool = {
 			const path = args.path as string | undefined;
 			const ref = args.ref as string | undefined;
 			const stat = (args.stat as boolean) ?? false;
+
+			if (ref) {
+				const refCheck = assertSafeArg(ref, "ref");
+				if (refCheck) return refCheck;
+			}
 
 			const cmdParts = ["git", "-C", context.workingDirectory, "diff"];
 			if (staged) cmdParts.push("--cached");

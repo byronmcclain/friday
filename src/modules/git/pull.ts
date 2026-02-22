@@ -1,4 +1,5 @@
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertSafeArg } from "../validation.ts";
 
 export const gitPull: FridayTool = {
 	name: "git.pull",
@@ -46,6 +47,13 @@ export const gitPull: FridayTool = {
 			const branch = args.branch as string | undefined;
 			const rebase = (args.rebase as boolean) ?? false;
 			const autostash = (args.autostash as boolean) ?? true;
+
+			const remoteCheck = assertSafeArg(remote, "remote");
+			if (remoteCheck) return remoteCheck;
+			if (branch) {
+				const branchCheck = assertSafeArg(branch, "branch");
+				if (branchCheck) return branchCheck;
+			}
 
 			const cmdParts = [
 				"git",
