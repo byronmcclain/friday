@@ -35,6 +35,7 @@ export function chatCommand(program: Command): void {
 					smartsDir: resolve(projectRoot, "smarts"),
 					dataDir: resolve(projectRoot, "data"),
 					modulesDir: resolve(projectRoot, "src/modules"),
+					forgeDir: resolve(projectRoot, "forge"),
 					fresh: options.fresh,
 				});
 			} catch (error) {
@@ -129,6 +130,48 @@ export function chatCommand(program: Command): void {
 					const result = await runtime.process(message);
 					spinner.stop();
 					console.log(`\n${renderMarkdown(result.output)}`);
+
+					// Check if forge requested a restart
+					if (runtime.restartRequested) {
+						console.log(chalk.cyan("\nForge restart requested. Rebooting subsystems...\n"));
+						const restartSpinner = ora({
+							text: chalk.dim("Restarting..."),
+							spinner: "dots",
+						}).start();
+
+						try {
+							await runtime.shutdown((_step, label) => {
+								restartSpinner.text = chalk.dim(label);
+							});
+							runtime.restartRequested = false;
+							await runtime.boot({
+								provider: options.provider as ProviderName,
+								model: options.model,
+								smartsDir: resolve(projectRoot, "smarts"),
+								dataDir: resolve(projectRoot, "data"),
+								modulesDir: resolve(projectRoot, "src/modules"),
+								forgeDir: resolve(projectRoot, "forge"),
+								fresh: false,
+							});
+							restartSpinner.succeed(chalk.dim("Restart complete"));
+
+							const health = runtime.forgeHealthReport;
+							if (health) {
+								if (health.loaded.length > 0) {
+									console.log(chalk.green(`  Forge modules loaded: ${health.loaded.join(", ")}`));
+								}
+								for (const f of health.failed) {
+									console.log(chalk.red(`  Forge module failed: ${f.name} — ${f.error}`));
+								}
+							}
+							console.log();
+						} catch (error) {
+							restartSpinner.fail(chalk.red("Restart failed"));
+							if (error instanceof Error) {
+								console.error(chalk.red(`  ${error.message}\n`));
+							}
+						}
+					}
 				} catch (error) {
 					spinner.fail(chalk.red("Something went wrong"));
 					if (error instanceof Error) {

@@ -1,0 +1,123 @@
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { mkdir, rm } from "node:fs/promises";
+import { forgeApply } from "../../src/modules/forge/apply.ts";
+import type { ForgeProposal } from "../../src/modules/forge/types.ts";
+import type { ToolContext } from "../../src/modules/types.ts";
+import { AuditLogger } from "../../src/audit/logger.ts";
+import { SignalBus } from "../../src/core/events.ts";
+
+const TEST_FORGE_DIR = "/tmp/friday-test-forge-apply";
+
+function makeMemory(proposals: Record<string, ForgeProposal>) {
+  return {
+    get: async <T>(key: string): Promise<T | undefined> => proposals[key] as T | undefined,
+    set: async <T>(key: string, value: T): Promise<void> => {
+      (proposals as Record<string, unknown>)[key] = value;
+    },
+    delete: async (key: string): Promise<void> => {
+      delete proposals[key];
+    },
+    list: async (): Promise<string[]> => Object.keys(proposals),
+  };
+}
+
+describe("forge_apply tool", () => {
+  let context: ToolContext;
+  let proposals: Record<string, ForgeProposal>;
+
+  beforeEach(async () => {
+    await mkdir(TEST_FORGE_DIR, { recursive: true });
+    proposals = {};
+    context = {
+      workingDirectory: TEST_FORGE_DIR,
+      audit: new AuditLogger(),
+      signal: new SignalBus(),
+      memory: makeMemory(proposals),
+    };
+  });
+
+  afterEach(async () => {
+    await rm(TEST_FORGE_DIR, { recursive: true, force: true });
+  });
+
+  test("has correct name and clearance", () => {
+    expect(forgeApply.name).toBe("forge_apply");
+    expect(forgeApply.clearance).toContain("write-fs");
+    expect(forgeApply.clearance).toContain("forge-modify");
+  });
+
+  test("requires proposalId parameter", async () => {
+    const result = await forgeApply.execute({}, context);
+    expect(result.success).toBe(false);
+    expect(result.output).toContain("proposalId");
+  });
+
+  test("rejects unknown proposalId", async () => {
+    const result = await forgeApply.execute(
+      { proposalId: "nonexistent", forgeDir: TEST_FORGE_DIR },
+      context,
+    );
+    expect(result.success).toBe(false);
+    expect(result.output).toContain("not found");
+  });
+
+  test("writes files for a create proposal", async () => {
+    const proposal: ForgeProposal = {
+      id: "test-id",
+      action: "create",
+      moduleName: "weather",
+      description: "Weather module",
+      files: [
+        { path: "index.ts", content: "export default { name: 'weather' };" },
+      ],
+      createdAt: new Date().toISOString(),
+    };
+    proposals["proposal:test-id"] = proposal;
+
+    const result = await forgeApply.execute(
+      { proposalId: "test-id", forgeDir: TEST_FORGE_DIR },
+      context,
+    );
+    expect(result.success).toBe(true);
+
+    const written = Bun.file(`${TEST_FORGE_DIR}/weather/index.ts`);
+    expect(await written.exists()).toBe(true);
+    expect(await written.text()).toBe("export default { name: 'weather' };");
+  });
+
+  test("creates backup for patch action", async () => {
+    // Create existing module on disk and in manifest
+    await mkdir(`${TEST_FORGE_DIR}/weather`, { recursive: true });
+    await Bun.write(`${TEST_FORGE_DIR}/weather/index.ts`, "old content");
+    const { ForgeManifestManager } = await import("../../src/modules/forge/manifest.ts");
+    const mgr = new ForgeManifestManager(TEST_FORGE_DIR);
+    await mgr.addModule("weather", "Weather lookups", "1.0.0", "Initial");
+
+    const proposal: ForgeProposal = {
+      id: "patch-id",
+      action: "patch",
+      moduleName: "weather",
+      description: "Fix weather",
+      files: [{ path: "index.ts", content: "new content" }],
+      createdAt: new Date().toISOString(),
+    };
+    proposals["proposal:patch-id"] = proposal;
+
+    const result = await forgeApply.execute(
+      { proposalId: "patch-id", forgeDir: TEST_FORGE_DIR },
+      context,
+    );
+    expect(result.success).toBe(true);
+
+    // Check backup was created
+    const backupDir = `${TEST_FORGE_DIR}/.backups`;
+    const backupFile = Bun.file(`${TEST_FORGE_DIR}/weather/index.ts`);
+    expect(await backupFile.text()).toBe("new content");
+
+    // Verify backup directory exists
+    const backups = new Bun.Glob("weather-*/**").scan({ cwd: backupDir });
+    let backupCount = 0;
+    for await (const _ of backups) backupCount++;
+    expect(backupCount).toBeGreaterThan(0);
+  });
+});

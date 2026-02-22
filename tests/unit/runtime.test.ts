@@ -122,6 +122,19 @@ describe("FridayRuntime", () => {
 		await runtime.boot({ injectedProvider: stubProvider });
 		expect(runtime.isBooted).toBe(true);
 	});
+
+	test("restartRequested defaults to false", async () => {
+		runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider });
+		expect(runtime.restartRequested).toBe(false);
+	});
+
+	test("restartRequested can be set to true", async () => {
+		runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider });
+		runtime.restartRequested = true;
+		expect(runtime.restartRequested).toBe(true);
+	});
 });
 
 const TEST_SMARTS_DIR_RT = "/tmp/friday-test-runtime-smarts";
@@ -476,5 +489,74 @@ describe("FridayRuntime — conversation summarization", () => {
 		// 2 messages (1 user + 1 assistant) is below the 4-message threshold
 		expect(sessions[0]!.summary).toBeUndefined();
 		memory.close();
+	});
+});
+
+describe("FridayRuntime — Forge integration", () => {
+	let forgeDir: string;
+
+	beforeEach(async () => {
+		forgeDir = `/tmp/friday-test-forge-runtime-${Date.now()}`;
+		await mkdir(forgeDir, { recursive: true });
+	});
+
+	afterEach(async () => {
+		await rm(forgeDir, { recursive: true, force: true });
+	});
+
+	test("boots with forgeDir and loads forge modules", async () => {
+		const modDir = `${forgeDir}/test-mod`;
+		await mkdir(modDir, { recursive: true });
+		await writeFile(
+			`${modDir}/index.ts`,
+			`export default {
+				name: "test-mod", description: "Test", version: "1.0.0",
+				tools: [], protocols: [], knowledge: [], triggers: [], clearance: [],
+			};`,
+		);
+
+		const runtime = new FridayRuntime();
+		await runtime.boot({
+			injectedProvider: stubProvider,
+			forgeDir,
+		});
+		expect(runtime.forgeHealthReport).toBeDefined();
+		expect(runtime.forgeHealthReport!.loaded).toContain("test-mod");
+		await runtime.shutdown();
+	});
+
+	test("forge module failure does not crash boot", async () => {
+		const modDir = `${forgeDir}/broken-mod`;
+		await mkdir(modDir, { recursive: true });
+		await writeFile(`${modDir}/index.ts`, "throw new Error('broken');");
+
+		const runtime = new FridayRuntime();
+		await runtime.boot({
+			injectedProvider: stubProvider,
+			forgeDir,
+		});
+		expect(runtime.isBooted).toBe(true);
+		expect(runtime.forgeHealthReport!.failed).toHaveLength(1);
+		expect(runtime.forgeHealthReport!.failed[0]!.name).toBe("broken-mod");
+		await runtime.shutdown();
+	});
+
+	test("boots without forgeDir (backwards compatible)", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider });
+		expect(runtime.forgeHealthReport).toBeUndefined();
+		await runtime.shutdown();
+	});
+
+	test("/forge protocol is registered when forgeDir is provided", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({
+			injectedProvider: stubProvider,
+			forgeDir,
+		});
+		const forgeProtocol = runtime.protocols.get("forge");
+		expect(forgeProtocol).toBeDefined();
+		expect(forgeProtocol!.name).toBe("forge");
+		await runtime.shutdown();
 	});
 });

@@ -1,4 +1,5 @@
 import { realpath } from "node:fs/promises";
+import { resolve } from "node:path";
 import type { FridayModule } from "./types.ts";
 
 export interface ValidationResult {
@@ -55,4 +56,68 @@ export async function discoverModules(modulesDir: string): Promise<FridayModule[
   }
 
   return modules;
+}
+
+export interface ForgeLoadResult {
+	loaded: FridayModule[];
+	failed: { name: string; error: string }[];
+}
+
+export async function discoverForgeModules(
+	forgeDir: string,
+): Promise<ForgeLoadResult> {
+	const result: ForgeLoadResult = { loaded: [], failed: [] };
+	const resolvedDir = resolve(forgeDir);
+	const glob = new Bun.Glob("*/index.ts");
+
+	try {
+		for await (const match of glob.scan({
+			cwd: resolvedDir,
+			onlyFiles: true,
+		})) {
+			const moduleName = match.split("/")[0]!;
+
+			// Skip dotfiles (.backups directory)
+			if (moduleName.startsWith(".")) continue;
+
+			const indexPath = `${resolvedDir}/${match}`;
+
+			// Resolve symlinks before checking containment
+			const realIndexPath = await realpath(indexPath).catch(
+				() => indexPath,
+			);
+			const realDir = await realpath(resolvedDir).catch(
+				() => resolvedDir,
+			);
+			if (!realIndexPath.startsWith(`${realDir}/`)) {
+				result.failed.push({
+					name: moduleName,
+					error: "Path traversal detected",
+				});
+				continue;
+			}
+
+			try {
+				// Cache-bust for re-imports after patches
+				const mod = await import(`${indexPath}?t=${Date.now()}`);
+				const manifest: FridayModule = mod.default ?? mod;
+				const validation = validateModule(manifest);
+				if (validation.valid) {
+					result.loaded.push(manifest);
+				} else {
+					result.failed.push({
+						name: moduleName,
+						error: validation.error ?? "Invalid manifest",
+					});
+				}
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err);
+				result.failed.push({ name: moduleName, error: msg });
+			}
+		}
+	} catch {
+		// Directory doesn't exist or isn't readable — return empty result
+	}
+
+	return result;
 }

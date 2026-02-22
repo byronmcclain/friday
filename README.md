@@ -69,6 +69,11 @@ Dual-cadence polling (30s fast / 5min slow) gathers machine stats, Docker contai
 
 Read, write, list, delete files and execute shell commands — Friday's first real module. Paged file reading for large files, clearance-gated execution, and full audit logging.
 
+### 🔨 The Forge — Self-Improvement
+
+Friday can write her own modules. The Forge system lets her propose new capabilities, validate them (import test, typecheck, lint), and gracefully restart to load them — all with human approval at every step. Failed modules don't crash the runtime; errors are reported back so Friday can iterate on fixes.
+`/forge list` · `/forge status <name>` · `/forge history <name>` · `/forge protect <name>`
+
 ### ⚡ SignalBus — Reactive Nervous System
 
 Typed events (`file:changed`, `test:failed`, `session:start`) flow through the bus, triggering directives and module behavior. Supports custom signals via `custom:*`.
@@ -106,6 +111,7 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 | Alert system | **Notification** | Multi-channel alerts (terminal, Slack, webhook) |
 | Field knowledge | **SMARTS** | Dynamic knowledge base — learns from conversations |
 | Sensor suite | **Sensorium** | Environmental awareness — machine, Docker, dev tools |
+| The workshop | **Forge** | Self-improvement — Friday authors and patches her own modules |
 
 ---
 
@@ -116,7 +122,7 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 ```
 SignalBus → ClearanceManager → AuditLogger → NotificationManager
   → ProtocolRegistry → DirectiveStore/Engine → Memory → SmartsStore
-  → Sensorium → Cortex → Module Discovery
+  → Sensorium → Cortex → Module Discovery → Forge Module Discovery
 ```
 
 ### Process Loop
@@ -202,6 +208,10 @@ bun run serve
 | `/history list` | Browse past conversation sessions |
 | `/history show <id>` | View a specific session |
 | `/history clear` | Delete all saved sessions |
+| `/forge list` | List all forge-authored modules |
+| `/forge status <name>` | Detailed health of a forge module |
+| `/forge history <name>` | Version history of a forge module |
+| `/forge protect <name>` | Mark a forge module as immutable |
 | `exit`, `quit`, `bye` | Ends the session |
 
 ### Provider Defaults
@@ -328,7 +338,8 @@ src/
 ├── modules/
 │   ├── types.ts           # FridayModule, FridayTool interfaces
 │   ├── loader.ts          # Module discovery and validation
-│   └── filesystem/        # Read, write, list, delete, exec tools
+│   ├── filesystem/        # Read, write, list, delete, exec tools
+│   └── forge/             # The Forge — self-improvement system
 ├── protocols/             # Protocol registry and routing
 ├── directives/            # Autonomous rule engine
 ├── smarts/

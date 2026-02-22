@@ -54,7 +54,8 @@ src/
 ├── modules/
 │   ├── types.ts           # FridayModule, FridayTool, FridayProtocol interfaces
 │   ├── loader.ts          # Module discovery, validation, and loading
-│   └── filesystem/        # Filesystem module — read, write, list, delete, exec tools
+│   ├── filesystem/        # Filesystem module — read, write, list, delete, exec tools
+│   └── forge/             # The Forge — self-improvement system
 ├── protocols/
 │   ├── types.ts           # Re-exports from modules/types.ts
 │   └── registry.ts        # ProtocolRegistry — /command routing with aliases
@@ -89,6 +90,7 @@ web/                       # React web UI (Vite + Tailwind)
 │   ├── contexts/          # WebSocket, Chat, Session providers
 │   └── index.css          # Tailwind theme (Friday amber palette)
 smarts/                    # Runtime-generated knowledge files (gitignored, user-specific)
+forge/                     # Friday-authored modules (gitignored, AI-generated)
 tests/
 ├── helpers/               # Shared test stubs (stubProvider, grokStub)
 ├── unit/                  # Unit tests (bun:test) — 300 tests across 30 files
@@ -108,6 +110,7 @@ tests/
 - **Types** are split by domain: core config in `src/core/types.ts`, tool/module contracts in `src/modules/types.ts`, directive structures in `src/directives/types.ts`.
 - **Sensorium** (`src/sensorium/`) is Friday's environmental awareness. Pure sensor functions gather machine stats (`node:os`), Docker containers (`Bun.$`), and dev environment (git, ports, runtimes). The Sensorium class runs a dual-cadence polling loop (30s fast / 5min slow), evaluates alert thresholds with hysteresis, and injects a compact context block into the system prompt via `getContextBlock()`. The `/env` protocol provides CLI access; `getEnvironmentStatus` tool provides LLM access.
 - **Dual-Model Architecture** — FridayRuntime resolves two models per provider: a reasoning model (for Cortex conversations) and a fast model (for SmartsCurator knowledge extraction and ConversationSummarizer). Resolution priority: CLI flag > env var > `PROVIDER_DEFAULTS`. `FridayConfig.fastModel` carries the fast model through the config chain.
+- **The Forge** (`src/modules/forge/`) is Friday's self-improvement system. She can author new modules in `forge/` and patch existing forge modules, subject to human approval. The Forge validates modules (import, manifest, typecheck, lint) before triggering an in-process restart. Failed forge modules don't crash boot — errors are reported back so Friday can iterate. The filesystem module and Forge itself are core-protected.
 - **Prompts** live in `src/core/prompts.ts` as exported constants. Friday's personality is defined here — keep it consistent when modifying.
 
 ## Testing

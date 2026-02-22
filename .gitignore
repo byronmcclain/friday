@@ -49,3 +49,6 @@ data
 
 # SMARTS knowledge files (user-specific, auto-generated)
 smarts
+
+# Forge-authored modules (AI-generated, user-specific)
+forge
