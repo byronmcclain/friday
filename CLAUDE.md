@@ -161,6 +161,10 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 Feature work uses git worktrees in `.worktrees/` (gitignored). Create with:
 `git worktree add .worktrees/<name> -b feature/<name>`
 
+## Documentation Lookup
+
+Always use Context7 MCP (`resolve-library-id` then `query-docs`) to fetch up-to-date documentation for any library before writing code that depends on it. Do not rely on training data for API details.
+
 ## Conventions
 
 - Friday's personality is defined in `src/core/prompts.ts` — changes there affect all interactions
