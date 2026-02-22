@@ -13,12 +13,12 @@ interface InputBarProps {
 export function InputBar(props: InputBarProps) {
 	return (
 		<box
-			height={3}
 			flexShrink={0}
 			border={["top"]}
 			borderColor={PALETTE.copperAccent}
 			backgroundColor={PALETTE.background}
-			paddingLeft={1}
+			paddingLeft={2}
+			paddingBottom={1}
 		>
 			<CommandTypeahead {...props} />
 		</box>

@@ -1,7 +1,4 @@
-import { createTextAttributes } from "@opentui/core";
-import { PALETTE } from "../theme.ts";
-
-const BOLD = createTextAttributes({ bold: true });
+import { PALETTE, BOLD, DIM } from "../theme.ts";
 
 interface HeaderProps {
 	provider: string;
@@ -11,18 +8,26 @@ interface HeaderProps {
 export function Header({ provider, model }: HeaderProps) {
 	return (
 		<box
-			flexDirection="row"
-			justifyContent="space-between"
+			flexDirection="column"
 			width="100%"
-			height={1}
+			flexShrink={0}
 			border={["bottom"]}
+			borderStyle="double"
 			borderColor={PALETTE.copperAccent}
+			backgroundColor={PALETTE.surface}
+			paddingLeft={1}
+			paddingRight={1}
 		>
-			<text fg={PALETTE.amberPrimary} attributes={BOLD}>
-				{" F.R.I.D.A.Y."}
-			</text>
-			<text fg={PALETTE.amberDim}>
-				{`${provider}: ${model} `}
+			<box flexDirection="row" justifyContent="space-between" width="100%">
+				<text fg={PALETTE.amberPrimary} attributes={BOLD}>
+					{"◆ F.R.I.D.A.Y."}
+				</text>
+				<text fg={PALETTE.amberDim}>
+					{`${provider}: ${model}`}
+				</text>
+			</box>
+			<text fg={PALETTE.textMuted} attributes={DIM}>
+				{"Female Replacement Intelligent Digital Assistant Youth"}
 			</text>
 		</box>
 	);

@@ -86,12 +86,17 @@ function FridayApp({ options }: FridayAppProps) {
 					aliases: p.aliases,
 				}));
 
-				const label = `${runtime.cortex.providerName}: ${runtime.cortex.modelName}`;
+				const providerLabel = runtime.cortex.providerName;
+				const modelLabel = runtime.cortex.modelName;
+				dispatch({
+					type: "set-welcome",
+					info: { provider: providerLabel, model: modelLabel },
+				});
 				dispatch({
 					type: "add-message",
 					message: createMessage(
 						"system",
-						`Friday online. (${label})`,
+						`Friday online. (${providerLabel}: ${modelLabel})`,
 					),
 				});
 				dispatch({ type: "set-phase", phase: "active" });
@@ -166,10 +171,7 @@ function FridayApp({ options }: FridayAppProps) {
 				dispatch({ type: "set-thinking", value: false });
 				dispatch({
 					type: "add-message",
-					message: createMessage(
-						result.source === "protocol" ? "system" : "assistant",
-						result.output,
-					),
+					message: createMessage("assistant", result.output),
 				});
 
 				// Forge restart check
@@ -290,6 +292,7 @@ function FridayApp({ options }: FridayAppProps) {
 			<ChatArea
 				messages={state.messages}
 				isThinking={state.isThinking}
+				welcomeInfo={state.welcomeInfo}
 			/>
 			<InputBar
 				commands={commandsRef.current}

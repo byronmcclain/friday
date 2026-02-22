@@ -1,8 +1,13 @@
-import { createTextAttributes } from "@opentui/core";
-import { PALETTE, FRIDAY_SYNTAX_STYLE } from "../theme.ts";
+import { PALETTE, FRIDAY_SYNTAX_STYLE, BOLD, DIM } from "../theme.ts";
 import type { Message as MessageType } from "../state.ts";
 
-const BOLD = createTextAttributes({ bold: true });
+function RoleBadge({ label, fg }: { label: string; fg: string }) {
+	return (
+		<text fg={fg} bg={PALETTE.surfaceLight} attributes={BOLD}>
+			{` ${label} `}
+		</text>
+	);
+}
 
 interface MessageProps {
 	message: MessageType;
@@ -13,11 +18,11 @@ export function Message({ message }: MessageProps) {
 
 	if (role === "user") {
 		return (
-			<box flexDirection="row" gap={1} paddingLeft={1}>
-				<text fg={PALETTE.amberGlow} attributes={BOLD}>
-					You:
-				</text>
-				<text fg={PALETTE.textPrimary}>{content}</text>
+			<box flexDirection="column" paddingLeft={1} gap={0} marginBottom={1}>
+				<RoleBadge label="You" fg={PALETTE.amberGlow} />
+				<box paddingLeft={1}>
+					<text fg={PALETTE.textPrimary}>{content}</text>
+				</box>
 			</box>
 		);
 	}
@@ -28,20 +33,29 @@ export function Message({ message }: MessageProps) {
 			content.toLowerCase().startsWith("boot failed");
 		return (
 			<box paddingLeft={1}>
-				<text fg={isError ? PALETTE.error : PALETTE.textMuted}>
-					{content}
+				<text
+					fg={isError ? PALETTE.error : PALETTE.amberDim}
+					attributes={DIM}
+				>
+					{`──── ${content} ────`}
 				</text>
 			</box>
 		);
 	}
 
-	// Assistant messages — <markdown> renders full markdown with syntax highlighting
+	// Assistant messages — badge + rounded bubble with markdown
 	return (
-		<box flexDirection="column" paddingLeft={1} gap={0}>
-			<text fg={PALETTE.amberPrimary} attributes={BOLD}>
-				Friday:
-			</text>
-			<box paddingLeft={2}>
+		<box flexDirection="column" paddingLeft={1} gap={0} marginTop={1}>
+			<RoleBadge label="Friday" fg={PALETTE.amberPrimary} />
+			<box
+				border
+				borderStyle="rounded"
+				borderColor={PALETTE.copperAccent}
+				backgroundColor={PALETTE.surface}
+				paddingLeft={1}
+				paddingRight={1}
+				marginLeft={1}
+			>
 				<markdown content={content} syntaxStyle={FRIDAY_SYNTAX_STYLE} />
 			</box>
 		</box>

@@ -1,10 +1,8 @@
 import { useState, useCallback, useRef } from "react";
 import { useKeyboard } from "@opentui/react";
-import { createTextAttributes } from "@opentui/core";
-import { PALETTE } from "../theme.ts";
+import { PALETTE, BOLD } from "../theme.ts";
 import { filterCommands, type TypeaheadEntry } from "../filter-commands.ts";
 
-const BOLD = createTextAttributes({ bold: true });
 const MAX_SUGGESTIONS = 6;
 
 interface CommandTypeaheadProps {
@@ -131,37 +129,46 @@ export function CommandTypeahead({
 					borderColor={PALETTE.copperAccent}
 					backgroundColor={PALETTE.surface}
 				>
-					{suggestions.map((entry, i) => (
-						<box
-							key={entry.name}
-							backgroundColor={
-								i === selectedIndex
-									? PALETTE.amberDim
-									: undefined
-							}
-							paddingLeft={1}
-							paddingRight={1}
-						>
-							<text
-								fg={
-									i === selectedIndex
-										? PALETTE.amberGlow
-										: PALETTE.amberPrimary
+					{suggestions.map((entry, i) => {
+						const selected = i === selectedIndex;
+						return (
+							<box
+								key={entry.name}
+								backgroundColor={
+									selected
+										? PALETTE.surfaceLight
+										: undefined
 								}
+								paddingLeft={1}
+								paddingRight={1}
 							>
-								{`/${entry.name}`}
-							</text>
-							<text fg={PALETTE.textMuted}>
-								{`  ${entry.description}`}
-							</text>
-						</box>
-					))}
+								<text
+									fg={
+										selected
+											? PALETTE.amberGlow
+											: PALETTE.amberPrimary
+									}
+								>
+									{selected ? `❯ /${entry.name}` : `  /${entry.name}`}
+								</text>
+								<text
+									fg={
+										selected
+											? PALETTE.textPrimary
+											: PALETTE.textMuted
+									}
+								>
+									{`  ${entry.description}`}
+								</text>
+							</box>
+						);
+					})}
 				</box>
 			)}
 			{/* Input field — no value prop; input owns its own buffer */}
 			<box flexDirection="row" gap={1}>
-				<text fg={PALETTE.amberGlow} attributes={BOLD}>
-					{"You >"}
+				<text fg={PALETTE.amberPrimary} attributes={BOLD}>
+					{"❯"}
 				</text>
 				<input
 					key={inputKey}

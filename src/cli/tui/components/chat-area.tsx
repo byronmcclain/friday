@@ -1,29 +1,69 @@
+import type { ReactNode } from "react";
 import { PALETTE } from "../theme.ts";
 import { Message } from "./message.tsx";
 import { ThinkingIndicator } from "./thinking.tsx";
-import type { Message as MessageType } from "../state.ts";
+import { Welcome } from "./welcome.tsx";
+import type { Message as MessageType, WelcomeInfo } from "../state.ts";
+
+function TurnSeparator() {
+	return (
+		<box paddingLeft={1} paddingRight={1}>
+			<text fg={PALETTE.borderDim}>
+				{"─".repeat(60)}
+			</text>
+		</box>
+	);
+}
 
 interface ChatAreaProps {
 	messages: MessageType[];
 	isThinking: boolean;
+	welcomeInfo?: WelcomeInfo;
 }
 
-export function ChatArea({ messages, isThinking }: ChatAreaProps) {
+export function ChatArea({ messages, isThinking, welcomeInfo }: ChatAreaProps) {
+	const hasUserMessage = messages.some((m) => m.role === "user");
+
+	// Build elements with turn separators between conversation turns
+	const elements: ReactNode[] = [];
+	for (let i = 0; i < messages.length; i++) {
+		const msg = messages[i]!;
+		// Insert separator when transitioning from assistant/system back to user
+		if (i > 0 && msg.role === "user") {
+			const prev = messages[i - 1]!;
+			if (prev.role === "assistant" || prev.role === "system") {
+				elements.push(<TurnSeparator key={`sep-${msg.id}`} />);
+			}
+		}
+		elements.push(<Message key={msg.id} message={msg} />);
+	}
+
 	return (
 		<scrollbox
 			flexGrow={1}
 			flexDirection="column"
 			backgroundColor={PALETTE.background}
-			gap={1}
+			gap={2}
 			paddingTop={1}
 			paddingBottom={1}
 			stickyScroll
 			stickyStart="bottom"
 			focused
+			verticalScrollbarOptions={{
+				trackOptions: {
+					foregroundColor: PALETTE.amberDim,
+					backgroundColor: PALETTE.surface,
+				},
+				arrowOptions: {
+					foregroundColor: PALETTE.copperAccent,
+					backgroundColor: PALETTE.surface,
+				},
+			}}
 		>
-			{messages.map((msg) => (
-				<Message key={msg.id} message={msg} />
-			))}
+			{!hasUserMessage && welcomeInfo && (
+				<Welcome provider={welcomeInfo.provider} model={welcomeInfo.model} />
+			)}
+			{elements}
 			{isThinking && <ThinkingIndicator />}
 		</scrollbox>
 	);
