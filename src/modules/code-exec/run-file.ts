@@ -97,8 +97,8 @@ export const codeRunFile: FridayTool = {
 				new Response(proc.stderr).arrayBuffer(),
 			]);
 
-			clearTimeout(timeoutId);
 			const exitCode = await proc.exited;
+			clearTimeout(timeoutId);
 
 			let stdout = new TextDecoder().decode(stdoutBuf);
 			let stderr = new TextDecoder().decode(stderrBuf);
