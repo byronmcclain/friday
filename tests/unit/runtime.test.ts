@@ -72,7 +72,7 @@ describe("FridayRuntime", () => {
 		runtime = new FridayRuntime();
 		await runtime.boot({ injectedProvider: stubProvider });
 		const validSteps: ShutdownStep[] = ["sensorium", "conversation", "knowledge", "modules", "cleanup"];
-		const captured: Array<{ step: string; label: string }> = [];
+		const captured: Array<{ step: ShutdownStep; label: string }> = [];
 		await runtime.shutdown((step, label) => {
 			captured.push({ step, label });
 		});

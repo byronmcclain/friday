@@ -32,6 +32,7 @@ export function chatCommand(program: Command): void {
 					model: options.model,
 					smartsDir: resolve(projectRoot, "smarts"),
 					dataDir: resolve(projectRoot, "data"),
+					modulesDir: resolve(projectRoot, "src/modules"),
 					fresh: options.fresh,
 				});
 			} catch (error) {
@@ -42,11 +43,29 @@ export function chatCommand(program: Command): void {
 			}
 
 			let shuttingDown = false;
+			const shutdownWithSpinner = async () => {
+				const spinner = ora({
+					text: chalk.dim("Shutting down..."),
+					spinner: "dots",
+				}).start();
+				try {
+					await runtime.shutdown((_step, label) => {
+						spinner.text = chalk.dim(label);
+					});
+					spinner.succeed(chalk.dim("Shutdown complete"));
+				} catch (error) {
+					spinner.fail(chalk.red("Shutdown failed"));
+					if (error instanceof Error) {
+						console.error(chalk.red(`  ${error.message}`));
+					}
+				}
+			};
+
 			const gracefulShutdown = async () => {
 				if (shuttingDown) return;
 				shuttingDown = true;
-				console.log(chalk.dim("\nShutting down gracefully..."));
-				await runtime.shutdown();
+				console.log(); // newline after ^C
+				await shutdownWithSpinner();
 				process.exit(0);
 			};
 			process.on("SIGINT", gracefulShutdown);
@@ -62,7 +81,11 @@ export function chatCommand(program: Command): void {
 			);
 			if (!process.stdin.isTTY) {
 				console.error(chalk.red("Interactive chat requires a TTY. Use piped input with 'friday process' instead."));
-				await runtime.shutdown();
+				try {
+					await runtime.shutdown();
+				} catch {
+					// best-effort cleanup
+				}
 				process.exit(1);
 			}
 
@@ -90,7 +113,7 @@ export function chatCommand(program: Command): void {
 					["exit", "quit", "bye"].includes(message.toLowerCase().trim())
 				) {
 					shuttingDown = true;
-					await runtime.shutdown();
+					await shutdownWithSpinner();
 					console.log(chalk.cyan("\nSee you later, boss! \u{1F44B}\n"));
 					break;
 				}
