@@ -16,7 +16,7 @@ export function useHistory() {
 	const [loading, setLoading] = useState(false);
 
 	useEffect(() => {
-		const unsub = subscribe("history:result", (msg) => {
+		const unsub1 = subscribe("history:result", (msg) => {
 			const m = msg as Extract<
 				ServerMessage,
 				{ type: "history:result" }
@@ -37,7 +37,15 @@ export function useHistory() {
 			}
 			setLoading(false);
 		});
-		return unsub;
+
+		const unsub2 = subscribe("error", () => {
+			setLoading(false);
+		});
+
+		return () => {
+			unsub1();
+			unsub2();
+		};
 	}, [subscribe]);
 
 	const fetchHistory = useCallback(

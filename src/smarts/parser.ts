@@ -35,17 +35,21 @@ export function parseFrontmatter(raw: string): ParsedSmart | null {
   };
 }
 
+function quoteYaml(s: string): string {
+  return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n")}"`;
+}
+
 export function serializeSmartFile(entry: Omit<SmartEntry, "filePath">): string {
   const today = new Date().toISOString().split("T")[0];
-  const tagsLine = entry.tags.map((t) => `  - ${t}`).join("\n");
+  const tagsLine = entry.tags.map((t) => `  - ${quoteYaml(t)}`).join("\n");
 
   return `---
-name: ${entry.name}
-domain: ${entry.domain}
+name: ${quoteYaml(entry.name)}
+domain: ${quoteYaml(entry.domain)}
 tags:
 ${tagsLine}
 confidence: ${entry.confidence}
-source: ${entry.source}
+source: ${quoteYaml(entry.source)}
 created: ${today}
 updated: ${today}
 ---
@@ -71,12 +75,16 @@ function parseYamlFields(yaml: string): Record<string, string> {
   return fields;
 }
 
+function stripQuotes(s: string): string {
+  return s.replace(/^(['"])(.*)\1$/, "$2");
+}
+
 function parseYamlArray(value: string): string[] {
   const inlineMatch = value.match(/^\[(.*)\]$/);
   if (inlineMatch) {
     return inlineMatch[1]!
       .split(",")
-      .map((s) => s.trim())
+      .map((s) => stripQuotes(s.trim()))
       .filter(Boolean);
   }
   if (value === "") {
@@ -84,6 +92,6 @@ function parseYamlArray(value: string): string[] {
   }
   return value
     .split(",")
-    .map((s) => s.trim())
+    .map((s) => stripQuotes(s.trim()))
     .filter(Boolean);
 }

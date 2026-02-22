@@ -13,11 +13,15 @@ export function useWebSocket(url: string) {
 	const wsRef = useRef<WebSocket | null>(null);
 	const [state, setState] = useState<ConnectionState>("disconnected");
 	const handlersRef = useRef<Map<string, Set<MessageHandler>>>(new Map());
-	const reconnectRef = useRef<ReturnType<typeof setTimeout>>();
+	const reconnectRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	const reconnectDelay = useRef(1000);
 
 	const connect = useCallback(() => {
-		if (wsRef.current?.readyState === WebSocket.OPEN) return;
+		if (
+			wsRef.current?.readyState === WebSocket.OPEN ||
+			wsRef.current?.readyState === WebSocket.CONNECTING
+		)
+			return;
 
 		setState("connecting");
 		const ws = new WebSocket(url);
@@ -68,10 +72,13 @@ export function useWebSocket(url: string) {
 		setState("disconnected");
 	}, []);
 
-	const send = useCallback((msg: ClientMessage) => {
+	const send = useCallback((msg: ClientMessage): boolean => {
 		if (wsRef.current?.readyState === WebSocket.OPEN) {
 			wsRef.current.send(JSON.stringify(msg));
+			return true;
 		}
+		console.warn("WebSocket not open, dropping message:", msg.type);
+		return false;
 	}, []);
 
 	const subscribe = useCallback(
@@ -90,7 +97,12 @@ export function useWebSocket(url: string) {
 	useEffect(() => {
 		return () => {
 			if (reconnectRef.current) clearTimeout(reconnectRef.current);
-			wsRef.current?.close();
+			if (wsRef.current) {
+				wsRef.current.onclose = null;
+				wsRef.current.onerror = null;
+				wsRef.current.close();
+				wsRef.current = null;
+			}
 		};
 	}, []);
 

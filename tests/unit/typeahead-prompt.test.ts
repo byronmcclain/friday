@@ -4,6 +4,7 @@ import {
 	formatSuggestionLine,
 	type TypeaheadEntry,
 } from "../../src/cli/typeahead-prompt.ts";
+import { stripAnsi } from "../../src/utils/strip-ansi.ts";
 
 const testCommands: TypeaheadEntry[] = [
 	{
@@ -119,10 +120,3 @@ describe("formatSuggestionLine", () => {
 	});
 });
 
-function stripAnsi(str: string): string {
-	return str.replace(
-		// biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape code stripping requires matching control characters
-		/[\u001B\u009B][[\]()#;?]*(?:(?:(?:[a-zA-Z\d]*(?:;[-a-zA-Z\d/#&.:=?%@~_]*)*)?\u0007)|(?:(?:\d{1,4}(?:;\d{0,4})*)?[\dA-PR-TZcf-nq-uy=><~]))/g,
-		"",
-	);
-}

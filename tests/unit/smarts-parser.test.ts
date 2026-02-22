@@ -140,11 +140,11 @@ describe("serializeSmartFile", () => {
     });
 
     expect(output).toContain("---");
-    expect(output).toContain("name: test-smart");
-    expect(output).toContain("domain: testing");
+    expect(output).toContain('name: "test-smart"');
+    expect(output).toContain('domain: "testing"');
     expect(output).toContain("tags:");
     expect(output).toContain("confidence: 0.8");
-    expect(output).toContain("source: auto");
+    expect(output).toContain('source: "auto"');
     expect(output).toContain("# Test Knowledge");
   });
 

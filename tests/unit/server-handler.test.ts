@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from "bun:test";
+import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { WebSocketHandler } from "../../src/server/handler.ts";
 import { FridayRuntime } from "../../src/core/runtime.ts";
 import { stubProvider } from "../helpers/stubs.ts";
@@ -17,6 +17,12 @@ describe("WebSocketHandler", () => {
 		runtime = new FridayRuntime();
 		handler = new WebSocketHandler(runtime, { injectedProvider: stubProvider });
 		sent = [];
+	});
+
+	afterEach(async () => {
+		if (runtime?.isBooted) {
+			await runtime.shutdown();
+		}
 	});
 
 	test("returns error when runtime not booted and chat received", async () => {

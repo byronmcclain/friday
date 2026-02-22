@@ -218,11 +218,11 @@ export class SQLiteMemory {
   }
 
   async search(namespace: string, query: string, limit = 5): Promise<SemanticResult[]> {
-    const sanitized = query.replace(/['"*()]/g, " ").trim();
+    const sanitized = query.replace(/['"*(){}[\]?:^~!@#$%&\\]/g, " ").trim();
     if (!sanitized) return [];
     const terms = sanitized.split(/\s+/).filter(Boolean);
     if (terms.length === 0) return [];
-    const ftsQuery = terms.map((t) => `"${t}"*`).join(" OR ");
+    const ftsQuery = terms.map((t) => `${t}*`).join(" OR ");
 
     try {
       const rows = this.db
@@ -251,15 +251,17 @@ export class SQLiteMemory {
   }
 
   async forget(namespace: string, embeddingId: string): Promise<void> {
-    const row = this.db
-      .query<{ rowid: number }, [string, string]>("SELECT rowid FROM embeddings WHERE id = ? AND namespace = ?")
-      .get(embeddingId, namespace);
-    if (row) {
-      this.db.query("DELETE FROM embeddings_fts WHERE rowid = ?").run(row.rowid);
-    }
-    this.db
-      .query("DELETE FROM embeddings WHERE id = ? AND namespace = ?")
-      .run(embeddingId, namespace);
+    this.db.transaction(() => {
+      const row = this.db
+        .query<{ rowid: number }, [string, string]>("SELECT rowid FROM embeddings WHERE id = ? AND namespace = ?")
+        .get(embeddingId, namespace);
+      if (row) {
+        this.db.query("DELETE FROM embeddings_fts WHERE rowid = ?").run(row.rowid);
+      }
+      this.db
+        .query("DELETE FROM embeddings WHERE id = ? AND namespace = ?")
+        .run(embeddingId, namespace);
+    })();
   }
 
   async purgeNamespace(namespace: string): Promise<void> {

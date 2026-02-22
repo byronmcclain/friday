@@ -16,7 +16,7 @@ export function useSmarts() {
 	const [loading, setLoading] = useState(false);
 
 	useEffect(() => {
-		const unsub = subscribe("smarts:result", (msg) => {
+		const unsub1 = subscribe("smarts:result", (msg) => {
 			const m = msg as Extract<
 				ServerMessage,
 				{ type: "smarts:result" }
@@ -34,7 +34,15 @@ export function useSmarts() {
 			}
 			setLoading(false);
 		});
-		return unsub;
+
+		const unsub2 = subscribe("error", () => {
+			setLoading(false);
+		});
+
+		return () => {
+			unsub1();
+			unsub2();
+		};
 	}, [subscribe]);
 
 	const fetchList = useCallback(() => {

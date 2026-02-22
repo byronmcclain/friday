@@ -20,7 +20,7 @@ import { Sensorium } from "../sensorium/sensorium.ts";
 import { createEnvProtocol } from "../sensorium/protocol.ts";
 import { createEnvironmentTool } from "../sensorium/tool.ts";
 import { SENSORIUM_DEFAULTS } from "../sensorium/types.ts";
-import { mkdirSync } from "node:fs";
+import { mkdir } from "node:fs/promises";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
 	modulesDir?: string;
@@ -83,6 +83,10 @@ export class FridayRuntime {
 		return this._sensorium;
 	}
 
+	get notifications(): NotificationManager | undefined {
+		return this._booted ? this._notifications : undefined;
+	}
+
 	get memory(): SQLiteMemory | undefined {
 		return this._memory;
 	}
@@ -95,6 +99,7 @@ export class FridayRuntime {
 			this._clearance = new ClearanceManager([
 				"read-fs",
 				"write-fs",
+				"delete-fs",
 				"exec-shell",
 				"network",
 				"git-read",
@@ -115,7 +120,7 @@ export class FridayRuntime {
 			this._directiveEngine.start();
 
 			if (config.dataDir) {
-				mkdirSync(config.dataDir, { recursive: true });
+				await mkdir(config.dataDir, { recursive: true });
 				const dbPath = `${config.dataDir}/friday.db`;
 				this._memory = new SQLiteMemory(dbPath);
 				this._sessionId = crypto.randomUUID();
@@ -200,6 +205,9 @@ export class FridayRuntime {
 		} catch (err) {
 			this._booted = false;
 			this._modules = [];
+			if (this._directiveEngine) {
+				this._directiveEngine.stop();
+			}
 			if (this._sensorium) {
 				this._sensorium.stop();
 				this._sensorium = undefined;
@@ -235,7 +243,7 @@ export class FridayRuntime {
 					workingDirectory: process.cwd(),
 					audit: this._audit,
 					signal: this._signals,
-					memory: {
+					memory: this._memory?.scoped("protocol") ?? {
 						get: async () => undefined,
 						set: async () => {},
 						delete: async () => {},
@@ -254,6 +262,7 @@ export class FridayRuntime {
 
 	async shutdown(): Promise<void> {
 		if (!this._booted) throw new Error("Runtime not booted");
+		this._booted = false;
 
 		// Stop sensorium polling before cleanup
 		if (this._sensorium) {
@@ -295,12 +304,14 @@ export class FridayRuntime {
 			this._memory.close();
 			this._memory = undefined;
 		}
+		if (this._directiveEngine) {
+			this._directiveEngine.stop();
+		}
 		this._audit.log({
 			action: "runtime:shutdown",
 			source: "runtime",
 			detail: "Friday going offline",
 			success: true,
 		});
-		this._booted = false;
 	}
 }

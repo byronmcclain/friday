@@ -4,6 +4,7 @@ import {
 	type ClientMessage,
 	type ServerMessage,
 } from "./protocol.ts";
+import { WebSocketNotificationChannel } from "./ws-channel.ts";
 
 export type SendFn = (msg: ServerMessage) => void;
 
@@ -86,6 +87,15 @@ export class WebSocketHandler {
 		msg: Extract<ClientMessage, { type: "session:boot" }>,
 		send: SendFn,
 	): Promise<void> {
+		if (this.runtime.isBooted) {
+			send({
+				type: "error",
+				requestId: msg.id,
+				code: "ALREADY_BOOTED",
+				message: "Runtime already booted",
+			});
+			return;
+		}
 		const config: RuntimeConfig = {
 			...this.bootConfigDefaults,
 			provider: msg.provider ?? this.bootConfigDefaults.provider,
@@ -94,6 +104,11 @@ export class WebSocketHandler {
 		};
 		await this.runtime.boot(config);
 		this.defaultSend = send;
+		if (this.runtime.notifications) {
+			this.runtime.notifications.addChannel(
+				new WebSocketNotificationChannel(send),
+			);
+		}
 		send({
 			type: "session:booted",
 			requestId: msg.id,

@@ -1,5 +1,19 @@
 import ReactMarkdown from "react-markdown";
+import type { Components } from "react-markdown";
 import type { ChatMessage } from "../../hooks/useChat.ts";
+
+const markdownComponents: Components = {
+	a: ({ href, children, ...props }) => {
+		if (href && !/^https?:\/\//i.test(href)) {
+			return <span>{children}</span>;
+		}
+		return (
+			<a href={href} target="_blank" rel="noopener noreferrer" {...props}>
+				{children}
+			</a>
+		);
+	},
+};
 
 export function MessageBubble({ message }: { message: ChatMessage }) {
 	const isUser = message.role === "user";
@@ -26,7 +40,7 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
 					<p className="whitespace-pre-wrap">{message.content}</p>
 				) : (
 					<div className="prose prose-invert prose-sm max-w-none [&_code]:text-friday-amber-light [&_a]:text-friday-amber [&_strong]:text-friday-text">
-						<ReactMarkdown>{message.content}</ReactMarkdown>
+						<ReactMarkdown components={markdownComponents}>{message.content}</ReactMarkdown>
 					</div>
 				)}
 			</div>

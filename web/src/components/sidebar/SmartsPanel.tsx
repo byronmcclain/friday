@@ -35,6 +35,7 @@ export function SmartsPanel() {
 					className="flex-1 bg-friday-surface border border-friday-amber-dim/30 rounded px-2 py-1 text-sm text-friday-text placeholder-friday-text-muted outline-none focus:border-friday-amber/50"
 				/>
 				<button
+					type="button"
 					onClick={fetchList}
 					className="text-xs text-friday-text-dim hover:text-friday-amber"
 				>
@@ -48,7 +49,7 @@ export function SmartsPanel() {
 			)}
 			{entries.map((entry) => (
 				<div
-					key={entry.name}
+					key={`${entry.domain}:${entry.name}`}
 					className="p-2 rounded border border-friday-amber-dim/20 bg-friday-surface/30"
 				>
 					<div className="text-sm text-friday-text font-medium">

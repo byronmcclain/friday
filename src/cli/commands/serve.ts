@@ -1,7 +1,8 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import boxen from "boxen";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createFridayServer } from "../../server/index.ts";
 import type { ProviderName } from "../../core/types.ts";
 import { DEFAULT_PROVIDER } from "../../providers/index.ts";
@@ -24,14 +25,15 @@ export function serveCommand(program: Command): void {
 				process.exit(1);
 			}
 
+			const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 			const server = createFridayServer({
 				port,
-				staticDir: resolve("web/dist"),
+				staticDir: resolve(projectRoot, "web/dist"),
 				runtimeConfig: {
 					provider: options.provider as ProviderName,
 					model: options.model,
-					smartsDir: resolve("smarts"),
-					dataDir: resolve("data"),
+					smartsDir: resolve(projectRoot, "smarts"),
+					dataDir: resolve(projectRoot, "data"),
 				},
 			});
 
@@ -42,10 +44,12 @@ export function serveCommand(program: Command): void {
 				),
 			);
 
-			process.on("SIGINT", () => {
+			const shutdown = () => {
 				console.log(chalk.dim("\nShutting down server..."));
 				server.stop(true);
 				process.exit(0);
-			});
+			};
+			process.on("SIGINT", shutdown);
+			process.on("SIGTERM", shutdown);
 		});
 }

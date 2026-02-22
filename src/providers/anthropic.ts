@@ -43,6 +43,10 @@ export function toAnthropicMessages(
             content: block.content,
             is_error: block.isError,
           };
+        default: {
+          const _exhaustive: never = block;
+          throw new Error(`Unknown content block type: ${(_exhaustive as { type: string }).type}`);
+        }
       }
     });
 
@@ -96,6 +100,13 @@ export class AnthropicProvider implements LLMProvider {
   private client: Anthropic;
 
   constructor() {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        "ANTHROPIC_API_KEY is not set. Add it to your .env file to use Anthropic.\n" +
+          "Get your API key at https://console.anthropic.com",
+      );
+    }
     this.client = new Anthropic();
   }
 

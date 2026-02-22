@@ -91,13 +91,20 @@ export class WebhookChannel implements NotificationChannel {
   }
 
   async send(notification: FridayNotification): Promise<void> {
-    const response = await fetch(this.url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...this.headers },
-      body: JSON.stringify(notification),
-    });
-    if (!response.ok) {
-      throw new Error(`Webhook failed: ${response.status} ${response.statusText}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(this.url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...this.headers },
+        body: JSON.stringify(notification),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`Webhook failed: ${response.status} ${response.statusText}`);
+      }
+    } finally {
+      clearTimeout(timeout);
     }
   }
 }
@@ -116,15 +123,22 @@ export class SlackChannel implements NotificationChannel {
       warning: ":warning:",
       alert: ":rotating_light:",
     };
-    const response = await fetch(this.webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text: `${emoji[notification.level]} *${notification.title}*\n${notification.body}`,
-      }),
-    });
-    if (!response.ok) {
-      throw new Error(`Slack webhook failed: ${response.status} ${response.statusText}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const response = await fetch(this.webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: `${emoji[notification.level]} *${notification.title}*\n${notification.body}`,
+        }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`Slack webhook failed: ${response.status} ${response.statusText}`);
+      }
+    } finally {
+      clearTimeout(timeout);
     }
   }
 }

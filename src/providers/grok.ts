@@ -113,11 +113,16 @@ interface GrokChoiceLike {
 /** Parse OpenAI-compatible response choice into Friday's ChatResponse */
 export function parseGrokResponse(choice: GrokChoiceLike): ChatResponse {
   if (choice.finish_reason === "tool_calls" && choice.message.tool_calls) {
-    const toolCalls = choice.message.tool_calls.map((tc) => ({
-      id: tc.id,
-      name: tc.function.name,
-      input: JSON.parse(tc.function.arguments) as Record<string, unknown>,
-    }));
+    const toolCalls = choice.message.tool_calls.map((tc) => {
+      let input: Record<string, unknown>;
+      try {
+        input = JSON.parse(tc.function.arguments) as Record<string, unknown>;
+      } catch {
+        console.warn(`Failed to parse tool arguments for ${tc.function.name}, using empty object`);
+        input = {};
+      }
+      return { id: tc.id, name: tc.function.name, input };
+    });
 
     return { type: "tool_use", toolCalls };
   }

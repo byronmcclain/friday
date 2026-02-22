@@ -3,15 +3,22 @@ import type { FridayDirective } from "./types.ts";
 
 export class DirectiveStore {
   private directives = new Map<string, FridayDirective>();
-  private onChange?: () => void;
+  private changeListeners = new Set<() => void>();
 
-  onStoreChange(callback: () => void): void {
-    this.onChange = callback;
+  onStoreChange(callback: () => void): () => void {
+    this.changeListeners.add(callback);
+    return () => this.changeListeners.delete(callback);
+  }
+
+  private notifyChange(): void {
+    for (const listener of this.changeListeners) {
+      listener();
+    }
   }
 
   add(directive: FridayDirective): void {
     this.directives.set(directive.id, directive);
-    this.onChange?.();
+    this.notifyChange();
   }
 
   get(id: string): FridayDirective | undefined {
@@ -20,14 +27,14 @@ export class DirectiveStore {
 
   remove(id: string): void {
     this.directives.delete(id);
-    this.onChange?.();
+    this.notifyChange();
   }
 
   update(id: string, updates: Partial<FridayDirective>): void {
     const existing = this.directives.get(id);
     if (existing) {
       this.directives.set(id, { ...existing, ...updates });
-      this.onChange?.();
+      this.notifyChange();
     }
   }
 

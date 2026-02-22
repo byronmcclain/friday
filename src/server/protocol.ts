@@ -97,6 +97,13 @@ export function parseClientMessage(raw: string): ClientMessage | null {
 		}
 	}
 
+	// Validate field types
+	if (typeof parsed.id !== "string") return null;
+	if ("content" in parsed && typeof parsed.content !== "string") return null;
+	if ("command" in parsed && typeof parsed.command !== "string") return null;
+	if ("query" in parsed && typeof parsed.query !== "string") return null;
+	if ("sessionId" in parsed && typeof parsed.sessionId !== "string") return null;
+
 	return parsed as ClientMessage;
 }
 

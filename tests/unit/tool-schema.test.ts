@@ -65,10 +65,13 @@ describe("toJsonSchema", () => {
     const result = toJsonSchema(params);
 
     for (const t of types) {
-      expect(result.properties[`param_${t}`]).toEqual({
+      const expected: Record<string, unknown> = {
         type: t,
         description: `A ${t} parameter`,
-      });
+      };
+      if (t === "array") expected.items = {};
+      if (t === "object") expected.additionalProperties = true;
+      expect(result.properties[`param_${t}`]).toEqual(expected);
     }
     expect(result.required).toEqual(types.map((t) => `param_${t}`));
   });

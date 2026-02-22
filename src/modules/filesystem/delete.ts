@@ -31,6 +31,9 @@ export const fsDelete: FridayTool = {
     }
 
     const resolved = resolve(context.workingDirectory, filePath);
+    if (!resolved.startsWith(`${context.workingDirectory}/`)) {
+      return { success: false, output: "Access denied: path escapes working directory" };
+    }
 
     try {
       const info = await stat(resolved);

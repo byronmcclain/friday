@@ -8,6 +8,7 @@ import {
 	gatherDev,
 	type CpuTimes,
 } from "./sensors.ts";
+import { formatBytes } from "./format.ts";
 
 export interface SensoriumOptions {
 	config: SensorConfig;
@@ -92,6 +93,9 @@ export class Sensorium {
 	start(): void {
 		if (this._running) return;
 		this._running = true;
+		if (!this._snapshot) {
+			void this.poll();
+		}
 		this._fastTimer = setInterval(
 			() => this.pollFast(),
 			this.config.fastPollInterval,
@@ -242,10 +246,3 @@ export class Sensorium {
 	}
 }
 
-function formatBytes(bytes: number): string {
-	if (bytes === 0) return "0B";
-	const units = ["B", "KB", "MB", "GB", "TB"];
-	const i = Math.floor(Math.log(bytes) / Math.log(1024));
-	const val = bytes / 1024 ** i;
-	return `${val.toFixed(1)}${units[i]}`;
-}

@@ -85,15 +85,18 @@ export function useChat() {
 
 		const unsub2 = subscribe("error", (msg) => {
 			const m = msg as Extract<ServerMessage, { type: "error" }>;
-			dispatch({
-				type: "receive",
-				message: {
-					id: m.requestId ?? crypto.randomUUID(),
-					role: "system",
-					content: `Error: ${m.message}`,
-					timestamp: new Date(),
-				},
-			});
+			// Only clear thinking state if the error matches our pending request
+			if (m.requestId) {
+				dispatch({
+					type: "receive",
+					message: {
+						id: m.requestId,
+						role: "system",
+						content: `Error: ${m.message}`,
+						timestamp: new Date(),
+					},
+				});
+			}
 		});
 
 		return () => {

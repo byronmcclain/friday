@@ -13,7 +13,7 @@ const levelLabel = {
 };
 
 export function NotificationPanel() {
-	const { notifications } = useNotifications();
+	const { notifications, dismiss, clear } = useNotifications();
 
 	if (notifications.length === 0) {
 		return (
@@ -23,11 +23,28 @@ export function NotificationPanel() {
 
 	return (
 		<div className="space-y-2">
+			<div className="flex justify-end">
+				<button
+					type="button"
+					onClick={clear}
+					className="text-xs text-friday-text-dim hover:text-friday-amber"
+				>
+					Clear all
+				</button>
+			</div>
 			{notifications.map((n) => (
 				<div
 					key={n.id}
-					className={`p-2 rounded border ${levelStyles[n.level]}`}
+					className={`p-2 rounded border ${levelStyles[n.level]} group relative`}
 				>
+					<button
+						type="button"
+						onClick={() => dismiss(n.id)}
+						className="absolute top-1 right-1 text-friday-text-dim hover:text-friday-text opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+						title="Dismiss"
+					>
+						&times;
+					</button>
 					<div className="flex items-center gap-2">
 						<span
 							className={`text-xs font-medium uppercase ${levelLabel[n.level]}`}

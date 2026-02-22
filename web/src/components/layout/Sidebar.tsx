@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 type Tab = "history" | "smarts" | "notifications";
 
 interface SidebarProps {
 	isOpen: boolean;
 	onToggle: () => void;
-	historyPanel: React.ReactNode;
-	smartsPanel: React.ReactNode;
-	notificationsPanel: React.ReactNode;
+	historyPanel: ReactNode;
+	smartsPanel: ReactNode;
+	notificationsPanel: ReactNode;
 }
 
 export function Sidebar({
@@ -22,6 +22,7 @@ export function Sidebar({
 	if (!isOpen) {
 		return (
 			<button
+				type="button"
 				onClick={onToggle}
 				className="px-2 py-4 bg-friday-bg border-l border-friday-amber-dim/20 text-friday-text-dim hover:text-friday-amber transition-colors"
 				title="Open sidebar"
@@ -38,6 +39,7 @@ export function Sidebar({
 					{(["history", "smarts", "notifications"] as Tab[]).map(
 						(tab) => (
 							<button
+								type="button"
 								key={tab}
 								onClick={() => setActiveTab(tab)}
 								className={`px-2 py-1 text-xs rounded transition-colors ${
@@ -52,6 +54,7 @@ export function Sidebar({
 					)}
 				</div>
 				<button
+					type="button"
 					onClick={onToggle}
 					className="text-friday-text-dim hover:text-friday-amber text-sm"
 				>

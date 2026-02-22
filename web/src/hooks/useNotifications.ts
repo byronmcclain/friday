@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useWS } from "../contexts/WebSocketContext.tsx";
 import type { ServerMessage } from "@friday/server/protocol.ts";
 
@@ -21,7 +21,7 @@ export function useNotifications() {
 				ServerMessage,
 				{ type: "notification" }
 			>;
-			setNotifications((prev) =>
+			setNotifications((prev: NotificationItem[]) =>
 				[
 					{
 						id: crypto.randomUUID(),
@@ -38,5 +38,13 @@ export function useNotifications() {
 		return unsub;
 	}, [subscribe]);
 
-	return { notifications };
+	const dismiss = useCallback((id: string) => {
+		setNotifications((prev) => prev.filter((n) => n.id !== id));
+	}, []);
+
+	const clear = useCallback(() => {
+		setNotifications([]);
+	}, []);
+
+	return { notifications, dismiss, clear };
 }

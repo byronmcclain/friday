@@ -120,7 +120,7 @@ export async function gatherContainers(): Promise<ContainerSnapshot> {
 					.filter(Boolean)) {
 					try {
 						const stat = JSON.parse(line);
-						statsMap.set(stat.ID || stat.Container, {
+						statsMap.set(stat.Name || stat.Names || stat.ID || stat.Container, {
 							cpu: Number.parseFloat(stat.CPUPerc) || 0,
 							memory: Number.parseFloat(stat.MemPerc) || 0,
 						});
@@ -134,7 +134,8 @@ export async function gatherContainers(): Promise<ContainerSnapshot> {
 				try {
 					const c = JSON.parse(line);
 					const id = c.ID ?? "";
-					const stats = statsMap.get(id) ?? { cpu: 0, memory: 0 };
+					const name = c.Names ?? "";
+					const stats = statsMap.get(name) ?? statsMap.get(id) ?? { cpu: 0, memory: 0 };
 					running.push({
 						id,
 						name: c.Names ?? "",

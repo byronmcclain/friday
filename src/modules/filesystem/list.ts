@@ -34,6 +34,9 @@ export const fsList: FridayTool = {
     const recursive = (args.recursive as boolean) ?? false;
     const glob = args.glob as string | undefined;
     const resolved = resolve(context.workingDirectory, dirPath);
+    if (!resolved.startsWith(`${context.workingDirectory}/`) && resolved !== context.workingDirectory) {
+      return { success: false, output: "Access denied: path escapes working directory" };
+    }
 
     try {
       const info = await stat(resolved);
