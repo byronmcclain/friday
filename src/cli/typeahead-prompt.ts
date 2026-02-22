@@ -1,12 +1,13 @@
 import * as readline from "node:readline";
 import chalk from "chalk";
 import { stripAnsi } from "../utils/strip-ansi.ts";
+import {
+	filterCommands,
+	type TypeaheadEntry,
+} from "./tui/filter-commands.ts";
 
-export interface TypeaheadEntry {
-	name: string;
-	description: string;
-	aliases: string[];
-}
+export type { TypeaheadEntry } from "./tui/filter-commands.ts";
+export { filterCommands } from "./tui/filter-commands.ts";
 
 export interface TypeaheadPromptConfig {
 	prompt: string;
@@ -14,19 +15,6 @@ export interface TypeaheadPromptConfig {
 }
 
 const MAX_SUGGESTIONS = 6;
-
-export function filterCommands(
-	commands: TypeaheadEntry[],
-	query: string,
-): TypeaheadEntry[] {
-	if (!query) return commands;
-	const q = query.toLowerCase();
-	return commands.filter(
-		(cmd) =>
-			cmd.name.toLowerCase().startsWith(q) ||
-			cmd.aliases.some((a) => a.toLowerCase().startsWith(q)),
-	);
-}
 
 export function formatSuggestionLine(
 	entry: TypeaheadEntry,

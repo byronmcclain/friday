@@ -1,9 +1,9 @@
 import { describe, test, expect } from "bun:test";
 import {
 	filterCommands,
-	formatSuggestionLine,
 	type TypeaheadEntry,
-} from "../../src/cli/typeahead-prompt.ts";
+} from "../../src/cli/tui/filter-commands.ts";
+import { formatSuggestionLine } from "../../src/cli/typeahead-prompt.ts";
 import { stripAnsi } from "../../src/utils/strip-ansi.ts";
 
 const testCommands: TypeaheadEntry[] = [
