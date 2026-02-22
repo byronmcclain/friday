@@ -11,7 +11,7 @@ export interface WelcomeInfo {
 }
 
 export interface AppState {
-	phase: "booting" | "active" | "shutting-down";
+	phase: "splash" | "fading" | "booting" | "active" | "shutting-down";
 	messages: Message[];
 	isThinking: boolean;
 	welcomeInfo?: WelcomeInfo;
@@ -25,7 +25,7 @@ export type AppAction =
 	| { type: "clear-messages" };
 
 export const initialState: AppState = {
-	phase: "booting",
+	phase: "splash",
 	messages: [],
 	isThinking: false,
 };

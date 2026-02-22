@@ -8,7 +8,7 @@ import {
 
 describe("TUI state reducer", () => {
 	test("initialState has correct defaults", () => {
-		expect(initialState.phase).toBe("booting");
+		expect(initialState.phase).toBe("splash");
 		expect(initialState.messages).toEqual([]);
 		expect(initialState.isThinking).toBe(false);
 	});
@@ -76,6 +76,26 @@ describe("TUI state reducer", () => {
 		});
 		state = appReducer(state, { type: "clear-messages" });
 		expect(state.messages).toEqual([]);
+	});
+
+	test("set-phase accepts splash phase", () => {
+		const state = appReducer(initialState, {
+			type: "set-phase",
+			phase: "splash",
+		});
+		expect(state.phase).toBe("splash");
+	});
+
+	test("set-phase accepts fading phase", () => {
+		const state = appReducer(initialState, {
+			type: "set-phase",
+			phase: "fading",
+		});
+		expect(state.phase).toBe("fading");
+	});
+
+	test("initialState phase is splash", () => {
+		expect(initialState.phase).toBe("splash");
 	});
 });
 
