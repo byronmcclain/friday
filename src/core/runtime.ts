@@ -8,7 +8,7 @@ import { ProtocolRegistry } from "../protocols/registry.ts";
 import { DirectiveStore } from "../directives/store.ts";
 import { DirectiveEngine } from "../directives/engine.ts";
 import { NotificationManager, TerminalChannel } from "./notifications.ts";
-import { discoverModules } from "../modules/loader.ts";
+import { discoverModules, discoverForgeModules } from "../modules/loader.ts";
 import type { FridayModule } from "../modules/types.ts";
 import { SmartsStore } from "../smarts/store.ts";
 import { SQLiteMemory } from "./memory.ts";
@@ -20,6 +20,8 @@ import { Sensorium } from "../sensorium/sensorium.ts";
 import { createEnvProtocol } from "../sensorium/protocol.ts";
 import { createEnvironmentTool } from "../sensorium/tool.ts";
 import { SENSORIUM_DEFAULTS } from "../sensorium/types.ts";
+import { createForgeProtocol } from "../modules/forge/protocol.ts";
+import type { ForgeHealthReport } from "../modules/forge/types.ts";
 import { mkdir } from "node:fs/promises";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
@@ -27,6 +29,7 @@ export interface RuntimeConfig extends Partial<FridayConfig> {
 	injectedProvider?: LLMProvider;
 	smartsDir?: string;
 	dataDir?: string;
+	forgeDir?: string;
 	fresh?: boolean;
 	enableSensorium?: boolean;
 }
@@ -57,6 +60,7 @@ export class FridayRuntime {
 	private _sessionStartedAt?: Date;
 	private _booted = false;
 	private _restartRequested = false;
+	private _forgeHealthReport?: ForgeHealthReport;
 
 	get isBooted(): boolean {
 		return this._booted;
@@ -68,6 +72,10 @@ export class FridayRuntime {
 
 	set restartRequested(value: boolean) {
 		this._restartRequested = value;
+	}
+
+	get forgeHealthReport(): ForgeHealthReport | undefined {
+		return this._forgeHealthReport;
 	}
 
 	get cortex(): Cortex {
@@ -117,6 +125,7 @@ export class FridayRuntime {
 				"git-write",
 				"provider",
 				"system",
+				"forge-modify",
 			]);
 			this._audit = new AuditLogger();
 			this._notifications = new NotificationManager([new TerminalChannel()]);
@@ -202,6 +211,31 @@ export class FridayRuntime {
 					if (mod.onLoad) {
 						await mod.onLoad();
 					}
+				}
+			}
+
+			if (config.forgeDir) {
+				await mkdir(config.forgeDir, { recursive: true });
+				this._protocols.register(createForgeProtocol(config.forgeDir));
+
+				const forgeResult = await discoverForgeModules(config.forgeDir);
+				this._forgeHealthReport = {
+					loaded: forgeResult.loaded.map((m) => m.name),
+					failed: forgeResult.failed,
+					pending: [],
+				};
+
+				for (const mod of forgeResult.loaded) {
+					for (const tool of mod.tools) {
+						this._cortex.registerTool(tool);
+					}
+					for (const protocol of mod.protocols) {
+						this._protocols.register(protocol);
+					}
+					if (mod.onLoad) {
+						await mod.onLoad();
+					}
+					this._modules.push(mod);
 				}
 			}
 
@@ -303,6 +337,8 @@ export class FridayRuntime {
 			const history = this._cortex.getHistory();
 			await this._curator.extractFromConversation(history);
 		}
+
+		this._forgeHealthReport = undefined;
 
 		onProgress?.("modules", "Unloading modules...");
 		await this._signals.emit("session:end", "runtime");
