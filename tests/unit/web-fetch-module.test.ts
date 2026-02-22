@@ -1,9 +1,37 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { AuditLogger } from "../../src/audit/logger.ts";
 import webFetchModule from "../../src/modules/web-fetch/index.ts";
 import { webFetch } from "../../src/modules/web-fetch/fetch.ts";
 import { webSearch } from "../../src/modules/web-fetch/search.ts";
 import type { ToolContext } from "../../src/modules/types.ts";
+
+let testServer: ReturnType<typeof Bun.serve>;
+let testServerUrl: string;
+
+beforeAll(() => {
+	testServer = Bun.serve({
+		port: 0,
+		fetch(req) {
+			const url = new URL(req.url);
+			if (url.pathname === "/json") {
+				return new Response(JSON.stringify({ ok: true, data: "test" }), {
+					headers: { "Content-Type": "application/json" },
+				});
+			}
+			if (url.pathname === "/large") {
+				return new Response("x".repeat(2_000_000));
+			}
+			return new Response("Hello from test server", {
+				headers: { "X-Custom": "friday" },
+			});
+		},
+	});
+	testServerUrl = `http://localhost:${testServer.port}`;
+});
+
+afterAll(() => {
+	testServer.stop();
+});
 
 const ctx: ToolContext = {
 	workingDirectory: "/tmp",
@@ -73,6 +101,32 @@ describe("web.fetch", () => {
 		const result = await webFetch.execute({ url: "data:text/html,hello" }, ctx);
 		expect(result.success).toBe(false);
 		expect(result.output).toContain("Disallowed protocol");
+	});
+
+	test("fetches from local server successfully", async () => {
+		const result = await webFetch.execute({ url: testServerUrl }, ctx);
+		expect(result.success).toBe(true);
+		expect(result.output).toContain("200");
+		expect(result.output).toContain("Hello from test server");
+	});
+
+	test("captures response headers", async () => {
+		const result = await webFetch.execute({ url: testServerUrl }, ctx);
+		expect(result.success).toBe(true);
+		expect(result.output).toContain("x-custom: friday");
+	});
+
+	test("truncates large responses", async () => {
+		const result = await webFetch.execute({ url: `${testServerUrl}/large` }, ctx);
+		expect(result.success).toBe(true);
+		expect(result.output).toContain("truncated");
+		expect(result.artifacts?.truncated).toBe(true);
+	});
+
+	test("detects JSON content type", async () => {
+		const result = await webFetch.execute({ url: `${testServerUrl}/json` }, ctx);
+		expect(result.success).toBe(true);
+		expect(result.output).toContain("application/json");
 	});
 });
 

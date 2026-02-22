@@ -1,8 +1,25 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { AuditLogger } from "../../src/audit/logger.ts";
 import notifyModule from "../../src/modules/notify/index.ts";
 import { notifySend } from "../../src/modules/notify/send.ts";
 import type { ToolContext } from "../../src/modules/types.ts";
+
+let mockWebhookServer: ReturnType<typeof Bun.serve>;
+let mockWebhookUrl: string;
+
+beforeAll(() => {
+	mockWebhookServer = Bun.serve({
+		port: 0,
+		fetch() {
+			return new Response("ok", { status: 200 });
+		},
+	});
+	mockWebhookUrl = `http://localhost:${mockWebhookServer.port}`;
+});
+
+afterAll(() => {
+	mockWebhookServer.stop();
+});
 
 const ctx: ToolContext = {
 	workingDirectory: "/tmp",
@@ -113,5 +130,25 @@ describe("notify.send", () => {
 		);
 		expect(result.success).toBe(false);
 		expect(result.output).toContain("Disallowed protocol");
+	});
+
+	test("sends webhook notification successfully", async () => {
+		const result = await notifySend.execute(
+			{ title: "Test Alert", body: "Something happened", channel: "webhook", url: mockWebhookUrl },
+			ctx,
+		);
+		expect(result.success).toBe(true);
+		expect(result.output).toContain("Webhook notification sent");
+		expect(result.artifacts?.channel).toBe("Webhook");
+		expect(result.artifacts?.title).toBe("Test Alert");
+	});
+
+	test("sends slack notification successfully", async () => {
+		const result = await notifySend.execute(
+			{ title: "Slack Test", body: "Hello Slack", channel: "slack", url: mockWebhookUrl },
+			ctx,
+		);
+		expect(result.success).toBe(true);
+		expect(result.output).toContain("Slack notification sent");
 	});
 });

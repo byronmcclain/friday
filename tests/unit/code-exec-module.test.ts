@@ -177,6 +177,19 @@ describe("code.run_file", () => {
 		expect(result.output).toContain("Missing");
 	});
 
+	test("rejects path traversal outside working directory", async () => {
+		const result = await codeRunFile.execute({ path: "../../etc/passwd" }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Access denied");
+	});
+
+	test("rejects path with no extension", async () => {
+		writeFileSync(resolve(testDir, "Makefile"), "all:\n\techo hi\n");
+		const result = await codeRunFile.execute({ path: "Makefile" }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("no extension");
+	});
+
 	test("declares exec-shell and read-fs clearance", () => {
 		expect(codeRunFile.clearance).toContain("exec-shell");
 		expect(codeRunFile.clearance).toContain("read-fs");
