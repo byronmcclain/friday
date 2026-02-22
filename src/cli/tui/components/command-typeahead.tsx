@@ -22,25 +22,36 @@ export function CommandTypeahead({
 	onSubmit,
 	onExit,
 }: CommandTypeaheadProps) {
-	const [input, setInput] = useState("");
+	// Track input value for suggestion filtering only — let <input> own its buffer
+	const [displayValue, setDisplayValue] = useState("");
 	const [selectedIndex, setSelectedIndex] = useState(0);
-	const inputRef = useRef(input);
-	inputRef.current = input;
+	// Incremented to force <input> to accept a programmatic value change
+	const [valueVersion, setValueVersion] = useState(0);
+	const displayRef = useRef(displayValue);
+	displayRef.current = displayValue;
 
 	const suggestions =
-		input.startsWith("/") && !input.includes(" ")
-			? filterCommands(commands, input.slice(1)).slice(0, MAX_SUGGESTIONS)
+		displayValue.startsWith("/") && !displayValue.includes(" ")
+			? filterCommands(commands, displayValue.slice(1)).slice(
+					0,
+					MAX_SUGGESTIONS,
+				)
 			: [];
 	const hasSuggestions = suggestions.length > 0;
 
-	// Handle text changes from the input element
+	// Sync from <input>'s internal buffer — fires on every keystroke
 	const handleInput = useCallback((value: string) => {
-		setInput(value);
+		setDisplayValue(value);
 		setSelectedIndex(0);
 	}, []);
 
-	// All keyboard shortcuts handled here to avoid onSubmit type conflict
-	// between React DOM's SubmitEvent and OpenTUI's string callback
+	// Push a programmatic value into the input and bump version
+	const pushValue = useCallback((value: string) => {
+		setDisplayValue(value);
+		setValueVersion((v) => v + 1);
+	}, []);
+
+	// Only intercept specific keys — let everything else flow to <input> unimpeded
 	useKeyboard((key) => {
 		if (disabled) return;
 
@@ -57,21 +68,21 @@ export function CommandTypeahead({
 			if (hasSuggestions) {
 				const selected = suggestions[selectedIndex];
 				if (selected) {
-					setInput(`/${selected.name} `);
+					pushValue(`/${selected.name} `);
 					setSelectedIndex(0);
 				}
 				return;
 			}
-			const trimmed = inputRef.current.trim();
+			const trimmed = displayRef.current.trim();
 			if (trimmed.length > 0) {
 				onSubmit(trimmed);
-				setInput("");
+				pushValue("");
 				setSelectedIndex(0);
 			}
 			return;
 		}
 
-		// Up/Down — navigate suggestions
+		// Up/Down — only intercept when suggestions are visible
 		if (key.name === "up" && hasSuggestions) {
 			key.preventDefault();
 			setSelectedIndex((i) =>
@@ -87,19 +98,20 @@ export function CommandTypeahead({
 			return;
 		}
 
-		// Tab — accept selected suggestion
+		// Tab — accept selected suggestion (only when suggestions visible)
 		if (key.name === "tab" && hasSuggestions) {
 			key.preventDefault();
 			const selected = suggestions[selectedIndex];
 			if (selected) {
-				setInput(`/${selected.name} `);
+				pushValue(`/${selected.name} `);
 				setSelectedIndex(0);
 			}
 			return;
 		}
 
-		// Escape — dismiss suggestions (reset index)
-		if (key.name === "escape") {
+		// Escape — dismiss suggestions only when showing
+		if (key.name === "escape" && hasSuggestions) {
+			key.preventDefault();
 			setSelectedIndex(0);
 			return;
 		}
@@ -149,8 +161,9 @@ export function CommandTypeahead({
 					{"You >"}
 				</text>
 				<input
+					key={valueVersion}
 					placeholder={placeholder}
-					value={input}
+					value={displayValue}
 					onInput={handleInput}
 					focused={!disabled}
 				/>

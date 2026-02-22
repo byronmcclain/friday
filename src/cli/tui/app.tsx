@@ -14,6 +14,10 @@ import { ChatArea } from "./components/chat-area.tsx";
 import { InputBar } from "./components/input-bar.tsx";
 import type { TypeaheadEntry } from "./filter-commands.ts";
 
+// Module-level renderer reference so shutdown can call destroy()
+let activeRenderer: Awaited<ReturnType<typeof createCliRenderer>> | null =
+	null;
+
 interface FridayAppProps {
 	options: {
 		provider: string;
@@ -130,8 +134,9 @@ function FridayApp({ options }: FridayAppProps) {
 			});
 		}
 
-		// Brief pause then exit
+		// Destroy renderer to restore terminal state, then exit
 		setTimeout(() => {
+			activeRenderer?.destroy();
 			process.exit(0);
 		}, 500);
 	}, [state.phase]);
@@ -313,6 +318,14 @@ export async function launchTui(options: {
 
 	try {
 		const renderer = await createCliRenderer({ exitOnCtrlC: false });
+		activeRenderer = renderer;
+
+		// Ensure terminal state is restored on unexpected signals
+		const emergencyCleanup = () => {
+			renderer.destroy();
+			process.exit(0);
+		};
+		process.on("SIGTERM", emergencyCleanup);
 
 		// Add toast overlay to the renderer
 		const toaster = new ToasterRenderable(renderer, {
@@ -333,7 +346,7 @@ export async function launchTui(options: {
 		root.render(<FridayApp options={options} />);
 
 		// Keep the process alive — OpenTUI handles the event loop
-		// Cleanup happens via process.exit() in the shutdown handler
+		// Cleanup happens via renderer.destroy() + process.exit() in the shutdown handler
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : "Unknown error";
 		console.error(`Cannot start TUI: ${msg}`);
