@@ -30,10 +30,15 @@ interface ExtractedSmart {
 }
 
 export class SmartsCurator {
+  private model: string;
+
   constructor(
     private store: SmartsStore,
     private provider: LLMProvider,
-  ) {}
+    fastModel?: string,
+  ) {
+    this.model = fastModel ?? provider.defaultModel;
+  }
 
   async extractFromConversation(messages: ConversationMessage[]): Promise<void> {
     if (messages.length < MIN_MESSAGES_FOR_EXTRACTION) return;
@@ -46,7 +51,7 @@ export class SmartsCurator {
       const chatResponse = await this.provider.chat(
         EXTRACTION_PROMPT,
         [{ role: "user", content: conversationText }],
-        { model: this.provider.defaultModel, maxTokens: 4096 },
+        { model: this.model, maxTokens: 4096 },
       );
       const response = chatResponse.type === "text" ? chatResponse.text : "";
 

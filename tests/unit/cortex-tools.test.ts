@@ -47,6 +47,7 @@ function sequencingProvider(
 	return {
 		name: "sequencing",
 		defaultModel: "seq-model",
+		defaultFastModel: "seq-fast",
 		chat: async (_sys, _msgs, opts) => {
 			capturedOptions.push(opts);
 			return responses[callIndex++]!;
@@ -359,6 +360,7 @@ describe("Cortex — agentic tool loop", () => {
 		const failingProvider: LLMProvider = {
 			name: "failing",
 			defaultModel: "fail-model",
+			defaultFastModel: "fail-fast",
 			chat: async () => {
 				throw new Error("API error");
 			},

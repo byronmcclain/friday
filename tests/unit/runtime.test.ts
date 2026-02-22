@@ -3,6 +3,7 @@ import { FridayRuntime, type ShutdownStep } from "../../src/core/runtime.ts";
 import type { LLMProvider } from "../../src/providers/types.ts";
 import { mkdir, writeFile, rm, unlink } from "node:fs/promises";
 import { mkdirSync } from "node:fs";
+import { PROVIDER_DEFAULTS } from "../../src/providers/index.ts";
 import { stubProvider, textResponse } from "../helpers/stubs.ts";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 
@@ -173,6 +174,7 @@ This is test knowledge.`,
 		const capturingProvider: LLMProvider = {
 			name: "capturing",
 			defaultModel: "capture",
+			defaultFastModel: "capture-fast",
 			chat: async (systemPrompt) => {
 				if (systemPrompt.includes("knowledge extraction")) {
 					extractionTriggered = true;
@@ -201,6 +203,7 @@ This is test knowledge.`,
 		const capturingProvider: LLMProvider = {
 			name: "capturing",
 			defaultModel: "capture",
+			defaultFastModel: "capture-fast",
 			chat: async (systemPrompt) => {
 				if (systemPrompt.includes("knowledge extraction")) {
 					extractionTriggered = true;
@@ -357,6 +360,7 @@ describe("FridayRuntime — Sensorium integration", () => {
 		const capturingProvider: LLMProvider = {
 			name: "capturing",
 			defaultModel: "capture",
+			defaultFastModel: "capture-fast",
 			chat: async (systemPrompt) => {
 				capturedPrompt = systemPrompt;
 				return textResponse("I can see the system!");
@@ -381,5 +385,96 @@ describe("FridayRuntime — Sensorium integration", () => {
 			steps.push(step);
 		});
 		expect(steps).toContain("sensorium");
+	});
+});
+
+describe("FridayRuntime — dual-model architecture", () => {
+	test("fastModel returns provider default when no override", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider });
+		expect(runtime.fastModel).toBe(PROVIDER_DEFAULTS.grok.fastModel);
+		await runtime.shutdown();
+	});
+
+	test("fastModel respects config override", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider, fastModel: "custom-fast" });
+		expect(runtime.fastModel).toBe("custom-fast");
+		await runtime.shutdown();
+	});
+
+	test("fastModel respects env var override", async () => {
+		const original = process.env.FRIDAY_FAST_MODEL;
+		process.env.FRIDAY_FAST_MODEL = "env-fast-model";
+		try {
+			const runtime = new FridayRuntime();
+			await runtime.boot({ injectedProvider: stubProvider });
+			expect(runtime.fastModel).toBe("env-fast-model");
+			await runtime.shutdown();
+		} finally {
+			if (original === undefined) {
+				delete process.env.FRIDAY_FAST_MODEL;
+			} else {
+				process.env.FRIDAY_FAST_MODEL = original;
+			}
+		}
+	});
+});
+
+describe("FridayRuntime — conversation summarization", () => {
+	let dataDir: string;
+
+	beforeEach(() => {
+		dataDir = "/tmp/friday-test-summary-" + Date.now();
+		mkdirSync(dataDir, { recursive: true });
+	});
+
+	afterEach(async () => {
+		await Promise.allSettled([
+			unlink(`${dataDir}/friday.db`),
+			unlink(`${dataDir}/friday.db-wal`),
+			unlink(`${dataDir}/friday.db-shm`),
+		]);
+		await rm(dataDir, { recursive: true, force: true });
+	});
+
+	test("summary populated on shutdown for sufficient history", async () => {
+		const summarizingProvider: LLMProvider = {
+			name: "summarizer",
+			defaultModel: "sum-model",
+			defaultFastModel: "sum-fast",
+			chat: async (systemPrompt) => {
+				if (systemPrompt.includes("summarizer")) {
+					return textResponse("Discussed various topics with the user.");
+				}
+				return textResponse("response");
+			},
+		};
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: summarizingProvider, dataDir });
+		// Need 4+ messages — 2 chat rounds = 4 messages (2 user + 2 assistant)
+		await runtime.process("First question");
+		await runtime.process("Second question");
+		await runtime.shutdown();
+
+		const memory = new SQLiteMemory(`${dataDir}/friday.db`);
+		const sessions = await memory.getConversationHistory(10);
+		expect(sessions).toHaveLength(1);
+		expect(sessions[0]!.summary).toBe("Discussed various topics with the user.");
+		memory.close();
+	});
+
+	test("summary skipped for short conversations", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider, dataDir });
+		await runtime.process("Quick question");
+		await runtime.shutdown();
+
+		const memory = new SQLiteMemory(`${dataDir}/friday.db`);
+		const sessions = await memory.getConversationHistory(10);
+		expect(sessions).toHaveLength(1);
+		// 2 messages (1 user + 1 assistant) is below the 4-message threshold
+		expect(sessions[0]!.summary).toBeUndefined();
+		memory.close();
 	});
 });

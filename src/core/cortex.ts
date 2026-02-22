@@ -44,7 +44,7 @@ export class Cortex {
   constructor(config: CortexConfig = {}) {
     const providerName = config.provider ?? DEFAULT_PROVIDER;
     this.provider = config.injectedProvider ?? createProvider(providerName);
-    this.model = config.model ?? PROVIDER_DEFAULTS[providerName];
+    this.model = config.model ?? PROVIDER_DEFAULTS[providerName].model;
     this.maxTokens = config.maxTokens ?? 4096;
     this.conversationHistory = [];
     this.tools = new Map();

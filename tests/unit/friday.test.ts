@@ -25,7 +25,7 @@ describe("Cortex", () => {
 
   test("defaults to grok-4-1-fast-reasoning-latest model", () => {
     const cortex = new Cortex({ injectedProvider: grokStub });
-    expect(cortex.modelName).toBe(PROVIDER_DEFAULTS.grok);
+    expect(cortex.modelName).toBe(PROVIDER_DEFAULTS.grok.model);
   });
 
   test("accepts custom model", () => {
@@ -67,6 +67,7 @@ describe("Cortex", () => {
     const failingProvider: LLMProvider = {
       name: "failing",
       defaultModel: "fail-model",
+      defaultFastModel: "fail-fast",
       chat: async () => { throw new Error("API error"); },
     };
     const cortex = new Cortex({ injectedProvider: failingProvider });
@@ -100,6 +101,7 @@ describe("Cortex — SMARTS integration", () => {
   const capturingProvider: LLMProvider = {
     name: "capturing",
     defaultModel: "capture-model",
+    defaultFastModel: "capture-fast",
     chat: async (systemPrompt) => {
       capturedPrompt = systemPrompt;
       return textResponse("response with smarts");
@@ -201,6 +203,7 @@ describe("Cortex — Sensorium integration", () => {
     const capturingProvider: LLMProvider = {
       name: "capturing",
       defaultModel: "capture",
+      defaultFastModel: "capture-fast",
       chat: async (systemPrompt) => {
         capturedPrompt = systemPrompt;
         return textResponse("ok");
@@ -222,6 +225,7 @@ describe("Cortex — Sensorium integration", () => {
     const capturingProvider: LLMProvider = {
       name: "capturing",
       defaultModel: "capture",
+      defaultFastModel: "capture-fast",
       chat: async (systemPrompt) => {
         capturedPrompt = systemPrompt;
         return textResponse("ok");

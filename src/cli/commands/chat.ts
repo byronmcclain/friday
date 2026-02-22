@@ -22,6 +22,7 @@ export function chatCommand(program: Command): void {
 			DEFAULT_PROVIDER,
 		)
 		.option("-m, --model <model>", "Model to use (defaults per provider)")
+		.option("--fast-model <model>", "Fast model for utility tasks (summarization, knowledge extraction)")
 		.option("--fresh", "Start a fresh session without loading previous conversation")
 		.action(async (options) => {
 			const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -30,6 +31,7 @@ export function chatCommand(program: Command): void {
 				await runtime.boot({
 					provider: options.provider as ProviderName,
 					model: options.model,
+					fastModel: options.fastModel,
 					smartsDir: resolve(projectRoot, "smarts"),
 					dataDir: resolve(projectRoot, "data"),
 					modulesDir: resolve(projectRoot, "src/modules"),

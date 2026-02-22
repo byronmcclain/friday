@@ -19,7 +19,7 @@ describe("Provider Abstraction", () => {
       const provider = createProvider("anthropic");
       expect(provider).toBeInstanceOf(AnthropicProvider);
       expect(provider.name).toBe("anthropic");
-      expect(provider.defaultModel).toBe(PROVIDER_DEFAULTS.anthropic);
+      expect(provider.defaultModel).toBe(PROVIDER_DEFAULTS.anthropic.model);
     } finally {
       if (origKey === undefined) {
         delete process.env.ANTHROPIC_API_KEY;

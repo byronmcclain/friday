@@ -30,6 +30,7 @@ export interface ToolDefinition {
 export interface LLMProvider {
   readonly name: string;
   readonly defaultModel: string;
+  readonly defaultFastModel: string;
   chat(
     systemPrompt: string,
     messages: ConversationMessage[],

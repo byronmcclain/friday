@@ -6,6 +6,7 @@ import type { ProviderName } from "@friday/core/types.ts";
 export interface SessionInfo {
 	provider: string;
 	model: string;
+	fastModel: string;
 }
 
 export type SessionState =
@@ -27,7 +28,7 @@ export function useSession() {
 				{ type: "session:booted" }
 			>;
 			setSessionState("active");
-			setSessionInfo({ provider: m.provider, model: m.model });
+			setSessionInfo({ provider: m.provider, model: m.model, fastModel: m.fastModel });
 		});
 
 		const unsub2 = subscribe("session:closed", () => {
@@ -53,6 +54,7 @@ export function useSession() {
 		(options?: {
 			provider?: ProviderName;
 			model?: string;
+			fastModel?: string;
 			fresh?: boolean;
 		}) => {
 			if (wsState !== "connected") {
@@ -65,6 +67,7 @@ export function useSession() {
 				id: crypto.randomUUID(),
 				provider: options?.provider,
 				model: options?.model,
+				fastModel: options?.fastModel,
 				fresh: options?.fresh,
 			});
 		},

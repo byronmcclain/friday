@@ -100,6 +100,7 @@ export class WebSocketHandler {
 			...this.bootConfigDefaults,
 			provider: msg.provider ?? this.bootConfigDefaults.provider,
 			model: msg.model,
+			fastModel: msg.fastModel,
 			fresh: msg.fresh,
 		};
 		await this.runtime.boot(config);
@@ -114,6 +115,7 @@ export class WebSocketHandler {
 			requestId: msg.id,
 			provider: this.runtime.cortex.providerName,
 			model: this.runtime.cortex.modelName,
+			fastModel: this.runtime.fastModel,
 		});
 	}
 

@@ -11,6 +11,7 @@ export type ClientMessage =
 			id: string;
 			provider?: ProviderName;
 			model?: string;
+			fastModel?: string;
 			fresh?: boolean;
 	  }
 	| { type: "session:shutdown"; id: string }
@@ -34,7 +35,7 @@ export type ServerMessage =
 			content: string;
 			success: boolean;
 	  }
-	| { type: "session:booted"; requestId: string; provider: string; model: string }
+	| { type: "session:booted"; requestId: string; provider: string; model: string; fastModel: string }
 	| { type: "session:closed"; requestId: string }
 	| { type: "history:result"; requestId: string; data: unknown }
 	| { type: "smarts:result"; requestId: string; data: unknown }

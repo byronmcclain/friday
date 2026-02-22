@@ -176,6 +176,9 @@ bun run start chat --provider grok
 # Use a specific model
 bun run start chat --model claude-sonnet-4-20250514
 
+# Override the fast model (used for summarization & knowledge extraction)
+bun run start chat --fast-model grok-4-1-fast-non-reasoning
+
 # Combine flags
 bun run start chat --provider grok --model grok-3
 
@@ -203,10 +206,14 @@ bun run serve
 
 ### Provider Defaults
 
-| Provider | Default Model |
-|---|---|
-| `anthropic` | `claude-sonnet-4-20250514` |
-| `grok` | `grok-3` |
+Friday uses a **dual-model architecture**: a reasoning model for conversations and a fast model for utility tasks (summarization, knowledge extraction).
+
+| Provider | Reasoning Model | Fast Model |
+|---|---|---|
+| `anthropic` | `claude-sonnet-4-20250514` | `claude-haiku-4-5-20251001` |
+| `grok` | `grok-4-1-fast-reasoning-latest` | `grok-4-1-fast-non-reasoning` |
+
+Resolution priority: CLI flag > env var > provider default.
 
 ---
 
@@ -272,8 +279,11 @@ ANTHROPIC_API_KEY=sk-ant-...
 # Required for Grok provider (--provider grok)
 XAI_API_KEY=xai-...
 
-# Optional: Override the default model
-FRIDAY_MODEL=claude-sonnet-4-20250514
+# Optional: Override reasoning model (CLI: --model)
+FRIDAY_REASONING_MODEL=claude-sonnet-4-20250514
+
+# Optional: Override fast model for utility tasks (CLI: --fast-model)
+FRIDAY_FAST_MODEL=claude-haiku-4-5-20251001
 ```
 
 Bun loads `.env` automatically — no dotenv needed.

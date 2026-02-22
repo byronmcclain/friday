@@ -44,6 +44,7 @@ describe("SmartsCurator", () => {
     const stubProvider: LLMProvider = {
       name: "stub",
       defaultModel: "stub",
+      defaultFastModel: "stub-fast",
       chat: async () => textResponse("should not be called"),
     };
     const curator = new SmartsCurator(store, stubProvider);
@@ -60,6 +61,7 @@ describe("SmartsCurator", () => {
     const mockProvider: LLMProvider = {
       name: "mock",
       defaultModel: "mock",
+      defaultFastModel: "mock-fast",
       chat: async (_system, messages) => {
         calledWith = getTextContent(messages[messages.length - 1]?.content ?? "");
         return textResponse(JSON.stringify([
@@ -97,6 +99,7 @@ describe("SmartsCurator", () => {
     const badProvider: LLMProvider = {
       name: "bad",
       defaultModel: "bad",
+      defaultFastModel: "bad-fast",
       chat: async () => textResponse("this is not JSON"),
     };
     const curator = new SmartsCurator(store, badProvider);
@@ -112,6 +115,7 @@ describe("SmartsCurator", () => {
     const fencedProvider: LLMProvider = {
       name: "fenced",
       defaultModel: "fenced",
+      defaultFastModel: "fenced-fast",
       chat: async () => textResponse(`Here are the results:
 
 \`\`\`json
@@ -130,10 +134,51 @@ That's what I found.`),
     expect(store.all()[0]!.name).toBe("fenced-knowledge");
   });
 
+  test("uses provided fast model in chat call", async () => {
+    let usedModel = "";
+    const modelCapture: LLMProvider = {
+      name: "model-capture",
+      defaultModel: "default-reasoning",
+      defaultFastModel: "default-fast",
+      chat: async (_system, _messages, options) => {
+        usedModel = options.model;
+        return textResponse("[]");
+      },
+    };
+    const curator = new SmartsCurator(store, modelCapture, "custom-fast-model");
+    const messages: ConversationMessage[] = Array.from({ length: 10 }, (_, i) => ({
+      role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
+      content: `Message ${i}`,
+    }));
+    await curator.extractFromConversation(messages);
+    expect(usedModel).toBe("custom-fast-model");
+  });
+
+  test("falls back to defaultModel when no fast model given", async () => {
+    let usedModel = "";
+    const modelCapture: LLMProvider = {
+      name: "model-capture",
+      defaultModel: "default-reasoning",
+      defaultFastModel: "default-fast",
+      chat: async (_system, _messages, options) => {
+        usedModel = options.model;
+        return textResponse("[]");
+      },
+    };
+    const curator = new SmartsCurator(store, modelCapture);
+    const messages: ConversationMessage[] = Array.from({ length: 10 }, (_, i) => ({
+      role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
+      content: `Message ${i}`,
+    }));
+    await curator.extractFromConversation(messages);
+    expect(usedModel).toBe("default-reasoning");
+  });
+
   test("handles provider error gracefully", async () => {
     const failingProvider: LLMProvider = {
       name: "failing",
       defaultModel: "failing",
+      defaultFastModel: "failing-fast",
       chat: async () => { throw new Error("API down"); },
     };
     const curator = new SmartsCurator(store, failingProvider);

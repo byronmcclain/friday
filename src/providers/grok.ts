@@ -139,6 +139,7 @@ export function parseGrokResponse(choice: GrokChoiceLike): ChatResponse {
 export class GrokProvider implements LLMProvider {
   readonly name = "grok";
   readonly defaultModel = "grok-4-1-fast-reasoning-latest";
+  readonly defaultFastModel = "grok-4-1-fast-non-reasoning";
   private client: OpenAI;
 
   constructor() {

@@ -1,6 +1,6 @@
-import type { FridayConfig } from "./types.ts";
+import type { FridayConfig, ProviderName } from "./types.ts";
 import { Cortex } from "./cortex.ts";
-import type { LLMProvider } from "../providers/index.ts";
+import { PROVIDER_DEFAULTS, type LLMProvider } from "../providers/index.ts";
 import { SignalBus } from "./events.ts";
 import { ClearanceManager } from "./clearance.ts";
 import { AuditLogger } from "../audit/logger.ts";
@@ -15,6 +15,7 @@ import { SQLiteMemory } from "./memory.ts";
 import { SMARTS_DEFAULTS } from "../smarts/types.ts";
 import { createSmartProtocol } from "../smarts/protocol.ts";
 import { SmartsCurator } from "../smarts/curator.ts";
+import { ConversationSummarizer } from "./summarizer.ts";
 import { createHistoryProtocol } from "../history/protocol.ts";
 import { Sensorium } from "../sensorium/sensorium.ts";
 import { createEnvProtocol } from "../sensorium/protocol.ts";
@@ -51,8 +52,10 @@ export class FridayRuntime {
 	private _smarts?: SmartsStore;
 	private _smartsMemory?: SQLiteMemory;
 	private _curator?: SmartsCurator;
+	private _summarizer?: ConversationSummarizer;
 	private _sensorium?: Sensorium;
 	private _memory?: SQLiteMemory;
+	private _fastModel!: string;
 	private _sessionId?: string;
 	private _sessionStartedAt?: Date;
 	private _booted = false;
@@ -91,6 +94,10 @@ export class FridayRuntime {
 
 	get memory(): SQLiteMemory | undefined {
 		return this._memory;
+	}
+
+	get fastModel(): string {
+		return this._fastModel;
 	}
 
 	async boot(config: RuntimeConfig = {}): Promise<void> {
@@ -142,6 +149,12 @@ export class FridayRuntime {
 				this._protocols.register(createSmartProtocol(this._smarts));
 			}
 
+			// Resolve dual models: CLI flag > env var > provider default
+			const providerName: ProviderName = config.provider ?? "grok";
+			const defaults = PROVIDER_DEFAULTS[providerName];
+			const reasoningModel = config.model ?? process.env.FRIDAY_REASONING_MODEL ?? defaults.model;
+			this._fastModel = config.fastModel ?? process.env.FRIDAY_FAST_MODEL ?? defaults.fastModel;
+
 			// Sensorium — before Cortex so context block is available from first chat()
 			if (config.enableSensorium !== false) {
 				this._sensorium = new Sensorium({
@@ -155,7 +168,9 @@ export class FridayRuntime {
 			}
 
 			this._cortex = new Cortex({
-				...config,
+				provider: providerName,
+				model: reasoningModel,
+				maxTokens: config.maxTokens,
 				injectedProvider: config.injectedProvider,
 				smartsStore: this._smarts,
 				sensorium: this._sensorium,
@@ -171,8 +186,9 @@ export class FridayRuntime {
 			}
 
 			if (this._smarts) {
-				this._curator = new SmartsCurator(this._smarts, this._cortex.llmProvider);
+				this._curator = new SmartsCurator(this._smarts, this._cortex.llmProvider, this._fastModel);
 			}
+			this._summarizer = new ConversationSummarizer(this._cortex.llmProvider, this._fastModel);
 
 			if (this._memory && !config.fresh) {
 				const recent = await this._memory.getConversationHistory(1);
@@ -278,6 +294,10 @@ export class FridayRuntime {
 			onProgress?.("conversation", "Saving conversation history...");
 			const history = this._cortex.getHistory();
 			if (history.length > 0) {
+				let summary: string | undefined;
+				if (this._summarizer) {
+					summary = await this._summarizer.summarize(history);
+				}
 				await this._memory.saveConversation({
 					id: this._sessionId,
 					startedAt: this._sessionStartedAt,
@@ -285,6 +305,7 @@ export class FridayRuntime {
 					provider: this._cortex.providerName,
 					model: this._cortex.modelName,
 					messages: history,
+					summary,
 				});
 			}
 		}

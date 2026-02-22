@@ -7,6 +7,8 @@ export interface FridayConfig {
   provider: ProviderName;
   /** Model identifier (provider-specific, e.g., "claude-sonnet-4-20250514" or "grok-3") */
   model: string;
+  /** Fast model for utility tasks (summarization, knowledge extraction) */
+  fastModel?: string;
   /** Maximum tokens for responses */
   maxTokens: number;
 }

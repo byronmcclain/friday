@@ -97,6 +97,7 @@ export function parseAnthropicResponse(response: AnthropicResponseLike): ChatRes
 export class AnthropicProvider implements LLMProvider {
   readonly name = "anthropic";
   readonly defaultModel = "claude-sonnet-4-20250514";
+  readonly defaultFastModel = "claude-haiku-4-5-20251001";
   private client: Anthropic;
 
   constructor() {

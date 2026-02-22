@@ -40,6 +40,7 @@ src/
 │   └── commands/          # One file per CLI command (e.g., chat.ts)
 ├── core/
 │   ├── cortex.ts          # Cortex — LLM brain, conversation state, tool registration
+│   ├── summarizer.ts      # ConversationSummarizer — generates session summaries via fast model
 │   ├── runtime.ts         # FridayRuntime — boot/shutdown orchestrator, wires all subsystems
 │   ├── events.ts          # SignalBus — typed event system (file:changed, test:failed, etc.)
 │   ├── clearance.ts       # ClearanceManager — permission gates (read-fs, exec-shell, etc.)
@@ -106,6 +107,7 @@ tests/
 - **Commands** are registered via Commander.js in `src/cli/index.ts`. Each command lives in its own file under `src/cli/commands/`.
 - **Types** are split by domain: core config in `src/core/types.ts`, tool/module contracts in `src/modules/types.ts`, directive structures in `src/directives/types.ts`.
 - **Sensorium** (`src/sensorium/`) is Friday's environmental awareness. Pure sensor functions gather machine stats (`node:os`), Docker containers (`Bun.$`), and dev environment (git, ports, runtimes). The Sensorium class runs a dual-cadence polling loop (30s fast / 5min slow), evaluates alert thresholds with hysteresis, and injects a compact context block into the system prompt via `getContextBlock()`. The `/env` protocol provides CLI access; `getEnvironmentStatus` tool provides LLM access.
+- **Dual-Model Architecture** — FridayRuntime resolves two models per provider: a reasoning model (for Cortex conversations) and a fast model (for SmartsCurator knowledge extraction and ConversationSummarizer). Resolution priority: CLI flag > env var > `PROVIDER_DEFAULTS`. `FridayConfig.fastModel` carries the fast model through the config chain.
 - **Prompts** live in `src/core/prompts.ts` as exported constants. Friday's personality is defined here — keep it consistent when modifying.
 
 ## Testing
@@ -133,6 +135,7 @@ Default to Bun APIs instead of Node.js equivalents or third-party packages:
 
 Requires `XAI_API_KEY` in `.env` for the default Grok provider. Bun loads `.env` automatically.
 Optional: `ANTHROPIC_API_KEY` for Anthropic provider (`--provider anthropic`).
+Optional: `FRIDAY_REASONING_MODEL` and `FRIDAY_FAST_MODEL` to override default models (resolution: CLI flag > env var > provider default).
 
 ## Docker
 
