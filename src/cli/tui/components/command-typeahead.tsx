@@ -22,36 +22,39 @@ export function CommandTypeahead({
 	onSubmit,
 	onExit,
 }: CommandTypeaheadProps) {
-	// Track input value for suggestion filtering only — let <input> own its buffer
-	const [displayValue, setDisplayValue] = useState("");
+	// Shadow copy of input value for suggestion filtering — the <input>
+	// element owns its own buffer; we never push value back via props.
+	const [shadow, setShadow] = useState("");
 	const [selectedIndex, setSelectedIndex] = useState(0);
-	// Incremented to force <input> to accept a programmatic value change
-	const [valueVersion, setValueVersion] = useState(0);
-	const displayRef = useRef(displayValue);
-	displayRef.current = displayValue;
+	// Bumped to remount <input> with a new initialValue (suggestion accept, submit clear)
+	const [inputKey, setInputKey] = useState(0);
+	// Holds the initialValue for the next <input> mount
+	const nextValueRef = useRef("");
+	const shadowRef = useRef(shadow);
+	shadowRef.current = shadow;
 
 	const suggestions =
-		displayValue.startsWith("/") && !displayValue.includes(" ")
-			? filterCommands(commands, displayValue.slice(1)).slice(
+		shadow.startsWith("/") && !shadow.includes(" ")
+			? filterCommands(commands, shadow.slice(1)).slice(
 					0,
 					MAX_SUGGESTIONS,
 				)
 			: [];
 	const hasSuggestions = suggestions.length > 0;
 
-	// Sync from <input>'s internal buffer — fires on every keystroke
+	// Track what the user types — only for suggestion filtering, never pushed back
 	const handleInput = useCallback((value: string) => {
-		setDisplayValue(value);
+		setShadow(value);
 		setSelectedIndex(0);
 	}, []);
 
-	// Push a programmatic value into the input and bump version
-	const pushValue = useCallback((value: string) => {
-		setDisplayValue(value);
-		setValueVersion((v) => v + 1);
+	// Programmatically replace input content by remounting with new initialValue
+	const replaceInput = useCallback((value: string) => {
+		nextValueRef.current = value;
+		setShadow(value);
+		setInputKey((k) => k + 1);
 	}, []);
 
-	// Only intercept specific keys — let everything else flow to <input> unimpeded
 	useKeyboard((key) => {
 		if (disabled) return;
 
@@ -68,15 +71,15 @@ export function CommandTypeahead({
 			if (hasSuggestions) {
 				const selected = suggestions[selectedIndex];
 				if (selected) {
-					pushValue(`/${selected.name} `);
+					replaceInput(`/${selected.name} `);
 					setSelectedIndex(0);
 				}
 				return;
 			}
-			const trimmed = displayRef.current.trim();
+			const trimmed = shadowRef.current.trim();
 			if (trimmed.length > 0) {
 				onSubmit(trimmed);
-				pushValue("");
+				replaceInput("");
 				setSelectedIndex(0);
 			}
 			return;
@@ -98,12 +101,12 @@ export function CommandTypeahead({
 			return;
 		}
 
-		// Tab — accept selected suggestion (only when suggestions visible)
+		// Tab — accept selected suggestion
 		if (key.name === "tab" && hasSuggestions) {
 			key.preventDefault();
 			const selected = suggestions[selectedIndex];
 			if (selected) {
-				pushValue(`/${selected.name} `);
+				replaceInput(`/${selected.name} `);
 				setSelectedIndex(0);
 			}
 			return;
@@ -155,17 +158,18 @@ export function CommandTypeahead({
 					))}
 				</box>
 			)}
-			{/* Input field */}
+			{/* Input field — no value prop; input owns its own buffer */}
 			<box flexDirection="row" gap={1}>
 				<text fg={PALETTE.amberGlow} attributes={BOLD}>
 					{"You >"}
 				</text>
 				<input
-					key={valueVersion}
+					key={inputKey}
 					placeholder={placeholder}
-					value={displayValue}
+					value={nextValueRef.current}
 					onInput={handleInput}
 					focused={!disabled}
+					flexGrow={1}
 				/>
 			</box>
 		</box>
