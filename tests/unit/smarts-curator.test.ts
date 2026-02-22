@@ -4,6 +4,8 @@ import { SmartsStore } from "../../src/smarts/store.ts";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 import type { LLMProvider } from "../../src/providers/types.ts";
 import type { ConversationMessage } from "../../src/core/types.ts";
+import { getTextContent } from "../../src/core/types.ts";
+import { textResponse } from "../helpers/stubs.ts";
 import { unlink, mkdir, rm } from "node:fs/promises";
 
 const TEST_DB = "/tmp/friday-test-curator.db";
@@ -42,7 +44,7 @@ describe("SmartsCurator", () => {
     const stubProvider: LLMProvider = {
       name: "stub",
       defaultModel: "stub",
-      chat: async () => "should not be called",
+      chat: async () => textResponse("should not be called"),
     };
     const curator = new SmartsCurator(store, stubProvider);
     const messages: ConversationMessage[] = [
@@ -59,8 +61,8 @@ describe("SmartsCurator", () => {
       name: "mock",
       defaultModel: "mock",
       chat: async (_system, messages) => {
-        calledWith = messages[messages.length - 1]?.content ?? "";
-        return JSON.stringify([
+        calledWith = getTextContent(messages[messages.length - 1]?.content ?? "");
+        return textResponse(JSON.stringify([
           {
             name: "docker-networking",
             domain: "docker",
@@ -68,7 +70,7 @@ describe("SmartsCurator", () => {
             confidence: 0.7,
             content: "# Docker Networking\n\nUse bridge networks for container isolation.",
           },
-        ]);
+        ]));
       },
     };
     const curator = new SmartsCurator(store, mockProvider);
@@ -95,7 +97,7 @@ describe("SmartsCurator", () => {
     const badProvider: LLMProvider = {
       name: "bad",
       defaultModel: "bad",
-      chat: async () => "this is not JSON",
+      chat: async () => textResponse("this is not JSON"),
     };
     const curator = new SmartsCurator(store, badProvider);
     const messages: ConversationMessage[] = Array.from({ length: 10 }, (_, i) => ({
@@ -110,13 +112,13 @@ describe("SmartsCurator", () => {
     const fencedProvider: LLMProvider = {
       name: "fenced",
       defaultModel: "fenced",
-      chat: async () => `Here are the results:
+      chat: async () => textResponse(`Here are the results:
 
 \`\`\`json
 [{"name": "fenced-knowledge", "domain": "test", "tags": ["fenced"], "confidence": 0.8, "content": "# Fenced\\n\\nExtracted from fences."}]
 \`\`\`
 
-That's what I found.`,
+That's what I found.`),
     };
     const curator = new SmartsCurator(store, fencedProvider);
     const messages: ConversationMessage[] = Array.from({ length: 10 }, (_, i) => ({

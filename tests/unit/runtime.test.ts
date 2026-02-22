@@ -3,7 +3,7 @@ import { FridayRuntime } from "../../src/core/runtime.ts";
 import type { LLMProvider } from "../../src/providers/types.ts";
 import { mkdir, writeFile, rm, unlink } from "node:fs/promises";
 import { mkdirSync } from "node:fs";
-import { stubProvider } from "../helpers/stubs.ts";
+import { stubProvider, textResponse } from "../helpers/stubs.ts";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 
 describe("FridayRuntime", () => {
@@ -151,7 +151,7 @@ This is test knowledge.`,
 				if (systemPrompt.includes("knowledge extraction")) {
 					extractionTriggered = true;
 				}
-				return "[]";
+				return textResponse("[]");
 			},
 		};
 
@@ -179,7 +179,7 @@ This is test knowledge.`,
 				if (systemPrompt.includes("knowledge extraction")) {
 					extractionTriggered = true;
 				}
-				return "[]";
+				return textResponse("[]");
 			},
 		};
 
@@ -322,7 +322,7 @@ describe("FridayRuntime — Sensorium integration", () => {
 			defaultModel: "capture",
 			chat: async (systemPrompt) => {
 				capturedPrompt = systemPrompt;
-				return "I can see the system!";
+				return textResponse("I can see the system!");
 			},
 		};
 

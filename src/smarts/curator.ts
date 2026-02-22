@@ -43,11 +43,12 @@ export class SmartsCurator {
         .map((m) => `${m.role}: ${m.content}`)
         .join("\n\n");
 
-      const response = await this.provider.chat(
+      const chatResponse = await this.provider.chat(
         EXTRACTION_PROMPT,
         [{ role: "user", content: conversationText }],
         { model: this.provider.defaultModel, maxTokens: 4096 },
       );
+      const response = chatResponse.type === "text" ? chatResponse.text : "";
 
       const extracted = this.parseResponse(response);
       for (const smart of extracted) {

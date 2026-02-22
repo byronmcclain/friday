@@ -71,11 +71,12 @@ export class Cortex {
     let assistantMessage: string;
     try {
       const systemPrompt = await this.buildSystemPrompt(userMessage);
-      assistantMessage = await this.provider.chat(
+      const response = await this.provider.chat(
         systemPrompt,
         this.conversationHistory,
         { model: this.model, maxTokens: this.maxTokens },
       );
+      assistantMessage = response.type === "text" ? response.text : "";
     } catch (err) {
       this.conversationHistory.pop();
       throw err;
