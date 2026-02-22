@@ -34,6 +34,7 @@ export function serveCommand(program: Command): void {
 					model: options.model,
 					smartsDir: resolve(projectRoot, "smarts"),
 					dataDir: resolve(projectRoot, "data"),
+					modulesDir: resolve(projectRoot, "src/modules"),
 				},
 			});
 

@@ -87,7 +87,7 @@ web/                       # React web UI (Vite + Tailwind)
 │   ├── hooks/             # useWebSocket, useChat, useSession, useSensorium, useSmarts, useHistory, useNotifications
 │   ├── contexts/          # WebSocket, Chat, Session providers
 │   └── index.css          # Tailwind theme (Friday amber palette)
-smarts/                    # Seed knowledge files (YAML frontmatter + markdown)
+smarts/                    # Runtime-generated knowledge files (gitignored, user-specific)
 tests/
 ├── helpers/               # Shared test stubs (stubProvider, grokStub)
 ├── unit/                  # Unit tests (bun:test) — 300 tests across 30 files

@@ -16,7 +16,7 @@ CLI-first. Module-driven. Built to think, remember, and adapt.
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tests](https://img.shields.io/badge/tests-270%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-363%20passing-brightgreen)]()
 [![Biome](https://img.shields.io/badge/lint-Biome-60a5fa?logo=biome)](https://biomejs.dev)
 
 <br />
@@ -53,7 +53,7 @@ Friday greets you and enters an interactive session. Type natural language to co
 
 ### 🧠 Cortex — The Brain
 
-LLM reasoning engine with conversation memory, multi-provider support (Anthropic Claude, xAI Grok), and tool registration. Every module's capabilities flow through here.
+LLM reasoning engine with conversation memory, multi-provider support (Anthropic Claude, xAI Grok), and an agentic tool loop. Modules register tools that Cortex executes in parallel with clearance gates, looping until the LLM is satisfied. Conversation history persists across sessions via SQLite.
 
 ### 📚 SMARTS — Dynamic Knowledge
 
@@ -72,6 +72,16 @@ Read, write, list, delete files and execute shell commands — Friday's first re
 ### ⚡ SignalBus — Reactive Nervous System
 
 Typed events (`file:changed`, `test:failed`, `session:start`) flow through the bus, triggering directives and module behavior. Supports custom signals via `custom:*`.
+
+### 🌐 Web UI — Browser Interface
+
+React-based web frontend (Vite + Tailwind) with real-time WebSocket connection to the Friday server. Features chat with markdown rendering, slash-command typeahead, collapsible sidebar with conversation history, SMARTS browser, notification panel, and a live Sensorium status bar.
+`bun run serve` · `bun run web:dev`
+
+### 💬 Conversation History
+
+Sessions persist to SQLite and can be browsed, resumed, or cleared. The `/history` protocol provides CLI access.
+`/history list` · `/history show <id>` · `/history clear`
 
 ### 🛡️ Clearance & Audit — Trust but Verify
 
@@ -126,7 +136,7 @@ User Input
 
 ### Subsystems
 
-- **Cortex** (`src/core/cortex.ts`) — The LLM brain. Owns conversation history, delegates to providers (Anthropic or Grok), exposes tool registration, and enriches the system prompt with SMARTS knowledge and Sensorium context per message.
+- **Cortex** (`src/core/cortex.ts`) — The LLM brain. Owns conversation history, delegates to providers (Anthropic or Grok), runs an agentic tool loop with parallel execution and clearance gates, and enriches the system prompt with SMARTS knowledge and Sensorium context per message.
 
 - **SMARTS** (`src/smarts/`) — Dynamic knowledge system. Markdown files with YAML frontmatter are FTS5-indexed into SQLite, queried per-message to enrich prompts, and new knowledge is extracted from conversations on shutdown via SmartsCurator.
 
@@ -148,6 +158,10 @@ User Input
 
 - **Notifications** (`src/core/notifications.ts`) — Multi-channel alerts: Terminal, Log file, Slack (webhook), and generic Webhook.
 
+- **Server** (`src/server/`) — Bun.serve() HTTP + WebSocket server. Routes WebSocket messages to FridayRuntime, pushes Sensorium updates and notifications to connected clients.
+
+- **History** (`src/history/protocol.ts`) — Conversation persistence. Sessions are saved to SQLite on shutdown and can be browsed or resumed via the `/history` protocol.
+
 ---
 
 ## CLI Usage
@@ -164,6 +178,9 @@ bun run start chat --model claude-sonnet-4-20250514
 
 # Combine flags
 bun run start chat --provider grok --model grok-3
+
+# Start the web UI server
+bun run serve
 ```
 
 ### In-Session Commands
@@ -179,6 +196,9 @@ bun run start chat --provider grok --model grok-3
 | `/env cpu` / `/env memory` | System resource details |
 | `/env docker` | Running container status |
 | `/env git` | Git repository state |
+| `/history list` | Browse past conversation sessions |
+| `/history show <id>` | View a specific session |
+| `/history clear` | Delete all saved sessions |
 | `exit`, `quit`, `bye` | Ends the session |
 
 ### Provider Defaults
@@ -264,13 +284,16 @@ Bun loads `.env` automatically — no dotenv needed.
 
 ```bash
 bun run dev              # Auto-restart on file changes
-bun test                 # Run all tests (270 tests across 25 files)
+bun test                 # Run all tests (363 tests across 35 files)
 bun test --watch         # Watch mode
 bun test tests/unit/cortex.test.ts  # Single test file
 bun run lint             # Lint check
 bun run lint:fix         # Lint and auto-fix
 bun run format           # Format source files
 bun run typecheck        # TypeScript type checking
+bun run serve            # Start Friday web UI server (port 3000)
+bun run web:dev          # Start Vite dev server for frontend (port 5173)
+bun run web:build        # Build frontend for production
 ```
 
 ### Project Structure
@@ -310,12 +333,24 @@ src/
 │   ├── sensorium.ts       # Polling loop, alerts, context block
 │   ├── protocol.ts        # /env protocol handler
 │   └── tool.ts            # LLM-accessible environment tool
+├── server/
+│   ├── index.ts           # Bun.serve() HTTP + WebSocket server
+│   ├── protocol.ts        # Shared message types (ClientMessage, ServerMessage)
+│   ├── handler.ts         # WebSocket message routing to FridayRuntime
+│   └── ws-channel.ts      # WebSocket notification channel
+├── history/
+│   └── protocol.ts        # /history protocol (list, show, clear)
 ├── providers/             # LLM provider adapters
 └── utils/                 # Shared utilities
-smarts/                    # Seed knowledge files (YAML + markdown)
+web/                       # React web UI (Vite + Tailwind)
+├── src/
+│   ├── components/        # Layout, chat, sidebar, input components
+│   ├── hooks/             # useWebSocket, useChat, useSession, useSensorium, useSmarts
+│   ├── contexts/          # WebSocket, Chat, Session providers
+│   └── index.css          # Tailwind theme (Friday amber palette)
 tests/
 ├── helpers/               # Shared test stubs
-├── unit/                  # 270 tests across 25 files
+├── unit/                  # 363 tests across 35 files
 └── integration/           # Integration tests — future
 ```
 
@@ -344,6 +379,7 @@ docker run -e XAI_API_KEY=xai-... friday chat --provider grok
 | Language | TypeScript (strict mode) |
 | AI Providers | Anthropic Claude (`@anthropic-ai/sdk`), xAI Grok (`openai` SDK) |
 | CLI Framework | [Commander.js](https://github.com/tj/commander.js) |
+| Web UI | React + [Vite](https://vite.dev) + [Tailwind CSS](https://tailwindcss.com) |
 | Database | SQLite via `bun:sqlite` (KV, conversations, FTS5 search) |
 | Knowledge | SMARTS — YAML frontmatter + FTS5-indexed markdown |
 | Monitoring | Sensorium — dual-cadence polling with alert hysteresis |
