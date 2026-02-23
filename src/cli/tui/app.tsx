@@ -83,10 +83,15 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 		runtimeRef.current = runtime;
 
 		(async () => {
-			// Process logo during splash phase
+			// Process logo during splash phase, sized to fit the terminal.
+			// Reserve rows for: ascii-font title (6) + gaps (2) + subtitle (2) + margin (4)
 			if (checkChafa()) {
 				const logoPath = resolve(projectRoot, "friday-logo.jpeg");
-				logoDataRef.current = await processLogo(logoPath, 80, 40);
+				const logoWidth = Math.min(80, renderer.width - 4);
+				const logoHeight = Math.min(40, renderer.height - 14);
+				if (logoWidth >= 10 && logoHeight >= 5) {
+					logoDataRef.current = await processLogo(logoPath, logoWidth, logoHeight);
+				}
 			}
 
 			// If logo failed to load, skip splash and go straight to booting
