@@ -158,11 +158,12 @@ export class SmartsStore {
     if (!resolvedFilePath.startsWith(`${dir}/`)) {
       throw new Error("Invalid SMART entry name: path escape");
     }
-    const content = serializeSmartFile(entry);
+    const stamped = { ...entry, sessionId: this._currentSession };
+    const content = serializeSmartFile(stamped);
 
     await Bun.write(filePath, content);
 
-    const full: SmartEntry = { ...entry, filePath };
+    const full: SmartEntry = { ...stamped, filePath };
     this.entries.set(entry.name, full);
 
     const embeddingId = await this.memory.embed(
@@ -179,7 +180,7 @@ export class SmartsStore {
     const existing = this.entries.get(name);
     if (!existing) return;
 
-    const updated: SmartEntry = { ...existing, content };
+    const updated: SmartEntry = { ...existing, content, sessionId: this._currentSession };
     const serialized = serializeSmartFile(updated);
     await Bun.write(existing.filePath, serialized);
 

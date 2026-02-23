@@ -442,5 +442,52 @@ Fresh content.`);
       const entry = await freshStore.getByName("fresh-entry");
       expect(entry).toBeDefined();
     });
+
+    test("create() stamps entry with current session", async () => {
+      await store.initialize(
+        { smartsDir: TEST_SMARTS_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },
+        memory,
+      );
+
+      await store.create({
+        name: "new-entry",
+        domain: "test",
+        tags: ["test"],
+        confidence: 0.7,
+        source: "conversation",
+        content: "New content.",
+      });
+
+      const entry = await store.getByName("new-entry");
+      expect(entry!.sessionId).toBe(store.currentSession);
+    });
+
+    test("update() refreshes sessionId to current session", async () => {
+      // Set counter to 4 so currentSession becomes 5 — distinct from sessionId: 1
+      await memory.set("smarts", "session-counter", 4);
+
+      const freshStore = new SmartsStore();
+      await freshStore.initialize(
+        { smartsDir: TEST_SMARTS_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },
+        memory,
+      );
+      expect(freshStore.currentSession).toBe(5);
+
+      await freshStore.create({
+        name: "update-me",
+        domain: "test",
+        tags: ["test"],
+        confidence: 0.7,
+        source: "conversation",
+        sessionId: 1,
+        content: "Original.",
+      });
+
+      await freshStore.update("update-me", "Updated content.");
+
+      const entry = await freshStore.getByName("update-me");
+      expect(entry!.sessionId).toBe(5);
+      expect(entry!.content).toContain("Updated content");
+    });
   });
 });
