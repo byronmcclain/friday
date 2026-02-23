@@ -14,6 +14,8 @@ export const PALETTE = {
 	success: "#3FB950",
 	error: "#F85149",
 	warning: "#D29922",
+	selectionBg: "#5C3D00",
+	selectionFg: "#FFFFFF",
 } as const;
 
 // Shared text attribute constants — use these instead of creating per-component
