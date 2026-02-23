@@ -21,7 +21,14 @@ export function Message({ message }: MessageProps) {
 			<box flexDirection="column" paddingLeft={1} gap={0} marginBottom={1}>
 				<RoleBadge label="You" fg={PALETTE.amberGlow} />
 				<box paddingLeft={1}>
-					<text fg={PALETTE.textPrimary}>{content}</text>
+					<text
+						fg={PALETTE.textPrimary}
+						selectable
+						selectionBg={PALETTE.selectionBg}
+						selectionFg={PALETTE.selectionFg}
+					>
+						{content}
+					</text>
 				</box>
 			</box>
 		);
@@ -36,6 +43,9 @@ export function Message({ message }: MessageProps) {
 				<text
 					fg={isError ? PALETTE.error : PALETTE.amberDim}
 					attributes={DIM}
+					selectable
+					selectionBg={PALETTE.selectionBg}
+					selectionFg={PALETTE.selectionFg}
 				>
 					{`──── ${content} ────`}
 				</text>
@@ -56,7 +66,13 @@ export function Message({ message }: MessageProps) {
 				paddingRight={1}
 				marginLeft={1}
 			>
-				<markdown content={content} syntaxStyle={FRIDAY_SYNTAX_STYLE} />
+				<markdown
+					content={content}
+					syntaxStyle={FRIDAY_SYNTAX_STYLE}
+					selectable
+					selectionBg={PALETTE.selectionBg}
+					selectionFg={PALETTE.selectionFg}
+				/>
 			</box>
 		</box>
 	);
