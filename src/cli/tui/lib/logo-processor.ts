@@ -19,6 +19,17 @@ function stripAnsi(str: string): string {
 }
 
 /**
+ * Strip DEC private mode sequences (cursor hide/show, etc.) that chafa
+ * wraps around its output. These are irrelevant when parsing for OpenTUI
+ * rendering and would leak through the ANSI parser as text if they appear
+ * on their own line (e.g. \x1b[?25h on the final line).
+ */
+function stripDecPrivateMode(str: string): string {
+	// biome-ignore lint/suspicious/noControlCharactersInRegex: stripping ANSI
+	return str.replace(/\x1b\[\?[0-9;]*[A-Za-z]/g, "");
+}
+
+/**
  * Process an image into parsed terminal art using chafa.
  * Returns null if chafa fails (missing image, chafa error, etc).
  */
@@ -49,7 +60,11 @@ export async function processLogo(
 
 		if (exitCode !== 0) return null;
 
-		const lines = output.split("\n");
+		// Strip DEC private mode sequences (cursor hide/show) that chafa
+		// wraps around its output before splitting into lines.
+		const cleaned = stripDecPrivateMode(output);
+
+		const lines = cleaned.split("\n");
 		while (lines.length > 0 && lines[lines.length - 1]!.trim() === "") {
 			lines.pop();
 		}

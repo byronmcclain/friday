@@ -4,6 +4,7 @@ import { createRoot } from "@opentui/react";
 import { toast, ToasterRenderable } from "@opentui-ui/toast";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { writeSync } from "node:fs";
 import { FridayRuntime } from "../../core/runtime.ts";
 import type { ProviderName } from "../../core/types.ts";
 import { TuiChannel } from "./channels/tui-channel.ts";
@@ -25,14 +26,17 @@ let activeRenderer: Awaited<ReturnType<typeof createCliRenderer>> | null =
 	null;
 
 // Explicit terminal restoration — safety net after renderer.destroy().
-// The native destroyRenderer may not flush all escape sequences before
-// process.exit() kills the process, leaving the terminal with residual
-// background colors or hidden cursor.
+// Uses writeSync to fd 1 (stdout) to bypass OpenTUI's stdout interception
+// (OTUI_OVERRIDE_STDOUT defaults to true, replacing process.stdout.write
+// with a capture function). Writing directly to the fd ensures these
+// sequences always reach the terminal, even if destroy() deferred
+// finalization because a render was in progress.
 function restoreTerminal(): void {
-	process.stdout.write(
+	writeSync(
+		1,
 		"\x1b[?1049l" + // Switch back to main screen (no-op if already there)
-		"\x1b[0m" +     // Reset all SGR attributes
-		"\x1b[?25h",    // Show cursor
+			"\x1b[0m" +     // Reset all SGR attributes
+			"\x1b[?25h",    // Show cursor
 	);
 }
 

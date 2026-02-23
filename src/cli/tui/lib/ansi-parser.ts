@@ -120,7 +120,12 @@ export function parseAnsiLine(line: string): ParsedLine {
 	}
 
 	if (spans.length === 0 && line.length > 0) {
-		spans.push({ text: line });
+		// Only push if line has visible text (not just escape sequences)
+		// biome-ignore lint/suspicious/noControlCharactersInRegex: stripping ANSI
+		const visible = line.replace(/\x1b\[\??[0-9;]*[A-Za-z]/g, "");
+		if (visible.length > 0) {
+			spans.push({ text: visible });
+		}
 	}
 
 	return spans;
