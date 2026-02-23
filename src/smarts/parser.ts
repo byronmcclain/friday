@@ -25,12 +25,16 @@ export function parseFrontmatter(raw: string): ParsedSmart | null {
     ? (fields.source as SmartSource)
     : "manual";
 
+  const sessionIdRaw = fields.session_id ?? fields.sessionId;
+  const sessionId = sessionIdRaw ? Number.parseInt(sessionIdRaw, 10) : undefined;
+
   return {
     name: name.trim(),
     domain: domain.trim(),
     tags,
     confidence,
     source,
+    ...(sessionId !== undefined && Number.isFinite(sessionId) ? { sessionId } : {}),
     content: body.trim(),
   };
 }
@@ -54,7 +58,7 @@ tags:
 ${tagsLine}
 confidence: ${entry.confidence}
 source: ${quoteYaml(entry.source)}
-created: ${today}
+${entry.sessionId !== undefined ? `session_id: ${entry.sessionId}\n` : ""}created: ${today}
 updated: ${today}
 ---
 

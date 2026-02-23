@@ -104,6 +104,41 @@ updated: 2026-02-21
     expect(result!.domain).toBe("quoted-domain");
   });
 
+  test("parses session_id from frontmatter", () => {
+    const raw = `---
+name: test-entry
+domain: test
+tags: [a, b]
+confidence: 0.7
+source: conversation
+session_id: 42
+created: 2026-02-22
+updated: 2026-02-22
+---
+
+Test content.`;
+    const result = parseFrontmatter(raw);
+    expect(result).not.toBeNull();
+    expect(result!.sessionId).toBe(42);
+  });
+
+  test("parses entry without session_id as undefined", () => {
+    const raw = `---
+name: legacy-entry
+domain: test
+tags: [a]
+confidence: 0.7
+source: manual
+created: 2026-02-22
+updated: 2026-02-22
+---
+
+Legacy content.`;
+    const result = parseFrontmatter(raw);
+    expect(result).not.toBeNull();
+    expect(result!.sessionId).toBeUndefined();
+  });
+
   test("trims whitespace from body", () => {
     const raw = `---
 name: trimmed
@@ -146,6 +181,31 @@ describe("serializeSmartFile", () => {
     expect(output).toContain("confidence: 0.8");
     expect(output).toContain('source: "auto"');
     expect(output).toContain("# Test Knowledge");
+  });
+
+  test("includes session_id when present", () => {
+    const output = serializeSmartFile({
+      name: "test",
+      domain: "test",
+      tags: ["a"],
+      confidence: 0.7,
+      source: "conversation",
+      sessionId: 42,
+      content: "Test content.",
+    });
+    expect(output).toContain("session_id: 42");
+  });
+
+  test("omits session_id when undefined", () => {
+    const output = serializeSmartFile({
+      name: "test",
+      domain: "test",
+      tags: ["a"],
+      confidence: 0.7,
+      source: "manual",
+      content: "Test content.",
+    });
+    expect(output).not.toContain("session_id");
   });
 
   test("round-trips through parse", () => {
