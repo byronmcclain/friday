@@ -5,6 +5,18 @@ import { withTimeout } from "../utils/timeout.ts";
 
 const MIN_MESSAGES_FOR_EXTRACTION = 4;
 
+const VOLATILE_PATTERNS = [
+	/\b\d+\s+tools?\b/i,
+	/\btool(?:s|kit)\s*\(/i,
+	/\bcurrent.*(?:tools|modules)/i,
+	/\bvisible\s+tools/i,
+	/\blive\s+tools/i,
+];
+
+function isVolatile(content: string): boolean {
+	return VOLATILE_PATTERNS.some((p) => p.test(content));
+}
+
 const PROJECT_CONTEXT = `This is the Friday project — a personal AI assistant runtime built with Bun and TypeScript. Key subsystems: Cortex (LLM brain), FridayRuntime (composition root), SignalBus (events), Modules (tools/protocols), SMARTS (this knowledge system), Sensorium (environment awareness), Directives (autonomous rules), The Forge (self-improvement).`;
 
 const EXTRACTION_PROMPT_BASE = `You are a knowledge extraction system for an AI assistant project. Review the conversation and extract high-value knowledge AND important context to remember for future conversations.
@@ -55,6 +67,8 @@ Important facts about the project's current state that future conversations need
 - Anything that restates official docs without adding insight
 - Trivial snippets that any developer would know
 - Ephemeral conversation details (greetings, clarifying questions, debugging dead-ends that led nowhere)
+- Enumerations of the system's own state: tool inventories, module lists, capability counts, component catalogs, or "what tools does Friday have" summaries — these are defined in code and change with every deploy, they are not knowledge
+- Lists that restate what the API tool definitions already provide
 
 When an existing entry covers the same topic, use "action": "update" with the existing name to merge new insights into it rather than creating a duplicate.
 
@@ -114,7 +128,8 @@ export class SmartsCurator {
 			const response = chatResponse.type === "text" ? chatResponse.text : "";
 
 			const extracted = this.parseResponse(response);
-			for (const smart of extracted) {
+			const filtered = extracted.filter((smart) => !isVolatile(smart.content));
+			for (const smart of filtered) {
 				const action = smart.action ?? "create";
 				const cappedConfidence = Math.max(0, Math.min(smart.confidence, 0.7));
 

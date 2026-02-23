@@ -331,6 +331,123 @@ That's what I found.`),
 		expect(capturedSystem).toContain("- existing-two");
 	});
 
+	describe("volatile extraction filter", () => {
+		test("rejects entries containing tool inventory counts", async () => {
+			const mockProvider: LLMProvider = {
+				name: "mock",
+				defaultModel: "mock",
+				defaultFastModel: "mock-fast",
+				chat: async () => textResponse(JSON.stringify([
+					{
+						action: "create",
+						name: "friday-tools",
+						domain: "project-context",
+						tags: ["tools"],
+						confidence: 0.7,
+						content: "**Current Live Tools (11 total)**:\n- getEnvironmentStatus\n- fs.read",
+					},
+				])),
+			};
+			const curator = new SmartsCurator(store, mockProvider);
+			await curator.extractFromConversation(makeMessages(10));
+			expect(store.all()).toHaveLength(0);
+		});
+
+		test("rejects entries with 'Visible Tools' pattern", async () => {
+			const mockProvider: LLMProvider = {
+				name: "mock",
+				defaultModel: "mock",
+				defaultFastModel: "mock-fast",
+				chat: async () => textResponse(JSON.stringify([
+					{
+						action: "create",
+						name: "friday-visible-tools",
+						domain: "project-context",
+						tags: ["tools"],
+						confidence: 0.7,
+						content: "Visible Tools:\n- fs.read\n- bash.exec",
+					},
+				])),
+			};
+			const curator = new SmartsCurator(store, mockProvider);
+			await curator.extractFromConversation(makeMessages(10));
+			expect(store.all()).toHaveLength(0);
+		});
+
+		test("rejects entries with 'Current Friday Toolkit' pattern", async () => {
+			const mockProvider: LLMProvider = {
+				name: "mock",
+				defaultModel: "mock",
+				defaultFastModel: "mock-fast",
+				chat: async () => textResponse(JSON.stringify([
+					{
+						action: "create",
+						name: "friday-toolkit",
+						domain: "project-context",
+						tags: ["tools"],
+						confidence: 0.7,
+						content: "# Current Friday Modules\n\nFilesystem, Forge",
+					},
+				])),
+			};
+			const curator = new SmartsCurator(store, mockProvider);
+			await curator.extractFromConversation(makeMessages(10));
+			expect(store.all()).toHaveLength(0);
+		});
+
+		test("allows non-volatile entries through", async () => {
+			const mockProvider: LLMProvider = {
+				name: "mock",
+				defaultModel: "mock",
+				defaultFastModel: "mock-fast",
+				chat: async () => textResponse(JSON.stringify([
+					{
+						action: "create",
+						name: "docker-networking",
+						domain: "docker",
+						tags: ["docker", "networking"],
+						confidence: 0.7,
+						content: "# Docker Networking\n\nUse bridge networks for container isolation.",
+					},
+				])),
+			};
+			const curator = new SmartsCurator(store, mockProvider);
+			await curator.extractFromConversation(makeMessages(10));
+			expect(store.all()).toHaveLength(1);
+			expect(store.all()[0]!.name).toBe("docker-networking");
+		});
+
+		test("filters volatile entries while keeping valid ones in same batch", async () => {
+			const mockProvider: LLMProvider = {
+				name: "mock",
+				defaultModel: "mock",
+				defaultFastModel: "mock-fast",
+				chat: async () => textResponse(JSON.stringify([
+					{
+						action: "create",
+						name: "friday-tools-list",
+						domain: "project-context",
+						tags: ["tools"],
+						confidence: 0.7,
+						content: "Friday has 29 tools available.",
+					},
+					{
+						action: "create",
+						name: "valid-knowledge",
+						domain: "typescript",
+						tags: ["ts"],
+						confidence: 0.7,
+						content: "# TS Tip\n\nUse satisfies for literal type preservation.",
+					},
+				])),
+			};
+			const curator = new SmartsCurator(store, mockProvider);
+			await curator.extractFromConversation(makeMessages(10));
+			expect(store.all()).toHaveLength(1);
+			expect(store.all()[0]!.name).toBe("valid-knowledge");
+		});
+	});
+
 	test("caps confidence at 0.7 for extracted entries", async () => {
 		const mockProvider: LLMProvider = {
 			name: "mock",
