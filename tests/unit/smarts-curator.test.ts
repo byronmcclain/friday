@@ -198,18 +198,25 @@ That's what I found.`),
 			expect(prompt).toContain("Bun and TypeScript");
 		});
 
-		test("includes quality bar guidance", () => {
+		test("includes durability test and exclusions", () => {
 			const prompt = buildExtractionPrompt([]);
+			expect(prompt).toContain("Durability Test");
+			expect(prompt).toContain("Lost-if-forgotten");
+			expect(prompt).toContain("Stable over time");
 			expect(prompt).toContain("Non-obvious");
 			expect(prompt).toContain("DO NOT extract");
 		});
 
-		test("includes all four extraction categories", () => {
+		test("includes all three extraction categories", () => {
 			const prompt = buildExtractionPrompt([]);
-			expect(prompt).toContain("Technical knowledge");
-			expect(prompt).toContain("Decisions and rationale");
-			expect(prompt).toContain("User preferences and working style");
-			expect(prompt).toContain("Project evolution and context");
+			expect(prompt).toContain("Technical gotchas and workarounds");
+			expect(prompt).toContain("Decision rationale");
+			expect(prompt).toContain("User preferences");
+		});
+
+		test("does not include project evolution category", () => {
+			const prompt = buildExtractionPrompt([]);
+			expect(prompt).not.toContain("Project evolution and context");
 		});
 	});
 
@@ -387,6 +394,69 @@ That's what I found.`),
 						tags: ["tools"],
 						confidence: 0.7,
 						content: "# Current Friday Modules\n\nFilesystem, Forge",
+					},
+				])),
+			};
+			const curator = new SmartsCurator(store, mockProvider);
+			await curator.extractFromConversation(makeMessages(10));
+			expect(store.all()).toHaveLength(0);
+		});
+
+		test("rejects entries with hardware stats (GB/cores)", async () => {
+			const mockProvider: LLMProvider = {
+				name: "mock",
+				defaultModel: "mock",
+				defaultFastModel: "mock-fast",
+				chat: async () => textResponse(JSON.stringify([
+					{
+						action: "create",
+						name: "env-hardware",
+						domain: "project-context",
+						tags: ["hardware"],
+						confidence: 0.7,
+						content: "**Runtime Environment**: 16 cores, 128 GB RAM, load avg 2.5",
+					},
+				])),
+			};
+			const curator = new SmartsCurator(store, mockProvider);
+			await curator.extractFromConversation(makeMessages(10));
+			expect(store.all()).toHaveLength(0);
+		});
+
+		test("rejects entries with file/entry/test counts", async () => {
+			const mockProvider: LLMProvider = {
+				name: "mock",
+				defaultModel: "mock",
+				defaultFastModel: "mock-fast",
+				chat: async () => textResponse(JSON.stringify([
+					{
+						action: "create",
+						name: "smarts-meta",
+						domain: "project-context",
+						tags: ["smarts"],
+						confidence: 0.7,
+						content: "SMARTS has 28+ files indexed via FTS5.",
+					},
+				])),
+			};
+			const curator = new SmartsCurator(store, mockProvider);
+			await curator.extractFromConversation(makeMessages(10));
+			expect(store.all()).toHaveLength(0);
+		});
+
+		test("rejects entries with percentage usage stats", async () => {
+			const mockProvider: LLMProvider = {
+				name: "mock",
+				defaultModel: "mock",
+				defaultFastModel: "mock-fast",
+				chat: async () => textResponse(JSON.stringify([
+					{
+						action: "create",
+						name: "system-stats",
+						domain: "project-context",
+						tags: ["system"],
+						confidence: 0.7,
+						content: "Memory: 75% used, CPU idle at 11% idle most of the time.",
 					},
 				])),
 			};

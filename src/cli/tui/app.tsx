@@ -24,6 +24,18 @@ import type { TypeaheadEntry } from "./filter-commands.ts";
 let activeRenderer: Awaited<ReturnType<typeof createCliRenderer>> | null =
 	null;
 
+// Explicit terminal restoration — safety net after renderer.destroy().
+// The native destroyRenderer may not flush all escape sequences before
+// process.exit() kills the process, leaving the terminal with residual
+// background colors or hidden cursor.
+function restoreTerminal(): void {
+	process.stdout.write(
+		"\x1b[?1049l" + // Switch back to main screen (no-op if already there)
+		"\x1b[0m" +     // Reset all SGR attributes
+		"\x1b[?25h",    // Show cursor
+	);
+}
+
 interface FridayAppProps {
 	options: {
 		provider: string;
@@ -170,6 +182,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 		// Destroy renderer to restore terminal state, then exit
 		setTimeout(() => {
 			activeRenderer?.destroy();
+			restoreTerminal();
 			process.exit(0);
 		}, 500);
 	}, [state.phase]);
@@ -409,6 +422,7 @@ export async function launchTui(options: {
 		// Ensure terminal state is restored on unexpected signals
 		const emergencyCleanup = () => {
 			renderer.destroy();
+			restoreTerminal();
 			process.exit(0);
 		};
 		process.on("SIGTERM", emergencyCleanup);

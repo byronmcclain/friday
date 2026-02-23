@@ -11,6 +11,12 @@ const VOLATILE_PATTERNS = [
 	/\bcurrent.*(?:tools|modules)/i,
 	/\bvisible\s+tools/i,
 	/\blive\s+tools/i,
+	/\b\d+\s*(?:GB|MB|cores?)\b/i,
+	/\bload\s+avg/i,
+	/\bport(?:s)?\s*:\s*\d/i,
+	/\b\d+\s*%\s*(?:used|free|idle)/i,
+	/\b\d+\+?\s+(?:files?|entries|tests)\b/i,
+	/\bcommits?\s+ahead/i,
 ];
 
 function isVolatile(content: string): boolean {
@@ -19,60 +25,72 @@ function isVolatile(content: string): boolean {
 
 const PROJECT_CONTEXT = `This is the Friday project — a personal AI assistant runtime built with Bun and TypeScript. Key subsystems: Cortex (LLM brain), FridayRuntime (composition root), SignalBus (events), Modules (tools/protocols), SMARTS (this knowledge system), Sensorium (environment awareness), Directives (autonomous rules), The Forge (self-improvement).`;
 
-const EXTRACTION_PROMPT_BASE = `You are a knowledge extraction system for an AI assistant project. Review the conversation and extract high-value knowledge AND important context to remember for future conversations.
+const EXTRACTION_PROMPT_BASE = `You are a strict knowledge extraction system. Your job is to extract ONLY durable knowledge that would be permanently lost if this conversation disappeared. Most conversations produce ZERO extractable knowledge — returning [] is the expected default.
 
 ${PROJECT_CONTEXT}
+
+## The Durability Test (apply to every candidate)
+
+Before extracting anything, it must pass ALL three gates:
+1. **Lost-if-forgotten**: This knowledge cannot be derived by reading the source code, CLAUDE.md, system prompt, or official documentation. If someone could rediscover it from those sources, do NOT extract it.
+2. **Stable over time**: This will still be accurate and useful 10+ sessions from now. If it could become stale as the project evolves, do NOT extract it.
+3. **Non-obvious**: A senior developer reading the codebase would not independently arrive at this insight. If it's conventional wisdom or standard practice, do NOT extract it.
+
+## What to extract (rare — most conversations have none)
+
+### 1. Technical gotchas and workarounds (domain: use the relevant tech area)
+Bugs, limitations, or non-obvious behaviors discovered through actual debugging:
+- A runtime quirk that cost real debugging time (e.g., "bun:sqlite transactions must invoke the returned function")
+- A workaround for an undocumented limitation
+- A subtle interaction between two libraries that isn't covered in either's docs
+
+### 2. Decision rationale (domain: "decisions")
+The WHY behind a significant architectural choice — only when the reasoning isn't obvious from the code:
+- "Chose X over Y because of Z" — where Z is a non-obvious trade-off
+- NOT "we built feature X" (that's visible in code) — only WHY and what alternatives were rejected
+
+### 3. User preferences (domain: "preferences")
+Stable personal preferences for communication and workflow:
+- How the user likes to be addressed, communication tone
+- Workflow patterns (e.g., "always brainstorm before implementing")
+- NOT one-time instructions or task-specific requests
+
+## DO NOT extract (these are the most common false positives)
+
+### System state and snapshots
+- Hardware specs, CPU/memory usage, load averages, port listings
+- Git status, commit counts, branch states
+- Docker container states, process lists
+- File counts, test counts, entry counts, line counts — any "N things" enumeration
+
+### Project self-descriptions
+- What the project IS, what modules/tools exist, architecture summaries — this is in CLAUDE.md
+- How subsystems work — this is in the source code
+- What was built or changed — this is in git history
+- Feature roadmaps, wish lists, planned modules, TODO items — aspirational content goes stale
+
+### Redundant knowledge
+- Anything already in the system prompt or CLAUDE.md
+- Standard patterns any TypeScript/Bun developer would know
+- Official API documentation restated without novel insight
+- Basic usage examples ("how to read a file", "how to run tests")
+
+### Conversation ephemera
+- Greetings, small talk, clarifying questions
+- Debugging dead-ends that led nowhere
+- Step-by-step narration of what was done (that's conversation history, not knowledge)
 
 Return a JSON array of knowledge entries. Each entry must have:
 - "action": "create" for new knowledge, or "update" to merge into an existing entry
 - "name": kebab-case identifier (for "update", use the exact existing name)
-- "domain": broad category relevant to this project (e.g., "bun", "typescript", "ai-agents", "architecture", "devops", "preferences", "decisions", "project-context")
+- "domain": broad category (e.g., "bun", "typescript", "ai-agents", "architecture", "devops", "preferences", "decisions")
 - "tags": array of specific keywords for search indexing
 - "confidence": 0.0-1.0 based on how authoritative and verified the information is
-- "content": markdown-formatted knowledge (concise, actionable)
+- "content": markdown-formatted knowledge (concise, actionable — no preamble, no "this was discussed", just the knowledge itself)
 
-## What to extract
+When an existing entry covers the same topic, use "action": "update" with the existing name to merge new insights rather than creating a duplicate.
 
-### 1. Technical knowledge (domain: use the relevant tech area)
-Patterns, gotchas, decision rationales, or architectural insights that are:
-- Non-obvious: not easily found in official documentation or basic tutorials
-- Actionable: contains a specific pattern, workaround, or design choice
-- Durable: will remain relevant across multiple future conversations
-
-### 2. Decisions and rationale (domain: "decisions")
-Architectural or design decisions made during the conversation:
-- Technology choices and WHY they were chosen over alternatives
-- Design patterns adopted and the reasoning behind them
-- Trade-offs discussed and which direction was taken
-- Example: "Chose FTS5 over vector embeddings for SMARTS because the knowledge base is small and keyword matching is sufficient"
-
-### 3. User preferences and working style (domain: "preferences")
-How the user likes to work, communicate, or structure things:
-- Coding style preferences, naming conventions, or patterns they favor
-- Workflow preferences (e.g., "prefers brainstorming before implementation")
-- Communication preferences (e.g., "wants concise responses", "prefers code examples over explanations")
-- Tool or library preferences
-
-### 4. Project evolution and context (domain: "project-context")
-Important facts about the project's current state that future conversations need:
-- What was built, changed, or refactored and why
-- Known limitations, tech debt, or planned next steps discussed
-- Integration points, deployment details, or environment-specific notes
-- Example: "SMARTS curator had a duplication problem — optimized prompt to include existing names and support update action"
-
-## DO NOT extract
-- Basic API usage or hello-world examples (e.g., "how to list files in Bun")
-- Installation paths or version numbers
-- Knowledge about unrelated tech stacks unless it reveals a transferable pattern
-- Anything that restates official docs without adding insight
-- Trivial snippets that any developer would know
-- Ephemeral conversation details (greetings, clarifying questions, debugging dead-ends that led nowhere)
-- Enumerations of the system's own state: tool inventories, module lists, capability counts, component catalogs, or "what tools does Friday have" summaries — these are defined in code and change with every deploy, they are not knowledge
-- Lists that restate what the API tool definitions already provide
-
-When an existing entry covers the same topic, use "action": "update" with the existing name to merge new insights into it rather than creating a duplicate.
-
-Return ONLY the JSON array. If nothing is worth extracting, return [].`;
+Return ONLY the JSON array. Return [] if nothing passes all three durability gates.`;
 
 export function buildExtractionPrompt(existingNames: string[]): string {
 	if (existingNames.length === 0) return EXTRACTION_PROMPT_BASE;
