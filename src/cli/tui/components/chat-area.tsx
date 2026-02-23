@@ -41,14 +41,20 @@ export function ChatArea({ messages, isThinking, welcomeInfo }: ChatAreaProps) {
 	return (
 		<scrollbox
 			flexGrow={1}
-			flexDirection="column"
 			backgroundColor={PALETTE.background}
-			gap={2}
-			paddingTop={1}
-			paddingBottom={1}
+			border
+			borderColor={PALETTE.background}
+			focusedBorderColor={PALETTE.background}
 			stickyScroll
 			stickyStart="bottom"
-			focused
+			wrapperOptions={{ backgroundColor: PALETTE.background }}
+			viewportOptions={{ backgroundColor: PALETTE.background }}
+			contentOptions={{
+				backgroundColor: PALETTE.background,
+				flexDirection: "column",
+				justifyContent: "flex-end",
+				paddingBottom: 1,
+			}}
 			verticalScrollbarOptions={{
 				trackOptions: {
 					foregroundColor: PALETTE.amberDim,

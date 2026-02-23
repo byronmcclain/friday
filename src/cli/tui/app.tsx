@@ -345,6 +345,7 @@ function FridayApp({ options }: FridayAppProps) {
 			width="100%"
 			height="100%"
 			backgroundColor={PALETTE.background}
+			shouldFill
 		>
 			<Header provider={provider} model={model} />
 			<ChatArea
