@@ -66,13 +66,7 @@ export function Message({ message }: MessageProps) {
 				paddingRight={1}
 				marginLeft={1}
 			>
-				<markdown
-					content={content}
-					syntaxStyle={FRIDAY_SYNTAX_STYLE}
-					selectable
-					selectionBg={PALETTE.selectionBg}
-					selectionFg={PALETTE.selectionFg}
-				/>
+				<markdown content={content} syntaxStyle={FRIDAY_SYNTAX_STYLE} />
 			</box>
 		</box>
 	);

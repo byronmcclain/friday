@@ -31,9 +31,10 @@ interface FridayAppProps {
 		fastModel?: string;
 		fresh?: boolean;
 	};
+	renderer: Awaited<ReturnType<typeof createCliRenderer>>;
 }
 
-function FridayApp({ options }: FridayAppProps) {
+function FridayApp({ options, renderer }: FridayAppProps) {
 	const [state, dispatch] = useReducer(appReducer, initialState);
 	const runtimeRef = useRef<FridayRuntime | null>(null);
 	const commandsRef = useRef<TypeaheadEntry[]>([]);
@@ -171,6 +172,27 @@ function FridayApp({ options }: FridayAppProps) {
 			process.exit(0);
 		}, 500);
 	}, [state.phase]);
+
+	// Auto-copy selected text on mouse release
+	const handleMouseUp = useCallback(() => {
+		// Defer to next tick so OpenTUI's internal selection processing completes first
+		setTimeout(() => {
+			if (!renderer.hasSelection) return;
+			const selection = renderer.getSelection();
+			if (!selection) return;
+			const text = selection.getSelectedText();
+			if (!text) {
+				renderer.clearSelection();
+				return;
+			}
+			renderer.copyToClipboardOSC52(text);
+			toast("Copied!");
+			// Clear selection after brief visual flash
+			setTimeout(() => {
+				renderer.clearSelection();
+			}, 500);
+		}, 0);
+	}, [renderer]);
 
 	// Handle input submission
 	const handleSubmit = useCallback(
@@ -346,6 +368,7 @@ function FridayApp({ options }: FridayAppProps) {
 			height="100%"
 			backgroundColor={PALETTE.background}
 			shouldFill
+			onMouseUp={handleMouseUp}
 		>
 			<Header provider={provider} model={model} />
 			<ChatArea
@@ -379,7 +402,7 @@ export async function launchTui(options: {
 	}
 
 	try {
-		const renderer = await createCliRenderer({ exitOnCtrlC: false });
+		const renderer = await createCliRenderer({ exitOnCtrlC: false, useMouse: true });
 		activeRenderer = renderer;
 
 		// Ensure terminal state is restored on unexpected signals
@@ -405,7 +428,7 @@ export async function launchTui(options: {
 		renderer.root.add(toaster);
 
 		const root = createRoot(renderer);
-		root.render(<FridayApp options={options} />);
+		root.render(<FridayApp options={options} renderer={renderer} />);
 
 		// Keep the process alive — OpenTUI handles the event loop
 		// Cleanup happens via renderer.destroy() + process.exit() in the shutdown handler
