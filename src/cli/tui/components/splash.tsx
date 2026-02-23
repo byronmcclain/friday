@@ -110,11 +110,11 @@ export function SplashScreen({ logoData, onComplete }: SplashScreenProps) {
 			<ascii-font text="F.R.I.D.A.Y." font="block" color={titleColor} />
 
 			{/* Subtitle */}
-			<box style={{ flexDirection: "column", alignItems: "center" }}>
-				<text fg={subtitleColor}>
+			<box style={{ flexDirection: "column", alignItems: "center", overflow: "hidden" }}>
+				<text fg={subtitleColor} wrapMode="none">
 					Female Replacement Intelligent Digital Assistant Youth
 				</text>
-				<text fg={versionColor}>── v0.1.0 ──</text>
+				<text fg={versionColor} wrapMode="none">── v0.1.0 ──</text>
 			</box>
 		</box>
 	);
