@@ -97,4 +97,40 @@ describe("SQLiteMemory conversation indexing", () => {
 		const results = await memory.searchConversations("");
 		expect(results).toHaveLength(0);
 	});
+
+	test("saveConversation indexes summary automatically", async () => {
+		const session = makeSession("auto-idx", "Auto-indexed conversation about TypeScript generics.");
+		await memory.saveConversation(session);
+
+		const results = await memory.searchConversations("TypeScript generics");
+		expect(results).toHaveLength(1);
+		expect(results[0]!.sessionId).toBe("auto-idx");
+	});
+
+	test("saveConversation skips indexing when no summary", async () => {
+		const session = makeSession("no-sum");
+		await memory.saveConversation(session);
+
+		const all = await memory.searchConversations("Hello");
+		expect(all).toHaveLength(0);
+	});
+
+	test("saveConversation cleans up orphaned embeddings on prune", async () => {
+		const s1 = makeSession("will-survive", "Survivor conversation.", new Date("2026-02-22T10:00:00Z"));
+		const s2 = makeSession("will-die", "Doomed conversation.", new Date("2026-01-01T10:00:00Z"));
+
+		await memory.saveConversation(s2);
+		await memory.saveConversation(s1);
+
+		// Both should be searchable
+		expect(await memory.searchConversations("Survivor")).toHaveLength(1);
+		expect(await memory.searchConversations("Doomed")).toHaveLength(1);
+
+		// After cleanup, orphaned embeddings for deleted conversations should be removed
+		await memory.cleanupOrphanedConversationEmbeddings();
+
+		// Both still exist because neither conversation was deleted
+		expect(await memory.searchConversations("Survivor")).toHaveLength(1);
+		expect(await memory.searchConversations("Doomed")).toHaveLength(1);
+	});
 });

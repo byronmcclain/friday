@@ -142,6 +142,14 @@ export class SQLiteMemory {
         )
         .run(SQLiteMemory.MAX_CONVERSATIONS);
     })();
+
+    // Index the conversation's summary for recall search
+    if (session.summary) {
+      await this.indexConversation(session);
+    }
+
+    // Clean up FTS5 embeddings for pruned conversations
+    await this.cleanupOrphanedConversationEmbeddings();
   }
 
   async getConversationHistory(limit = 20): Promise<ConversationSession[]> {
@@ -201,6 +209,28 @@ export class SQLiteMemory {
         summary: r.content,
         similarity: r.similarity,
       }));
+  }
+
+  async cleanupOrphanedConversationEmbeddings(): Promise<void> {
+    const keys = this.db
+      .query<{ key: string }, [string]>("SELECT key FROM kv WHERE namespace = ?")
+      .all("conversations");
+
+    for (const { key } of keys) {
+      if (key === "backfill-done") continue;
+
+      const exists = this.db
+        .query<{ id: string }, [string]>("SELECT id FROM conversations WHERE id = ?")
+        .get(key);
+
+      if (!exists) {
+        const embeddingId = await this.get<string>("conversations", key);
+        if (embeddingId) {
+          await this.forget("conversations", embeddingId);
+        }
+        await this.delete("conversations", key);
+      }
+    }
   }
 
   async embed(
