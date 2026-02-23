@@ -169,6 +169,40 @@ export class SQLiteMemory {
     this.db.query("DELETE FROM conversations").run();
   }
 
+  async indexConversation(session: ConversationSession): Promise<void> {
+    if (!session.summary) return;
+
+    // Idempotent: remove old embedding if re-indexing
+    const existing = await this.get<string>("conversations", session.id);
+    if (existing) {
+      await this.forget("conversations", existing);
+    }
+
+    const embeddingId = await this.embed(
+      "conversations",
+      session.summary,
+      { sessionId: session.id, date: session.startedAt.toISOString() },
+    );
+
+    // Store session → embeddingId mapping for later cleanup
+    await this.set("conversations", session.id, embeddingId);
+  }
+
+  async searchConversations(
+    query: string,
+    limit = 5,
+  ): Promise<Array<{ sessionId: string; date: string; summary: string; similarity: number }>> {
+    const results = await this.search("conversations", query, limit);
+    return results
+      .filter((r) => r.metadata?.sessionId)
+      .map((r) => ({
+        sessionId: r.metadata!.sessionId as string,
+        date: (r.metadata!.date as string) ?? "",
+        summary: r.content,
+        similarity: r.similarity,
+      }));
+  }
+
   async embed(
     namespace: string,
     content: string,
