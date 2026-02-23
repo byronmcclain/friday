@@ -52,7 +52,8 @@ src/
 │   ├── runtime.ts         # FridayRuntime — boot/shutdown orchestrator, wires all subsystems
 │   ├── events.ts          # SignalBus — typed event system (file:changed, test:failed, etc.)
 │   ├── clearance.ts       # ClearanceManager — permission gates (read-fs, exec-shell, etc.)
-│   ├── memory.ts          # SQLiteMemory — KV store, conversation history, FTS5 semantic search
+│   ├── memory.ts          # SQLiteMemory — KV store, conversation history, FTS5 search, conversation indexing
+│   ├── recall-tool.ts     # recall_memory tool — FTS5 search across past conversations (Deja Vu)
 │   ├── notifications.ts   # NotificationManager — multi-channel alerts (terminal, log, slack, webhook)
 │   ├── types.ts           # Core types (FridayConfig, ConversationMessage, ProviderName)
 │   └── prompts.ts         # System prompts defining Friday's personality and behavior
@@ -62,7 +63,13 @@ src/
 ├── modules/
 │   ├── types.ts           # FridayModule, FridayTool, FridayProtocol interfaces
 │   ├── loader.ts          # Module discovery, validation, and loading
+│   ├── validation.ts      # Shared input validation (path traversal, SSRF, flag injection)
 │   ├── filesystem/        # Filesystem module — read, write, list, delete, exec tools
+│   ├── git/               # Git module — status, diff, log, branch, stash, push, pull
+│   ├── docker/            # Docker module — ps, logs, inspect, stats, exec
+│   ├── code-exec/         # Code execution module — sandboxed script runner
+│   ├── web-fetch/         # Web fetch module — HTTP requests with SSRF protection
+│   ├── notify/            # Notification module — multi-channel dispatch
 │   └── forge/             # The Forge — self-improvement system
 ├── protocols/
 │   ├── types.ts           # Re-exports from modules/types.ts
@@ -103,13 +110,13 @@ smarts/                    # Runtime-generated knowledge files (gitignored, user
 forge/                     # Friday-authored modules (gitignored, AI-generated)
 tests/
 ├── helpers/               # Shared test stubs (stubProvider, grokStub)
-├── unit/                  # Unit tests (bun:test) — 642 tests across 57 files
+├── unit/                  # Unit tests (bun:test) — 646 tests across 57 files
 └── integration/           # Integration tests — future
 ```
 
 ### Key Design Patterns
 
-- **FridayRuntime** (`src/core/runtime.ts`) is the composition root. It boots all subsystems in order: SignalBus, ClearanceManager, AuditLogger, NotificationManager, ProtocolRegistry, DirectiveStore/Engine, Memory, SmartsStore, Sensorium, Cortex, then discovers and loads Modules.
+- **FridayRuntime** (`src/core/runtime.ts`) is the composition root. It boots all subsystems in order: SignalBus, ClearanceManager, AuditLogger, NotificationManager, ProtocolRegistry, DirectiveStore/Engine, Memory, SmartsStore, Sensorium, Cortex, Recall Tool, then discovers and loads Modules.
 - **Cortex** (`src/core/cortex.ts`) is Friday's LLM brain. It owns conversation history, delegates to providers, and exposes tool registration for modules. When a SmartsStore is provided, Cortex enriches the system prompt with pinned and FTS5-matched knowledge per message. Replaces the old FridayCore.
 - **SMARTS** (`src/smarts/`) is Friday's dynamic knowledge system. Markdown files with YAML frontmatter in `smarts/` are indexed into FTS5, queried per-message to enrich prompts, and new knowledge is extracted from conversations on shutdown via SmartsCurator. The `/smart` protocol provides manual control (list, show, search, reload).
 - **SignalBus** (`src/core/events.ts`) is the reactive nervous system. Typed signals (file:changed, test:failed, etc.) flow through here, triggering directives and module behavior.
@@ -121,13 +128,16 @@ tests/
 - **Sensorium** (`src/sensorium/`) is Friday's environmental awareness. Pure sensor functions gather machine stats (`node:os`), Docker containers (`Bun.$`), and dev environment (git, ports, runtimes). The Sensorium class runs a dual-cadence polling loop (30s fast / 5min slow), evaluates alert thresholds with hysteresis, and injects a compact context block into the system prompt via `getContextBlock()`. The `/env` protocol provides CLI access; `getEnvironmentStatus` tool provides LLM access.
 - **Dual-Model Architecture** — FridayRuntime resolves two models per provider: a reasoning model (for Cortex conversations) and a fast model (for SmartsCurator knowledge extraction and ConversationSummarizer). Resolution priority: CLI flag > env var > `PROVIDER_DEFAULTS`. `FridayConfig.fastModel` carries the fast model through the config chain.
 - **The Forge** (`src/modules/forge/`) is Friday's self-improvement system. She can author new modules in `forge/` and patch existing forge modules, subject to human approval. The Forge validates modules (import, manifest, typecheck, lint) before triggering an in-process restart. Failed forge modules don't crash boot — errors are reported back so Friday can iterate. The filesystem module and Forge itself are core-protected.
-- **TUI** (`src/cli/tui/`) is Friday's interactive terminal interface, built with OpenTUI (React for CLI). The `chat` command delegates to `launchTui()` which renders a React component tree: Header (shimmer animation), ChatArea (messages + thinking indicator), InputBar (command typeahead). State is managed via a reducer with phases: `splash → fading → booting → active → shutting-down`. TuiChannel bridges NotificationManager into TUI toasts. The splash screen uses chafa to convert the logo image to ANSI art with a fade animation.
+- **TUI** (`src/cli/tui/`) is Friday's interactive terminal interface, built with OpenTUI (React for CLI). The `chat` command delegates to `launchTui()` which renders a React component tree: Header (shimmer animation), ChatArea (messages + thinking indicator), InputBar (command typeahead). State is managed via a reducer with phases: `splash → fading → booting → active → shutting-down`. TuiChannel bridges NotificationManager into TUI toasts. The splash screen uses chafa to convert the logo image to ANSI art with a fade animation. Mouse-enabled text selection with auto-copy to clipboard.
 - **History** (`src/history/protocol.ts`) provides the `/history` protocol (aliases: `/hist`) for browsing, viewing, and clearing past conversation sessions stored in SQLite.
-- **Prompts** live in `src/core/prompts.ts` as exported constants. Friday's personality is defined here — keep it consistent when modifying.
+- **Recall (Deja Vu)** (`src/core/recall-tool.ts`) is Friday's conversational memory search. The `recall_memory` tool provides two modes: `search` (FTS5 keyword search across conversation summaries, returns session IDs + dates + snippets) and `recall` (retrieves full message transcript for a session). Conversations are auto-indexed on save via `memory.indexConversation()` with pruning of deleted sessions. Wired into Cortex as a registered tool at boot.
+- **Operational Modules** — Beyond the filesystem module, Friday has 5 additional modules: **git** (status, diff, log, branch, stash, push, pull), **docker** (ps, logs, inspect, stats, exec), **code-exec** (sandboxed script execution), **web-fetch** (HTTP with SSRF protection), and **notify** (multi-channel dispatch). All use shared validation from `src/modules/validation.ts` for path traversal, SSRF, and flag injection protection.
+- **SMARTS Staleness Prevention** — SMARTS entries carry a `sessionId` field. On boot, `SmartsStore.pruneStale()` removes entries whose session hasn't been seen within a TTL window. The SmartsCurator filters volatile extractions (greetings, meta-commentary) and stamps `sessionId` on create/update for TTL renewal.
+- **Prompts** live in `src/core/prompts.ts` as exported constants. Friday's personality is defined here — keep it consistent when modifying. The system prompt includes current date/time injection and recall_memory tool usage guidance.
 
 ## Testing
 
-- 642 tests across 57 files (as of 2026-02-23)
+- 646 tests across 57 files (as of 2026-02-23)
 - Runtime/Cortex tests use `injectedProvider` (stub `LLMProvider`) to avoid needing `ANTHROPIC_API_KEY`
 - Shared test stubs live in `tests/helpers/stubs.ts` — import `stubProvider`/`grokStub` instead of defining inline
 - SQLite tests must clean up WAL files: unlink `db`, `db-wal`, and `db-shm` in afterEach
@@ -180,8 +190,10 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 - OpenTUI TUI design: `docs/plans/2026-02-22-opentui-tui-design.md`
 - Hero header splash: `docs/plans/2026-02-22-hero-header-design.md`
 - Forge design: `docs/plans/2026-02-22-the-forge-self-improvement-design.md`
-- Forge implementation: `docs/plans/2026-02-22-the-forge-implementation-plan.md`
-- MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite
+- SMARTS staleness prevention: `docs/plans/2026-02-22-smarts-staleness-prevention-design.md`
+- TUI text selection & copy: `docs/plans/2026-02-22-tui-text-selection-copy-design.md`
+- Conversational memory recall (Deja Vu): `docs/plans/2026-02-23-conversational-memory-recall-design.md`
+- MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall
 
 ## Worktrees
 

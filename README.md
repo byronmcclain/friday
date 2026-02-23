@@ -16,7 +16,7 @@ TUI-first. Module-driven. Built to think, remember, and adapt.
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tests](https://img.shields.io/badge/tests-469%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-646%20passing-brightgreen)]()
 [![Biome](https://img.shields.io/badge/lint-Biome-60a5fa?logo=biome)](https://biomejs.dev)
 
 <br />
@@ -57,7 +57,7 @@ LLM reasoning engine with conversation memory, multi-provider support (Anthropic
 
 ### 📚 SMARTS — Dynamic Knowledge
 
-Markdown files with YAML frontmatter, FTS5-indexed into SQLite. Knowledge is queried per-message to enrich the system prompt, and new insights are extracted from conversations automatically via the SmartsCurator.
+Markdown files with YAML frontmatter, FTS5-indexed into SQLite. Knowledge is queried per-message to enrich the system prompt, and new insights are extracted from conversations automatically via the SmartsCurator. Session-based TTL with boot-time pruning prevents knowledge staleness; volatile extractions (greetings, meta-commentary) are filtered out.
 `/smart list` · `/smart search <query>` · `/smart domains`
 
 ### 🌡️ Sensorium — Environmental Awareness
@@ -65,9 +65,20 @@ Markdown files with YAML frontmatter, FTS5-indexed into SQLite. Knowledge is que
 Dual-cadence polling (30s fast / 5min slow) gathers machine stats, Docker containers, git status, open ports, and installed runtimes. Alert hysteresis fires on state transitions, not every tick. A compact context block is injected into every system prompt so Friday always knows her environment.
 `/env status` · `/env cpu` · `/env memory` · `/env docker` · `/env git`
 
-### 📁 Filesystem Module — Hands On the Keyboard
+### 📁 Modules — Hands On the Keyboard
 
-Read, write, list, delete files and execute shell commands — Friday's first real module. Paged file reading for large files, clearance-gated execution, and full audit logging.
+Seven operational modules give Friday real-world capabilities, all with clearance gates, audit logging, and shared input validation (path traversal, SSRF, flag injection protection):
+
+- **Filesystem** — Read, write, list, delete files with paged reading for large files
+- **Git** — Status, diff, log, branch, stash, push, pull with flag injection protection
+- **Docker** — Container listing, logs, inspect, stats, exec with command injection guards
+- **Code Exec** — Sandboxed script execution with timeout enforcement
+- **Web Fetch** — HTTP requests with SSRF protection (private IP blocking)
+- **Notify** — Multi-channel notification dispatch (terminal, Slack, webhook)
+
+### 🧩 Deja Vu — Conversational Memory Recall
+
+Friday remembers past conversations. The `recall_memory` tool provides FTS5 search across conversation history — search by keyword to find relevant past sessions, then recall the full transcript. Conversations are auto-indexed on save with stale session pruning.
 
 ### 🔨 The Forge — Self-Improvement
 
@@ -80,7 +91,7 @@ Typed events (`file:changed`, `test:failed`, `session:start`) flow through the b
 
 ### 🖥️ TUI — Terminal Interface
 
-Full interactive terminal UI built with OpenTUI (React for CLI). Features an MCU-inspired splash screen with chafa-rendered logo art, a shimmer-animated header, chat area with syntax-highlighted responses, command typeahead with `/` suggestions, and a thinking indicator with braille spinner. State machine manages boot phases: splash → fading → booting → active → shutting-down.
+Full interactive terminal UI built with OpenTUI (React for CLI). Features an MCU-inspired splash screen with chafa-rendered logo art, a shimmer-animated header, chat area with syntax-highlighted responses, command typeahead with `/` suggestions, thinking indicator with braille spinner, and mouse-enabled text selection with auto-copy. State machine manages boot phases: splash → fading → booting → active → shutting-down.
 `bun run start chat`
 
 ### 🌐 Web UI — Browser Interface
@@ -118,6 +129,7 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 | Sensor suite | **Sensorium** | Environmental awareness — machine, Docker, dev tools |
 | The workshop | **Forge** | Self-improvement — Friday authors and patches her own modules |
 | Heads-up display | **TUI** | Interactive terminal interface — boot splash, shimmer header, chat |
+| "I remember when..." | **Deja Vu** | Conversational memory recall — FTS5 search across past sessions |
 
 ---
 
@@ -128,7 +140,7 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 ```
 SignalBus → ClearanceManager → AuditLogger → NotificationManager
   → ProtocolRegistry → DirectiveStore/Engine → Memory → SmartsStore
-  → Sensorium → Cortex → Module Discovery → Forge Module Discovery
+  → Sensorium → Cortex → Recall Tool → Module Discovery → Forge Module Discovery
 ```
 
 ### Process Loop
@@ -156,7 +168,7 @@ User Input
 
 - **SignalBus** (`src/core/events.ts`) — Typed event system. Signals like `file:changed`, `test:failed`, and `session:start` flow through the bus, triggering directives and module behavior.
 
-- **Modules** (`src/modules/`) — Discoverable capability bundles. Each module declares tools, protocols, knowledge, signal triggers, and required clearances. Auto-loaded from the filesystem at boot. First module: **Filesystem** (read, write, list, delete, exec).
+- **Modules** (`src/modules/`) — Discoverable capability bundles. Each module declares tools, protocols, knowledge, signal triggers, and required clearances. Auto-loaded from the filesystem at boot. Seven modules: **Filesystem** (read, write, list, delete, exec), **Git** (status, diff, log, branch, stash), **Docker** (ps, logs, inspect, stats, exec), **Code Exec** (sandboxed scripting), **Web Fetch** (HTTP with SSRF protection), **Notify** (multi-channel dispatch), and **Forge** (self-improvement). Shared validation in `validation.ts` guards against path traversal, SSRF, and flag injection.
 
 - **Protocols** (`src/protocols/registry.ts`) — Slash-command routing with alias support. Input starting with `/` is dispatched directly to the matching handler.
 
@@ -164,7 +176,7 @@ User Input
 
 - **Clearance** (`src/core/clearance.ts`) — Permission gates. Every tool call and directive execution is checked against granted clearances.
 
-- **Memory** (`src/core/memory.ts`) — SQLite-backed persistence via `bun:sqlite`. Namespaced KV store, conversation history, and FTS5 full-text search. Modules get scoped memory instances.
+- **Memory** (`src/core/memory.ts`) — SQLite-backed persistence via `bun:sqlite`. Namespaced KV store, conversation history, FTS5 full-text search, and conversation indexing for Deja Vu recall. Modules get scoped memory instances.
 
 - **Audit** (`src/audit/logger.ts`) — Action tracking with source, action type, detail, success/failure, and metadata.
 
@@ -175,6 +187,8 @@ User Input
 - **TUI** (`src/cli/tui/`) — OpenTUI-based terminal interface. React component tree rendered to the terminal: FridayApp root manages lifecycle phases (splash → fading → booting → active → shutting-down), Header renders a shimmer-animated title, ChatArea displays messages with syntax highlighting, InputBar provides command typeahead, and Splash shows a chafa-rendered logo with fade animation.
 
 - **History** (`src/history/protocol.ts`) — Conversation persistence. Sessions are saved to SQLite on shutdown and can be browsed or resumed via the `/history` protocol.
+
+- **Recall (Deja Vu)** (`src/core/recall-tool.ts`) — Conversational memory search. The `recall_memory` tool provides `search` (FTS5 keyword search across conversation summaries) and `recall` (full transcript retrieval by session ID). Conversations are auto-indexed on save with pruning.
 
 ---
 
@@ -312,7 +326,7 @@ Bun loads `.env` automatically — no dotenv needed.
 
 ```bash
 bun run dev              # Auto-restart on file changes
-bun test                 # Run all tests (469 tests across 49 files)
+bun test                 # Run all tests (646 tests across 57 files)
 bun test --watch         # Watch mode
 bun test tests/unit/cortex.test.ts  # Single test file
 bun run lint             # Lint check
@@ -347,7 +361,8 @@ src/
 │   ├── runtime.ts         # Boot/shutdown orchestrator
 │   ├── events.ts          # SignalBus — typed event system
 │   ├── clearance.ts       # Permission gates
-│   ├── memory.ts          # SQLite persistence and FTS5 search
+│   ├── memory.ts          # SQLite persistence, FTS5 search, conversation indexing
+│   ├── recall-tool.ts     # recall_memory tool — conversation memory search (Deja Vu)
 │   ├── notifications.ts   # Multi-channel notification system
 │   ├── types.ts           # Core TypeScript interfaces
 │   └── prompts.ts         # Friday's personality
@@ -355,7 +370,13 @@ src/
 ├── modules/
 │   ├── types.ts           # FridayModule, FridayTool interfaces
 │   ├── loader.ts          # Module discovery and validation
+│   ├── validation.ts      # Shared input validation (path traversal, SSRF, flag injection)
 │   ├── filesystem/        # Read, write, list, delete, exec tools
+│   ├── git/               # Git operations (status, diff, log, branch, stash, push, pull)
+│   ├── docker/            # Docker management (ps, logs, inspect, stats, exec)
+│   ├── code-exec/         # Sandboxed script execution
+│   ├── web-fetch/         # HTTP requests with SSRF protection
+│   ├── notify/            # Multi-channel notification dispatch
 │   └── forge/             # The Forge — self-improvement system
 ├── protocols/             # Protocol registry and routing
 ├── directives/            # Autonomous rule engine
@@ -388,7 +409,7 @@ web/                       # React web UI (Vite + Tailwind)
 │   └── index.css          # Tailwind theme (Friday amber palette)
 tests/
 ├── helpers/               # Shared test stubs
-├── unit/                  # 469 tests across 49 files
+├── unit/                  # 646 tests across 57 files
 └── integration/           # Integration tests — future
 ```
 
