@@ -5,6 +5,8 @@ import { unlink, mkdir, writeFile, rm } from "node:fs/promises";
 
 const TEST_DB = "/tmp/friday-test-smarts.db";
 const TEST_SMARTS_DIR = "/tmp/friday-test-smarts";
+const SESSION_TEST_DB = "/tmp/friday-test-smarts-session.db";
+const SESSION_TEST_DIR = "/tmp/friday-test-smarts-session";
 
 const SECURITY_SMART = `---
 name: security-basics
@@ -301,5 +303,191 @@ This was added by hand.`;
       (r) => (r.metadata as { name?: string })?.name === "security-basics",
     );
     expect(securityResults).toHaveLength(1);
+  });
+
+  describe("session-based TTL", () => {
+    test("increments session counter on each initialize", async () => {
+      // Use isolated DB/dir to avoid interference from shared beforeEach
+      await mkdir(SESSION_TEST_DIR, { recursive: true });
+
+      const store1 = new SmartsStore();
+      const mem1 = new SQLiteMemory(SESSION_TEST_DB);
+      await store1.initialize(
+        { smartsDir: SESSION_TEST_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },
+        mem1,
+      );
+      expect(store1.currentSession).toBe(1);
+      mem1.close();
+
+      const store2 = new SmartsStore();
+      const mem2 = new SQLiteMemory(SESSION_TEST_DB);
+      await store2.initialize(
+        { smartsDir: SESSION_TEST_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },
+        mem2,
+      );
+      expect(store2.currentSession).toBe(2);
+      mem2.close();
+
+      await Promise.allSettled([
+        unlink(SESSION_TEST_DB),
+        unlink(`${SESSION_TEST_DB}-wal`),
+        unlink(`${SESSION_TEST_DB}-shm`),
+        rm(SESSION_TEST_DIR, { recursive: true }),
+      ]);
+    });
+
+    test("stamps legacy entries with current session on first boot", async () => {
+      await writeFile(`${TEST_SMARTS_DIR}/legacy.md`, `---
+name: legacy-entry
+domain: test
+tags: [test]
+confidence: 0.7
+source: conversation
+created: 2026-02-22
+updated: 2026-02-22
+---
+
+Legacy content.`);
+
+      const freshStore = new SmartsStore();
+      await freshStore.initialize(
+        { smartsDir: TEST_SMARTS_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },
+        memory,
+      );
+
+      const entry = await freshStore.getByName("legacy-entry");
+      expect(entry).toBeDefined();
+      expect(entry!.sessionId).toBe(freshStore.currentSession);
+    });
+
+    test("prunes expired conversation entries on boot", async () => {
+      await writeFile(`${TEST_SMARTS_DIR}/old-entry.md`, `---
+name: old-entry
+domain: test
+tags: [test]
+confidence: 0.7
+source: conversation
+session_id: 1
+created: 2026-02-22
+updated: 2026-02-22
+---
+
+Old content.`);
+
+      // Set counter to 9 so initialize increments to 10 (age = 10 - 1 = 9 > 5)
+      await memory.set("smarts", "session-counter", 9);
+
+      const freshStore = new SmartsStore();
+      await freshStore.initialize(
+        { smartsDir: TEST_SMARTS_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },
+        memory,
+      );
+
+      expect(freshStore.currentSession).toBe(10);
+      const entry = await freshStore.getByName("old-entry");
+      expect(entry).toBeUndefined();
+      expect(await Bun.file(`${TEST_SMARTS_DIR}/old-entry.md`).exists()).toBe(false);
+    });
+
+    test("does NOT prune manual entries regardless of age", async () => {
+      await writeFile(`${TEST_SMARTS_DIR}/manual-entry.md`, `---
+name: manual-entry
+domain: test
+tags: [test]
+confidence: 0.9
+source: manual
+session_id: 1
+created: 2026-02-22
+updated: 2026-02-22
+---
+
+Manual content that should persist forever.`);
+
+      await memory.set("smarts", "session-counter", 99);
+
+      const freshStore = new SmartsStore();
+      await freshStore.initialize(
+        { smartsDir: TEST_SMARTS_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },
+        memory,
+      );
+
+      const entry = await freshStore.getByName("manual-entry");
+      expect(entry).toBeDefined();
+      expect(entry!.content).toContain("persist forever");
+    });
+
+    test("does NOT prune entries within TTL window", async () => {
+      await writeFile(`${TEST_SMARTS_DIR}/fresh-entry.md`, `---
+name: fresh-entry
+domain: test
+tags: [test]
+confidence: 0.7
+source: conversation
+session_id: 8
+created: 2026-02-22
+updated: 2026-02-22
+---
+
+Fresh content.`);
+
+      await memory.set("smarts", "session-counter", 9);
+
+      const freshStore = new SmartsStore();
+      await freshStore.initialize(
+        { smartsDir: TEST_SMARTS_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },
+        memory,
+      );
+
+      expect(freshStore.currentSession).toBe(10);
+      const entry = await freshStore.getByName("fresh-entry");
+      expect(entry).toBeDefined();
+    });
+
+    test("create() stamps entry with current session", async () => {
+      await store.initialize(
+        { smartsDir: TEST_SMARTS_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },
+        memory,
+      );
+
+      await store.create({
+        name: "new-entry",
+        domain: "test",
+        tags: ["test"],
+        confidence: 0.7,
+        source: "conversation",
+        content: "New content.",
+      });
+
+      const entry = await store.getByName("new-entry");
+      expect(entry!.sessionId).toBe(store.currentSession);
+    });
+
+    test("update() refreshes sessionId to current session", async () => {
+      // Set counter to 4 so currentSession becomes 5 — distinct from sessionId: 1
+      await memory.set("smarts", "session-counter", 4);
+
+      const freshStore = new SmartsStore();
+      await freshStore.initialize(
+        { smartsDir: TEST_SMARTS_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },
+        memory,
+      );
+      expect(freshStore.currentSession).toBe(5);
+
+      await freshStore.create({
+        name: "update-me",
+        domain: "test",
+        tags: ["test"],
+        confidence: 0.7,
+        source: "conversation",
+        sessionId: 1,
+        content: "Original.",
+      });
+
+      await freshStore.update("update-me", "Updated content.");
+
+      const entry = await freshStore.getByName("update-me");
+      expect(entry!.sessionId).toBe(5);
+      expect(entry!.content).toContain("Updated content");
+    });
   });
 });

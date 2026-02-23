@@ -6,6 +6,7 @@ export interface SmartEntry {
   tags: string[];
   confidence: number;
   source: SmartSource;
+  sessionId?: number;
   content: string;
   filePath: string;
 }
