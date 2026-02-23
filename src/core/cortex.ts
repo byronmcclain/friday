@@ -10,7 +10,7 @@ import type { ToolDefinition } from "../providers/types.ts";
 import type { FridayTool } from "../modules/types.ts";
 import type { ClearanceManager } from "./clearance.ts";
 import type { SmartsStore } from "../smarts/store.ts";
-import type { Sensorium } from "../sensorium/sensorium.ts";
+import { type Sensorium, formatDateTime } from "../sensorium/sensorium.ts";
 import type { AuditLogger } from "../audit/logger.ts";
 import type { SignalBus, SignalEmitter } from "./events.ts";
 import type { ScopedMemory } from "./memory.ts";
@@ -274,12 +274,15 @@ export class Cortex {
       }
     }
 
-    // Sensorium environment context
+    // Sensorium environment context (includes date/time)
     if (this.sensorium) {
       const envBlock = this.sensorium.getContextBlock();
       if (envBlock) {
         prompt = `${prompt}\n\n## Environment\n\n${envBlock}`;
       }
+    } else {
+      // Fallback: always provide date/time even without Sensorium
+      prompt = `${prompt}\n\n## Current Time\n\n${formatDateTime()}`;
     }
 
     return prompt;

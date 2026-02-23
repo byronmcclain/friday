@@ -18,7 +18,6 @@ export function InputBar(props: InputBarProps) {
 			borderColor={PALETTE.copperAccent}
 			backgroundColor={PALETTE.background}
 			paddingLeft={2}
-			paddingBottom={1}
 		>
 			<CommandTypeahead {...props} />
 		</box>

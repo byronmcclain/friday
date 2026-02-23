@@ -108,6 +108,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 
 				const providerLabel = runtime.cortex.providerName;
 				const modelLabel = runtime.cortex.modelName;
+				const toolCount = runtime.cortex.availableTools.length;
 				dispatch({
 					type: "set-welcome",
 					info: { provider: providerLabel, model: modelLabel },
@@ -116,7 +117,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 					type: "add-message",
 					message: createMessage(
 						"system",
-						`Friday online. (${providerLabel}: ${modelLabel})`,
+						`Friday online. (${providerLabel}: ${modelLabel}, ${toolCount} tools)`,
 					),
 				});
 				setBootComplete(true);

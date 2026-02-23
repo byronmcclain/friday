@@ -155,8 +155,10 @@ describe("Cortex — SMARTS integration", () => {
   test("works without smartsStore (backwards compatible)", async () => {
     const cortex = new Cortex({ injectedProvider: capturingProvider });
     await cortex.chat("Hello");
-    expect(capturedPrompt).toBe(SYSTEM_PROMPT);
+    expect(capturedPrompt).toContain(SYSTEM_PROMPT);
     expect(capturedPrompt).not.toContain("Active Knowledge");
+    // Without sensorium, falls back to a standalone Current Time section
+    expect(capturedPrompt).toContain("## Current Time");
   });
 
   test("pinned SMARTS are always included", async () => {

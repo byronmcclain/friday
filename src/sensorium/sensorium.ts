@@ -10,6 +10,29 @@ import {
 } from "./sensors.ts";
 import { formatBytes } from "./format.ts";
 
+/**
+ * Formats the current date/time as a compact string with both local and UTC.
+ * e.g. "Sun Feb 23 2026 3:45 PM CST (21:45 UTC)"
+ */
+export function formatDateTime(now = new Date()): string {
+	const local = now.toLocaleString("en-US", {
+		weekday: "short",
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+		hour: "numeric",
+		minute: "2-digit",
+		timeZoneName: "short",
+	});
+	const utcTime = now.toLocaleString("en-US", {
+		hour: "numeric",
+		minute: "2-digit",
+		hour12: false,
+		timeZone: "UTC",
+	});
+	return `${local} (${utcTime} UTC)`;
+}
+
 export interface SensoriumOptions {
 	config: SensorConfig;
 	signals: SignalBus;
@@ -233,6 +256,7 @@ export class Sensorium {
 				: 0;
 
 		const parts: string[] = [
+			formatDateTime(),
 			`${s.machine.osVersion} ${s.machine.arch}`,
 			`${s.machine.cpus.count} cores @ ${s.machine.cpus.usage}%`,
 			`${memUsed}/${memTotal} RAM (${memPercent}%)`,
