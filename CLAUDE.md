@@ -103,7 +103,7 @@ smarts/                    # Runtime-generated knowledge files (gitignored, user
 forge/                     # Friday-authored modules (gitignored, AI-generated)
 tests/
 ├── helpers/               # Shared test stubs (stubProvider, grokStub)
-├── unit/                  # Unit tests (bun:test) — 469 tests across 49 files
+├── unit/                  # Unit tests (bun:test) — 642 tests across 57 files
 └── integration/           # Integration tests — future
 ```
 
@@ -127,7 +127,7 @@ tests/
 
 ## Testing
 
-- 469 tests across 49 files (as of 2026-02-22)
+- 642 tests across 57 files (as of 2026-02-23)
 - Runtime/Cortex tests use `injectedProvider` (stub `LLMProvider`) to avoid needing `ANTHROPIC_API_KEY`
 - Shared test stubs live in `tests/helpers/stubs.ts` — import `stubProvider`/`grokStub` instead of defining inline
 - SQLite tests must clean up WAL files: unlink `db`, `db-wal`, and `db-shm` in afterEach
