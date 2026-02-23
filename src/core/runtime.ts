@@ -23,6 +23,7 @@ import { createEnvironmentTool } from "../sensorium/tool.ts";
 import { SENSORIUM_DEFAULTS } from "../sensorium/types.ts";
 import { createForgeProtocol } from "../modules/forge/protocol.ts";
 import type { ForgeHealthReport } from "../modules/forge/types.ts";
+import { createRecallTool } from "./recall-tool.ts";
 import { mkdir } from "node:fs/promises";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
@@ -155,6 +156,20 @@ export class FridayRuntime {
 				this._protocols.register(createHistoryProtocol(this._memory));
 			}
 
+			// Backfill conversation FTS5 index (one-time migration)
+			if (this._memory) {
+				const backfillDone = await this._memory.get<boolean>("conversations", "backfill-done");
+				if (!backfillDone) {
+					const sessions = await this._memory.getConversationHistory(500);
+					for (const session of sessions) {
+						if (session.summary) {
+							await this._memory.indexConversation(session);
+						}
+					}
+					await this._memory.set("conversations", "backfill-done", true);
+				}
+			}
+
 			if (config.smartsDir) {
 				await mkdir(config.smartsDir, { recursive: true });
 				const dbPath = `${config.smartsDir}/.smarts-index.db`;
@@ -201,6 +216,11 @@ export class FridayRuntime {
 			// Register sensorium tool on Cortex (needs Cortex to exist)
 			if (this._sensorium) {
 				this._cortex.registerTool(createEnvironmentTool(this._sensorium));
+			}
+
+			// Register recall tool for conversation memory search
+			if (this._memory) {
+				this._cortex.registerTool(createRecallTool(this._memory));
 			}
 
 			if (this._smarts) {

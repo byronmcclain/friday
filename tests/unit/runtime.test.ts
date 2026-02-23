@@ -321,6 +321,15 @@ describe("FridayRuntime — conversation persistence", () => {
 		await runtime2.shutdown();
 	});
 
+	test("recall_memory tool is registered when dataDir is provided", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider, dataDir });
+		const recallTool = runtime.cortex.availableTools.find((t) => t.name === "recall_memory");
+		expect(recallTool).toBeDefined();
+		expect(recallTool!.name).toBe("recall_memory");
+		await runtime.shutdown();
+	});
+
 	test("shutdown reports conversation step via onProgress", async () => {
 		const runtime = new FridayRuntime();
 		await runtime.boot({ injectedProvider: stubProvider, dataDir });
