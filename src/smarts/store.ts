@@ -1,16 +1,23 @@
 import type { SmartEntry, SmartsConfig } from "./types.ts";
 import { parseFrontmatter, serializeSmartFile } from "./parser.ts";
 import type { SQLiteMemory } from "../core/memory.ts";
-import { mkdir } from "node:fs/promises";
+import { mkdir, unlink } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const SMARTS_NAMESPACE = "smarts";
 
 export class SmartsStore {
+  private static readonly MAX_SESSION_AGE = 5;
+
   private entries = new Map<string, SmartEntry>();
   private embeddingIds = new Map<string, string>();
   private config!: SmartsConfig;
   private memory!: SQLiteMemory;
+  private _currentSession = 0;
+
+  get currentSession(): number {
+    return this._currentSession;
+  }
 
   async initialize(config: SmartsConfig, memory: SQLiteMemory): Promise<void> {
     this.config = config;
@@ -20,8 +27,16 @@ export class SmartsStore {
 
     const dir = resolve(config.smartsDir);
     await mkdir(dir, { recursive: true });
-    await this.memory.purgeNamespace(SMARTS_NAMESPACE);
 
+    // Increment session counter
+    const prev = await this.memory.get<number>("smarts", "session-counter") ?? 0;
+    this._currentSession = prev + 1;
+    await this.memory.set("smarts", "session-counter", this._currentSession);
+
+    // Prune expired entries before indexing
+    await this.pruneExpired(dir);
+
+    await this.memory.purgeNamespace(SMARTS_NAMESPACE);
     await this.scanAndIndex(dir);
   }
 
@@ -58,6 +73,35 @@ export class SmartsStore {
       const { entry } = parsed[i]!;
       this.entries.set(entry.name, entry);
       this.embeddingIds.set(entry.name, ids[i]!);
+    }
+  }
+
+  private async pruneExpired(dir: string): Promise<void> {
+    const glob = new Bun.Glob("*.md");
+    for await (const match of glob.scan({ cwd: dir, onlyFiles: true })) {
+      const filePath = `${dir}/${match}`;
+      try {
+        const raw = await Bun.file(filePath).text();
+        const parsed = parseFrontmatter(raw);
+        if (!parsed) continue;
+
+        // Manual entries never expire
+        if (parsed.source === "manual") continue;
+
+        if (parsed.sessionId === undefined) {
+          // Legacy entry — stamp with current session (migration)
+          const stamped = serializeSmartFile({ ...parsed, sessionId: this._currentSession });
+          await Bun.write(filePath, stamped);
+          continue;
+        }
+
+        // Prune if expired
+        if (this._currentSession - parsed.sessionId > SmartsStore.MAX_SESSION_AGE) {
+          await unlink(filePath);
+        }
+      } catch {
+        // Skip files that can't be read or parsed
+      }
     }
   }
 
