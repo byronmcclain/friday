@@ -108,16 +108,6 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 		const runtime = new FridayRuntime();
 		runtimeRef.current = runtime;
 
-		// Wire audit log callback to LogStore (before boot to capture boot-time entries)
-		runtime.audit.onLog = (entry: AuditEntry) => {
-			pushLog(
-				entry.success ? "success" : "error",
-				"audit",
-				entry.action,
-				entry.detail,
-			);
-		};
-
 		(async () => {
 			// Process logo during splash phase, sized to fit the terminal.
 			// Reserve rows for: ascii-font title (6) + gaps (2) + subtitle (2) + margin (4)
@@ -142,6 +132,16 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			pushLog("info", "runtime", "Booting Friday...");
 			try {
 				await runtime.boot(bootConfig());
+
+				// Wire audit log callback to LogStore (after boot so _audit exists)
+				runtime.audit.onLog = (entry: AuditEntry) => {
+					pushLog(
+						entry.success ? "success" : "error",
+						"audit",
+						entry.action,
+						entry.detail,
+					);
+				};
 
 				// Wire TuiChannel for toast notifications
 				const notifications = runtime.notifications;
