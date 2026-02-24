@@ -53,65 +53,532 @@ Friday greets you and enters an interactive session. Type natural language to co
 
 ### 🧠 Cortex — The Brain
 
-LLM reasoning engine with conversation memory, multi-provider support (Anthropic Claude, xAI Grok), and an agentic tool loop. Modules register tools that Cortex executes in parallel with clearance gates, looping until the LLM is satisfied. Conversation history persists across sessions via SQLite.
+Cortex is Friday's LLM reasoning engine — the central intelligence that processes every non-protocol message. It manages conversation history, delegates to LLM providers (Anthropic Claude or xAI Grok), and runs an **agentic tool loop** that executes tools in parallel until the LLM is satisfied with its response.
+
+Every message Friday receives triggers a sophisticated pipeline: the system prompt is dynamically enriched with pinned SMARTS knowledge, FTS5-matched knowledge relevant to the current message, and a compact Sensorium environment context block — all before the LLM ever sees it. This means Friday's responses are always informed by what she's learned and what's happening on the machine.
+
+Friday uses a **dual-model architecture**: a reasoning model (e.g., Claude Sonnet, Grok) handles conversations, while a fast model (e.g., Claude Haiku) handles utility tasks like summarization and knowledge extraction.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as Cortex
+    participant S as SMARTS
+    participant E as Sensorium
+    participant LLM as LLM Provider
+    participant T as Tools
+
+    U->>C: User message
+    C->>S: Query pinned + FTS5 match
+    S-->>C: Relevant knowledge entries
+    C->>E: getContextBlock()
+    E-->>C: CPU, memory, Docker, git summary
+    C->>C: Build enriched system prompt
+    C->>LLM: System prompt + conversation history + tool definitions
+
+    loop Agentic Tool Loop (max 10 iterations)
+        LLM-->>C: tool_use response (1..N tool calls)
+        C->>C: Check clearance for each tool
+        C->>T: Execute ALL tool calls in parallel
+        T-->>C: Tool results
+        C->>LLM: Tool results + continue reasoning
+    end
+
+    LLM-->>C: Final text response
+    C-->>U: Response
+```
+
+**Error recovery** is built into the loop: if the LLM fails *before* any tools run, Cortex rolls back the conversation history to its pre-call state. If tools have already executed (with side effects), the partial conversation state is preserved to maintain consistency.
+
+| Feature | Detail |
+|---|---|
+| Parallel tool execution | All tool calls in a single LLM response execute via `Promise.all()` |
+| Clearance gates | Every tool call checks `ClearanceManager.checkAll()` before execution |
+| Max iteration guard | Configurable cap (default 10) prevents runaway tool loops |
+| Prompt enrichment | SMARTS knowledge + Sensorium context injected per-message |
+| Dual-model | Reasoning model for chat, fast model for summarization & extraction |
+
+---
 
 ### 📚 SMARTS — Dynamic Knowledge
 
-Markdown files with YAML frontmatter, FTS5-indexed into SQLite. Knowledge is queried per-message to enrich the system prompt, and new insights are extracted from conversations automatically via the SmartsCurator. Session-based TTL with boot-time pruning prevents knowledge staleness; volatile extractions (greetings, meta-commentary) are filtered out.
-`/smart list` · `/smart search <query>` · `/smart domains`
+SMARTS (Smart Memory And Runtime Training System) is how Friday **learns from conversations and carries that knowledge forward**. It's not static documentation — it's a living knowledge base that grows, self-curates, and decays gracefully.
+
+Knowledge entries are markdown files with YAML frontmatter, indexed into SQLite via FTS5 full-text search. Each entry carries a domain, tags, confidence score, source attribution, and a session ID for staleness tracking. On every message, Cortex queries SMARTS for relevant knowledge and injects it into the system prompt — so Friday genuinely *knows* things she learned last Tuesday.
+
+```mermaid
+flowchart TB
+    subgraph Runtime ["During Conversation"]
+        A[User sends message] --> B[Cortex.buildSystemPrompt]
+        B --> C{SMARTS query}
+        C --> D[Pinned entries always included]
+        C --> E[FTS5 search matches user message]
+        D --> F[Inject into system prompt]
+        E --> F
+        F --> G[LLM sees enriched context]
+    end
+
+    subgraph Shutdown ["On Session Shutdown"]
+        H[Conversation ends] --> I[SmartsCurator receives history]
+        I --> J[Fast model extracts knowledge]
+        J --> K{Durability test}
+        K -->|Lost-if-forgotten?| L{Stable over time?}
+        L -->|Non-obvious?| M{Volatile filter}
+        M -->|Pass| N[Confidence capped at 0.7]
+        N --> O[FTS5 index in SQLite]
+        K -->|Fail| P[Discard]
+        L -->|Fail| P
+        M -->|Fail| P
+    end
+
+    subgraph Boot ["On Next Boot"]
+        Q[SmartsStore.pruneStale] --> R{Session TTL check}
+        R -->|Expired| S[Remove from FTS5 + SQLite]
+        R -->|Active| T[Available for queries]
+    end
+
+    O --> Q
+```
+
+The **SmartsCurator** applies a strict three-gate durability test before accepting any extraction:
+
+1. **Lost-if-forgotten** — Can't be rediscovered from source code, CLAUDE.md, or docs
+2. **Stable over time** — Will still be accurate 10+ sessions from now
+3. **Non-obvious** — A senior developer wouldn't independently arrive at this insight
+
+Volatile content (system stats, tool counts, port listings, test counts) is filtered via regex patterns before it ever reaches the store. Confidence is hard-capped at 0.7 for auto-extracted knowledge — only human-authored or human-verified entries can score higher.
+
+`/smart list` · `/smart search <query>` · `/smart domains` · `/smart show <name>`
+
+---
 
 ### 🌡️ Sensorium — Environmental Awareness
 
-Dual-cadence polling (30s fast / 5min slow) gathers machine stats, Docker containers, git status, open ports, and installed runtimes. Alert hysteresis fires on state transitions, not every tick. A compact context block is injected into every system prompt so Friday always knows her environment.
-`/env status` · `/env cpu` · `/env memory` · `/env docker` · `/env git`
+Sensorium is Friday's **sensory nervous system** — she always knows what machine she's running on, what's happening with resources, which Docker containers are up, and what the git state looks like. This context is injected into every system prompt so Friday can make informed decisions without being asked.
 
-### 📁 Modules — Hands On the Keyboard
+The system uses **dual-cadence polling** to balance freshness with efficiency: fast-changing metrics poll every 30 seconds, while slow-changing state polls every 5 minutes.
 
-Seven operational modules give Friday real-world capabilities, all with clearance gates, audit logging, and shared input validation (path traversal, SSRF, flag injection protection):
+```mermaid
+flowchart LR
+    subgraph Fast ["Fast Cadence (30s)"]
+        FC1[CPU usage]
+        FC2[Memory usage]
+        FC3[System load]
+    end
 
-- **Filesystem** — Read, write, list, delete files with paged reading for large files
-- **Git** — Status, diff, log, branch, stash, push, pull with flag injection protection
-- **Docker** — Container listing, logs, inspect, stats, exec with command injection guards
-- **Code Exec** — Sandboxed script execution with timeout enforcement
-- **Web Fetch** — HTTP requests with SSRF protection (private IP blocking)
-- **Notify** — Multi-channel notification dispatch (terminal, Slack, webhook)
+    subgraph Slow ["Slow Cadence (5min)"]
+        SC1[Docker containers]
+        SC2[Git status]
+        SC3[Open ports]
+        SC4[Installed runtimes]
+    end
+
+    Fast --> SNAP[SystemSnapshot]
+    Slow --> SNAP
+    SNAP --> CTX[getContextBlock]
+    CTX --> SYS[Injected into every system prompt]
+    SNAP --> ALERT[evaluateAlerts]
+```
+
+Alerts use **hysteresis** — they fire on *state transitions*, not on every poll tick. This means you get one `custom:env-memory-high` signal when memory crosses the threshold, not a flood every 30 seconds. CPU alerts additionally require **two consecutive high readings** to filter out momentary spikes.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Normal
+    Normal --> High : memPercent >= memoryHigh
+    Normal --> Critical : memPercent >= memoryCritical
+    High --> Critical : memPercent >= memoryCritical
+    High --> Normal : memPercent drops below memoryHigh
+    Critical --> Normal : memPercent drops below memoryHigh
+
+    note right of High : Emits custom env-memory-high
+    note right of Critical : Emits custom env-memory-critical
+```
+
+CPU alerts additionally require **two consecutive high readings** to filter out momentary spikes:
+
+```mermaid
+stateDiagram-v2
+    [*] --> CpuNormal
+    CpuNormal --> CpuCounting : usage >= cpuHigh
+    CpuCounting --> CpuHigh : 2nd consecutive high reading
+    CpuHigh --> CpuNormal : usage drops below cpuHigh
+    CpuCounting --> CpuNormal : usage drops below cpuHigh
+
+    note right of CpuHigh : Emits custom env-cpu-high
+```
+
+When a state transition occurs, Sensorium emits a typed signal on the SignalBus *and* dispatches a notification through the NotificationManager — both the reactive and the alerting systems are triggered simultaneously.
+
+| Sensor | Source | Cadence | Signals |
+|---|---|---|---|
+| CPU usage | `node:os` cpus delta | 30s | `custom:env-cpu-high` |
+| Memory | `node:os` freemem/totalmem | 30s | `custom:env-memory-high`, `custom:env-memory-critical` |
+| Docker | `Bun.$` docker ps | 5min | `custom:env-container-down` |
+| Git | `Bun.$` git status | 5min | -- |
+| Ports | `Bun.$` lsof | 5min | -- |
+
+`/env status` · `/env cpu` · `/env memory` · `/env docker` · `/env git` · `/env ports`
+
+---
+
+### 📁 Modules — Capabilities
+
+Modules are Friday's **hands on the keyboard** — each one bundles tools, protocols, knowledge, signal triggers, and clearance requirements into a discoverable unit. They're auto-loaded from the filesystem at boot, validated against the manifest contract, and given scoped memory instances for persistent state.
+
+```mermaid
+flowchart TB
+    subgraph Module ["FridayModule Anatomy"]
+        direction TB
+        M[Module Manifest] --> TOOLS[Tools: executable actions]
+        M --> PROTO[Protocols: slash commands]
+        M --> KNOW[Knowledge: static entries]
+        M --> TRIG[Triggers: signal subscriptions]
+        M --> CLEAR[Clearance: required permissions]
+        M --> LC[Lifecycle: onLoad / onUnload]
+    end
+
+    subgraph Validation ["Shared Validation Layer"]
+        V1[Path traversal guard]
+        V2[SSRF protection: private IP blocking]
+        V3[Flag injection detection: rejects args starting with dash]
+        V4[Protocol allowlist: http/https only]
+        V5[Integer coercion: prevents type confusion from LLM args]
+    end
+
+    TOOLS --> Validation
+```
+
+Seven operational modules ship with Friday:
+
+| Module | Tools | Clearance | Security |
+|---|---|---|---|
+| **Filesystem** | read, write, list, delete, exec | `read-fs`, `write-fs`, `delete-fs`, `exec-shell` | Path traversal guard |
+| **Git** | status, diff, log, branch, stash, push, pull | `git-read`, `git-write` | Flag injection protection |
+| **Docker** | ps, logs, inspect, stats, exec | `exec-shell` | Command injection guards |
+| **Code Exec** | run (sandboxed script execution) | `exec-shell` | Timeout enforcement |
+| **Web Fetch** | fetch (HTTP requests) | `network` | SSRF protection (private IP blocking) |
+| **Notify** | send (multi-channel dispatch) | -- | Channel validation |
+| **Forge** | propose, apply, validate, restart, status | `provider`, `write-fs`, `read-fs`, `exec-shell`, `system`, `forge-modify` | Core module protection |
+
+Every tool call flows through the same pipeline: Cortex receives a `tool_use` from the LLM → checks clearance via `ClearanceManager.checkAll()` → calls `tool.execute()` with a `ToolContext` (working directory, audit logger, signal emitter, scoped memory) → returns the result to the LLM.
+
+---
 
 ### 🧩 Deja Vu — Conversational Memory Recall
 
-Friday remembers past conversations. The `recall_memory` tool provides FTS5 search across conversation history — search by keyword to find relevant past sessions, then recall the full transcript. Conversations are auto-indexed on save with stale session pruning.
+Deja Vu gives Friday **long-term conversational memory**. She doesn't just remember the current session — she can search across all past conversations, find when something was discussed, and pull up the full transcript. The `recall_memory` tool is registered in Cortex at boot, so the LLM can autonomously decide to search its memory when a user references something from a prior session.
+
+```mermaid
+flowchart TB
+    subgraph Save ["Session Save (shutdown)"]
+        A[Conversation ends] --> B[ConversationSummarizer]
+        B --> C[Fast model generates 1-3 sentence summary]
+        C --> D[Save to SQLite conversations table]
+        D --> E[memory.indexConversation]
+        E --> F[Summary indexed into FTS5]
+    end
+
+    subgraph Search ["recall_memory: search mode"]
+        G[LLM calls recall_memory] --> H{mode?}
+        H -->|search| I[FTS5 query across summaries]
+        I --> J[Returns: session IDs + dates + snippets]
+    end
+
+    subgraph Recall ["recall_memory: recall mode"]
+        H -->|recall| K[Retrieve by session ID]
+        K --> L[Full message transcript]
+        L --> M[Truncated to 50 msgs / 8KB max]
+    end
+
+    subgraph Maintenance ["Automatic Maintenance"]
+        N[Boot] --> O[Prune deleted sessions from FTS5 index]
+    end
+
+    F --> I
+```
+
+The two-step flow is intentional: **search** finds relevant sessions cheaply (just FTS5 over summaries), then **recall** retrieves the full transcript only for the sessions that matter. This keeps token usage low while giving Friday genuine long-term memory.
+
+---
 
 ### 🔨 The Forge — Self-Improvement
 
-Friday can write her own modules. The Forge system lets her propose new capabilities, validate them (import test, typecheck, lint), and gracefully restart to load them — all with human approval at every step. Failed modules don't crash the runtime; errors are reported back so Friday can iterate on fixes.
+The Forge is Friday's **workshop** — where she can author entirely new modules, patch existing forge-authored modules, validate them through a multi-stage pipeline, and gracefully restart to load the changes. Every step requires human approval, and core modules (filesystem, the Forge itself) are protected from modification.
+
+```mermaid
+flowchart TB
+    A[Friday proposes new module] --> B[forge_propose tool]
+    B --> C[Write module to forge/ directory]
+    C --> D[forge_validate tool]
+
+    subgraph Validation ["Multi-Stage Validation"]
+        D --> V1[Import test: can Bun load it?]
+        V1 --> V2[Manifest check: valid FridayModule?]
+        V2 --> V3[TypeScript typecheck: tsc --noEmit]
+        V3 --> V4[Lint check: Biome]
+    end
+
+    V4 -->|All pass| E{Human approval}
+    V4 -->|Any fail| F[Errors reported back to Friday]
+    F --> G[Friday iterates on fixes]
+    G --> D
+
+    E -->|Approved| H[forge_apply tool]
+    H --> I[forge_restart tool]
+    I --> J[Graceful runtime restart]
+    J --> K[New module loaded at next boot]
+
+    E -->|Denied| L[Module shelved]
+
+    style Validation fill:#1a1a2e,stroke:#e2b340
+```
+
+Key safety properties:
+- **Failed modules don't crash boot** — if a forge module fails to load, the error is captured and reported through `forge_status`, but the rest of the runtime continues normally
+- **Core protection** — the filesystem module and the Forge module itself cannot be modified via the Forge
+- **Human-in-the-loop** — every apply step requires explicit approval
+- **Iterative** — when validation fails, errors flow back to Friday so she can fix and retry
+
 `/forge list` · `/forge status <name>` · `/forge history <name>` · `/forge protect <name>`
+
+---
 
 ### ⚡ SignalBus — Reactive Nervous System
 
-Typed events (`file:changed`, `test:failed`, `session:start`) flow through the bus, triggering directives and module behavior. Supports custom signals via `custom:*`.
+The SignalBus is the **connective tissue** that makes Friday feel alive rather than scripted. It's a typed, async, in-process event emitter — 65 lines of code that enable the entire autonomous behavior layer. Subsystems emit signals without knowing who's listening; consumers subscribe without knowing who emits.
+
+```mermaid
+flowchart TB
+    subgraph Producers ["Signal Producers"]
+        RT[FridayRuntime]
+        SN[Sensorium]
+        AR[Arc Rhythm]
+    end
+
+    subgraph Bus ["SignalBus"]
+        direction TB
+        SB[/"Signal Name -> Handler Set"/]
+    end
+
+    subgraph Consumers ["Signal Consumers"]
+        DE[DirectiveEngine]
+        MOD[Modules via triggers]
+    end
+
+    RT -->|"session:start, session:end, command:post-execute"| SB
+    SN -->|"custom:env-memory-high, custom:env-cpu-high, custom:env-container-down"| SB
+    AR -->|"custom:arc-rhythm-executed, custom:arc-rhythm-failed, custom:arc-rhythm-paused"| SB
+    SB --> DE
+    SB --> MOD
+
+    DE --> CL{Clearance check}
+    CL -->|Granted| ACT[Execute directive action]
+    CL -->|Denied| AUD[Audit log: blocked]
+```
+
+The `SignalName` type uses a **template literal union** — 10 well-known signals (`file:changed`, `test:failed`, `session:start`, etc.) plus a `custom:${string}` catch-all. Any subsystem can mint new signal types at runtime without touching the type definition.
+
+**Design properties:**
+- **Error isolation** — each handler runs in its own try/catch. One broken handler can't take down the bus or prevent others from firing
+- **Sequential execution** — handlers are awaited in order, preventing race conditions between directive actions and audit logging
+- **Dynamic subscriptions** — the DirectiveEngine syncs its subscriptions whenever the DirectiveStore changes, automatically subscribing to signals needed by new directives
+
+The DirectiveEngine is the primary consumer. It watches the DirectiveStore for enabled directives, subscribes to exactly the signals they need, and when a signal fires: finds matching directives → checks clearance → executes the action → logs to audit → increments execution count. **No subsystem imports another.** The bus carries the signal, the engine matches it, the action fires.
+
+---
 
 ### 🖥️ TUI — Terminal Interface
 
-Full interactive terminal UI built with OpenTUI (React for CLI). Features an MCU-inspired splash screen with chafa-rendered logo art, a shimmer-animated header, chat area with syntax-highlighted responses, command typeahead with `/` suggestions, thinking indicator with braille spinner, and mouse-enabled text selection with auto-copy. State machine manages boot phases: splash → fading → booting → active → shutting-down.
+The TUI is Friday's primary interactive interface — a full terminal UI built with **OpenTUI** (React for CLI). It's not a readline prompt — it's a React component tree rendered to the terminal with managed state, animations, and mouse support.
+
+```mermaid
+stateDiagram-v2
+    [*] --> splash : App launches
+    splash --> fading : Logo rendered via chafa
+    fading --> booting : Fade animation complete
+    booting --> active : FridayRuntime.boot() resolves
+    active --> shutting_down : User types exit/quit/bye
+    shutting_down --> [*] : Runtime.shutdown() complete
+
+    state splash {
+        [*] --> ChafaRender : Convert logo to ANSI art
+        ChafaRender --> ColorLerp : Apply amber palette fade
+    }
+
+    state active {
+        [*] --> Idle
+        Idle --> Thinking : User sends message
+        Thinking --> Idle : Response received
+        Idle --> Typeahead : User types /
+    }
+```
+
+```mermaid
+flowchart TB
+    subgraph ComponentTree ["Component Tree"]
+        APP[FridayApp: lifecycle, boot, runtime] --> HDR[Header: shimmer animation, 60ms tick]
+        APP --> CHAT[ChatArea: message list + thinking indicator]
+        APP --> INPUT[InputBar: text input + command typeahead]
+        APP --> SPLASH[Splash: chafa logo + fade animation]
+
+        CHAT --> MSG[Message: role-colored, syntax highlighted]
+        CHAT --> THINK[Thinking: braille spinner animation]
+        INPUT --> TA[CommandTypeahead: /command suggestions]
+    end
+
+    subgraph Bridge ["Notification Bridge"]
+        NM[NotificationManager] --> TC[TuiChannel]
+        TC --> TOAST["@opentui-ui/toast"]
+    end
+```
+
+Key UX features:
+- **Splash screen** — chafa CLI converts the logo image to ANSI art, then a color-lerp fade animation transitions to the boot phase
+- **Shimmer header** — a traveling highlight animation across the "F.R.I.D.A.Y." title (60ms tick, 4s pause cycle)
+- **Command typeahead** — typing `/` shows a filtered list of available protocols
+- **Mouse text selection** — click and drag to select text, auto-copied to clipboard
+- **State machine** — the `appReducer` manages phases (splash → fading → booting → active → shutting-down) with clear transitions, no ambiguous intermediate states
+
 `bun run start chat`
+
+---
 
 ### 🌐 Web UI — Browser Interface
 
-React-based web frontend (Vite + Tailwind) with real-time WebSocket connection to the Friday server. Features chat with markdown rendering, slash-command typeahead, collapsible sidebar with conversation history, SMARTS browser, notification panel, and a live Sensorium status bar.
+The Web UI provides a full browser-based interface to Friday over WebSocket. The React frontend (Vite + Tailwind) connects to a `Bun.serve()` backend that routes messages through the same `FridayRuntime` as the TUI — same Cortex, same modules, same knowledge.
+
+```mermaid
+flowchart LR
+    subgraph Browser ["React Frontend (Vite + Tailwind)"]
+        CHAT[Chat interface]
+        SIDE[Sidebar: history, SMARTS browser]
+        SENSOR[Sensorium status bar]
+        NOTIF[Notification panel]
+    end
+
+    subgraph Server ["Bun.serve() Backend"]
+        WS[WebSocketHandler]
+        RT[FridayRuntime]
+    end
+
+    Browser <-->|"WebSocket (bidirectional)"| WS
+    WS -->|"chat, protocol, history, smarts"| RT
+    RT -->|"responses"| WS
+    WS -.->|"Push: sensorium:update"| SENSOR
+    WS -.->|"Push: notifications"| NOTIF
+```
+
+The WebSocket protocol supports: `session:boot`, `session:shutdown`, `chat`, `protocol`, `history:list`, `history:load`, `smarts:list`, `smarts:search`. Sensorium snapshots and notifications are pushed to connected clients in real-time via dedicated channels.
+
 `bun run serve` · `bun run web:dev`
+
+---
 
 ### ⏱️ Arc Rhythm — Autonomous Scheduling
 
-Friday's heartbeat. Arc Rhythm is the autonomous scheduling subsystem — define recurring tasks with cron expressions and Friday executes them headlessly through Cortex, tool calls, or protocol dispatches. SQLite-persisted rhythms with execution history, reentrant guards, and auto-pause after 5 consecutive failures. Built-in zero-dependency cron parser with ranges, lists, steps, named days/months, and shorthands.
-`/arc list` · `/arc create "0 9 * * MON-FRI" daily standup` · `/arc history` · `/arc pause <id>`
+Arc Rhythm is Friday's **heartbeat** — the autonomous scheduling subsystem that lets her execute recurring tasks headlessly. Define a rhythm with a cron expression, and Friday will execute it through Cortex (LLM reasoning), tool calls (direct execution), or protocol dispatches (slash commands) — all persisted to SQLite with full execution history.
+
+```mermaid
+flowchart TB
+    subgraph Scheduler ["RhythmScheduler (ticks every 60s)"]
+        TICK[Tick] --> FIND[Find due rhythms]
+        FIND --> GUARD{In inflight Set?}
+        GUARD -->|Yes| SKIP[Skip: already running]
+        GUARD -->|No| ADD[Add to inflight Set]
+        ADD --> EXEC[RhythmExecutor.execute]
+    end
+
+    subgraph Executor ["RhythmExecutor: Action Dispatch"]
+        EXEC --> CL{Clearance check}
+        CL -->|Denied| FAIL1[failure: clearance denied]
+
+        CL -->|Granted| TYPE{action.type?}
+        TYPE -->|prompt| PROMPT[Cortex.chat: full LLM reasoning]
+        TYPE -->|tool| TOOL[Tool registry lookup + execute]
+        TYPE -->|protocol| PROTO[ProtocolRegistry.get + execute]
+
+        PROMPT --> RES[ExecutionResult]
+        TOOL --> RES
+        PROTO --> RES
+    end
+
+    subgraph PostExec ["Post-Execution"]
+        RES --> RECORD[Record in execution history]
+        RECORD --> NEXT[Calculate next occurrence from cron]
+        NEXT --> SIG{Status?}
+        SIG -->|success| EMIT1["Emit custom:arc-rhythm-executed"]
+        SIG -->|failure| EMIT2["Emit custom:arc-rhythm-failed"]
+        EMIT2 --> CHECK{failures >= 5?}
+        CHECK -->|Yes| PAUSE["Auto-pause + emit custom:arc-rhythm-paused"]
+        CHECK -->|No| DONE[Done]
+        EMIT1 --> DONE
+    end
+```
+
+The built-in **cron parser** is zero-dependency and supports: 5-field expressions, ranges (`1-5`), lists (`MON,WED,FRI`), steps (`*/15`), named days/months (`JAN`, `MON`), and shorthands (`@hourly`, `@daily`, `@weekly`, `@monthly`).
+
+**Dual access pattern:**
+- **Humans** use the `/arc` protocol: `/arc create "0 9 * * MON-FRI" run morning standup`
+- **Friday herself** uses the `manage_rhythm` tool — she can self-schedule recurring tasks through Cortex
+
+The **reentrant guard** (inflight `Set`) prevents a slow-running rhythm from being double-dispatched on the next tick. **Auto-pause** disables a rhythm after 5 consecutive failures and emits a signal + notification so both the directive system and the user are informed.
+
+`/arc list` · `/arc create "cron" description` · `/arc show <id>` · `/arc pause <id>` · `/arc resume <id>` · `/arc history [id]` · `/arc delete <id>` · `/arc run`
+
+---
 
 ### 💬 Conversation History
 
-Sessions persist to SQLite and can be browsed, resumed, or cleared. The `/history` protocol provides CLI access.
+Sessions persist to SQLite and form the backbone of Friday's long-term memory. Each session captures the full message transcript, provider/model used, timestamps, and an auto-generated summary.
+
+```mermaid
+flowchart LR
+    A[Session starts: boot] --> B[Messages accumulate in Cortex]
+    B --> C[Session ends: shutdown]
+    C --> D[ConversationSummarizer: fast model generates summary]
+    D --> E[Save to SQLite conversations table]
+    E --> F[Index summary into FTS5 for Deja Vu recall]
+    F --> G[Browseable via /history protocol]
+```
+
+The conversation table is capped at 500 sessions with oldest-first eviction. Summaries are generated by the **fast model** (not the reasoning model) to keep shutdown snappy.
+
 `/history list` · `/history show <id>` · `/history clear`
+
+---
 
 ### 🛡️ Clearance & Audit — Trust but Verify
 
-Every tool call and directive execution passes through permission gates. Every action is logged with source, detail, success/failure, and metadata.
+Every tool call, directive execution, and module action in Friday passes through a **permission gate** before it can execute. The ClearanceManager maintains a set of granted permissions, and every action must declare what it needs.
+
+```mermaid
+flowchart TB
+    A[Tool call / Directive fire] --> B[Declare required clearances]
+    B --> C[ClearanceManager.checkAll]
+    C --> D{All permissions granted?}
+    D -->|Yes| E[Execute action]
+    D -->|No| F[Return denial with reason]
+    E --> G[AuditLogger.log: success]
+    F --> H[AuditLogger.log: blocked]
+```
+
+**10 clearance types** control every capability boundary:
+
+| Clearance | What It Gates |
+|---|---|
+| `read-fs` | Reading files from the filesystem |
+| `write-fs` | Writing or creating files |
+| `delete-fs` | Deleting files |
+| `exec-shell` | Running shell commands |
+| `network` | Making HTTP requests |
+| `git-read` | Git read operations (status, diff, log) |
+| `git-write` | Git write operations (push, branch, stash) |
+| `provider` | Calling the LLM provider |
+| `system` | System-level operations (restart, env access) |
+| `forge-modify` | Creating or patching forge modules |
+
+The **AuditLogger** records every action with structured entries: `action` (what happened), `source` (who did it), `detail` (human-readable description), `success` (boolean), and optional `metadata` (signal name, directive ID, etc.). This creates a complete trail of everything Friday does.
 
 ---
 
@@ -141,62 +608,112 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 
 ## Architecture
 
+### System Topology
+
+How all subsystems wire together through the FridayRuntime composition root:
+
+```mermaid
+graph TB
+    RT["FridayRuntime<br/>(composition root)"]
+
+    RT --> SB["SignalBus"]
+    RT --> CL["ClearanceManager"]
+    RT --> AU["AuditLogger"]
+    RT --> NM["NotificationManager"]
+    RT --> PR["ProtocolRegistry"]
+    RT --> DS["DirectiveStore"]
+    RT --> DE["DirectiveEngine"]
+    RT --> MEM["SQLiteMemory"]
+    RT --> SM["SmartsStore"]
+    RT --> SEN["Sensorium"]
+    RT --> CX["Cortex"]
+    RT --> RC["Recall Tool"]
+    RT --> ARC["Arc Rhythm"]
+    RT --> MOD["Modules"]
+
+    DE -->|subscribes to| SB
+    DE -->|reads from| DS
+    DE -->|checks| CL
+    DE -->|logs to| AU
+
+    CX -->|queries| SM
+    CX -->|reads| SEN
+    CX -->|executes| MOD
+    CX -->|checks| CL
+    CX -->|logs to| AU
+    CX -->|emits| SB
+
+    SEN -->|emits alerts| SB
+    SEN -->|dispatches| NM
+
+    ARC -->|executes via| CX
+    ARC -->|dispatches| PR
+    ARC -->|emits results| SB
+    ARC -->|dispatches| NM
+    ARC -->|stores in| MEM
+
+    RC -->|searches| MEM
+    SM -->|indexed in| MEM
+    MOD -->|register tools in| CX
+    MOD -->|register protocols in| PR
+
+    style RT fill:#e2b340,stroke:#1a1a2e,color:#1a1a2e
+    style CX fill:#2a2a4e,stroke:#e2b340,color:#e2b340
+    style SB fill:#2a2a4e,stroke:#e2b340,color:#e2b340
+```
+
 ### Boot Sequence
 
-```
-SignalBus → ClearanceManager → AuditLogger → NotificationManager
-  → ProtocolRegistry → DirectiveStore/Engine → Memory → SmartsStore
-  → Sensorium → Cortex → Recall Tool → Arc Rhythm → Module Discovery → Forge Module Discovery
+FridayRuntime boots subsystems in strict dependency order. Each step depends on what came before:
+
+```mermaid
+flowchart LR
+    A[SignalBus] --> B[ClearanceManager]
+    B --> C[AuditLogger]
+    C --> D[NotificationManager]
+    D --> E[ProtocolRegistry]
+    E --> F["DirectiveStore +<br/>DirectiveEngine"]
+    F --> G[SQLiteMemory]
+    G --> H[SmartsStore]
+    H --> I[Sensorium]
+    I --> J[Cortex]
+    J --> K[Recall Tool]
+    K --> L["Arc Rhythm<br/>(store + executor + scheduler)"]
+    L --> M[Module Discovery]
+    M --> N[Forge Module Discovery]
+    N --> O["Emit session:start"]
 ```
 
 ### Process Loop
 
+How user input flows through the runtime:
+
+```mermaid
+sequenceDiagram
+    participant U as User Input
+    participant RT as FridayRuntime
+    participant PR as ProtocolRegistry
+    participant CX as Cortex
+    participant SB as SignalBus
+    participant DE as DirectiveEngine
+
+    U->>RT: process(input)
+
+    alt Input starts with /
+        RT->>PR: Lookup protocol handler
+        PR-->>RT: Execute handler directly
+        RT-->>U: Protocol result (no LLM involved)
+    else Natural language
+        RT->>CX: chat(input)
+        Note over CX: Build enriched system prompt<br/>(SMARTS + Sensorium)
+        Note over CX: Agentic tool loop<br/>(parallel execution, clearance gates)
+        CX-->>RT: LLM response
+    end
+
+    RT->>SB: emit("command:post-execute")
+    SB->>DE: Signal dispatched to matching directives
+    RT-->>U: Response + audit entry
 ```
-User Input
-  |-- Starts with /command?
-  |     YES → ProtocolRegistry → Execute handler → Return result
-  |     NO  → Cortex (LLM) → Reason with tools → Generate response
-  |-- Cortex enriches prompt with:
-  |     • Pinned + FTS5-matched SMARTS knowledge
-  |     • Sensorium environment context block
-  |-- Emit signal: command:post-execute
-  |-- Check directives triggered by result
-  '-- Return response + audit entry
-```
-
-### Subsystems
-
-- **Cortex** (`src/core/cortex.ts`) — The LLM brain. Owns conversation history, delegates to providers (Anthropic or Grok), runs an agentic tool loop with parallel execution and clearance gates, and enriches the system prompt with SMARTS knowledge and Sensorium context per message.
-
-- **SMARTS** (`src/smarts/`) — Dynamic knowledge system. Markdown files with YAML frontmatter are FTS5-indexed into SQLite, queried per-message to enrich prompts, and new knowledge is extracted from conversations on shutdown via SmartsCurator.
-
-- **Sensorium** (`src/sensorium/`) — Environmental awareness. Pure sensor functions gather machine stats (`node:os`), Docker containers (`Bun.$`), and dev environment (git, ports, runtimes). Dual-cadence polling with alert hysteresis injects a compact context block into the system prompt.
-
-- **SignalBus** (`src/core/events.ts`) — Typed event system. Signals like `file:changed`, `test:failed`, and `session:start` flow through the bus, triggering directives and module behavior.
-
-- **Modules** (`src/modules/`) — Discoverable capability bundles. Each module declares tools, protocols, knowledge, signal triggers, and required clearances. Auto-loaded from the filesystem at boot. Seven modules: **Filesystem** (read, write, list, delete, exec), **Git** (status, diff, log, branch, stash), **Docker** (ps, logs, inspect, stats, exec), **Code Exec** (sandboxed scripting), **Web Fetch** (HTTP with SSRF protection), **Notify** (multi-channel dispatch), and **Forge** (self-improvement). Shared validation in `validation.ts` guards against path traversal, SSRF, and flag injection.
-
-- **Protocols** (`src/protocols/registry.ts`) — Slash-command routing with alias support. Input starting with `/` is dispatched directly to the matching handler.
-
-- **Directives** (`src/directives/engine.ts`) — Autonomous rules. A directive binds a trigger (signal, schedule, pattern, or manual) to an action (tool, protocol, prompt, or sequence). The engine fires matching directives after clearance checks.
-
-- **Clearance** (`src/core/clearance.ts`) — Permission gates. Every tool call and directive execution is checked against granted clearances.
-
-- **Memory** (`src/core/memory.ts`) — SQLite-backed persistence via `bun:sqlite`. Namespaced KV store, conversation history, FTS5 full-text search, and conversation indexing for Deja Vu recall. Modules get scoped memory instances.
-
-- **Audit** (`src/audit/logger.ts`) — Action tracking with source, action type, detail, success/failure, and metadata.
-
-- **Notifications** (`src/core/notifications.ts`) — Multi-channel alerts: Terminal, Log file, Slack (webhook), and generic Webhook.
-
-- **Server** (`src/server/`) — Bun.serve() HTTP + WebSocket server. Routes WebSocket messages to FridayRuntime, pushes Sensorium updates and notifications to connected clients.
-
-- **TUI** (`src/cli/tui/`) — OpenTUI-based terminal interface. React component tree rendered to the terminal: FridayApp root manages lifecycle phases (splash → fading → booting → active → shutting-down), Header renders a shimmer-animated title, ChatArea displays messages with syntax highlighting, InputBar provides command typeahead, and Splash shows a chafa-rendered logo with fade animation.
-
-- **History** (`src/history/protocol.ts`) — Conversation persistence. Sessions are saved to SQLite on shutdown and can be browsed or resumed via the `/history` protocol.
-
-- **Recall (Deja Vu)** (`src/core/recall-tool.ts`) — Conversational memory search. The `recall_memory` tool provides `search` (FTS5 keyword search across conversation summaries) and `recall` (full transcript retrieval by session ID). Conversations are auto-indexed on save with pruning.
-
-- **Arc Rhythm** (`src/arc-rhythm/`) — Autonomous scheduling subsystem. RhythmStore persists rhythms and execution history to SQLite (shared database with Memory). RhythmScheduler ticks every 60s, dispatching due rhythms through RhythmExecutor which routes prompt/tool/protocol actions. Built-in zero-dependency cron parser. Auto-pause after 5 consecutive failures. Emits signals for execution results. `/arc` protocol for humans; `manage_rhythm` tool for LLM self-scheduling.
 
 ---
 
