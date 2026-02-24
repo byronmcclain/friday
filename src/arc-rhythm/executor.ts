@@ -62,8 +62,9 @@ export class RhythmExecutor {
 		const response = await this.cortex.chat(rhythm.action.prompt);
 		this.audit.log({
 			action: "arc-rhythm:prompt",
-			target: rhythm.id,
-			detail: `Rhythm "${rhythm.name}" prompt executed`,
+			source: "arc-rhythm",
+			detail: `Rhythm "${rhythm.name}" (${rhythm.id}) prompt executed`,
+			success: true,
 		});
 		return { status: "success", result: response };
 	}
@@ -88,8 +89,9 @@ export class RhythmExecutor {
 
 		this.audit.log({
 			action: "arc-rhythm:tool",
-			target: rhythm.id,
-			detail: `Rhythm "${rhythm.name}" tool "${toolName}" executed`,
+			source: "arc-rhythm",
+			detail: `Rhythm "${rhythm.name}" (${rhythm.id}) tool "${toolName}" executed`,
+			success: true,
 		});
 
 		return { status: "success", result: result.output };
@@ -115,8 +117,9 @@ export class RhythmExecutor {
 
 		this.audit.log({
 			action: "arc-rhythm:protocol",
-			target: rhythm.id,
-			detail: `Rhythm "${rhythm.name}" protocol "${protoName}" executed`,
+			source: "arc-rhythm",
+			detail: `Rhythm "${rhythm.name}" (${rhythm.id}) protocol "${protoName}" executed`,
+			success: true,
 		});
 
 		return { status: "success", result: result.summary };

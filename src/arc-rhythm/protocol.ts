@@ -89,7 +89,8 @@ function handleCreate(store: RhythmStore, input: string): ProtocolResult {
 		return { success: false, summary: 'Usage: /arc create "cron expression" description' };
 	}
 
-	const [, cron, description] = cronMatch;
+	const cron = cronMatch[1]!;
+	const description = cronMatch[2]!;
 	const validation = validate(cron);
 	if (!validation.valid) {
 		return { success: false, summary: `Invalid cron expression: ${validation.error}` };

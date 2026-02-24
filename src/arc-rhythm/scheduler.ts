@@ -137,8 +137,9 @@ export class RhythmScheduler {
 
 			this.audit.log({
 				action: `arc-rhythm:${result.status}`,
-				target: rhythm.id,
-				detail: `Rhythm "${rhythm.name}" ${result.status}`,
+				source: "arc-rhythm",
+				detail: `Rhythm "${rhythm.name}" (${rhythm.id}) ${result.status}`,
+				success: result.status === "success",
 			});
 		} finally {
 			this.inflight.delete(rhythmId);

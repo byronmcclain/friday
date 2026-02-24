@@ -118,9 +118,9 @@ describe("RhythmStore execution tracking", () => {
 		const exec = store.logExecution({ rhythmId: rhythm.id, startedAt: new Date(), status: "running" });
 		store.completeExecution(exec.id, "success", "All clear");
 		const history = store.getHistory(rhythm.id);
-		expect(history[0].status).toBe("success");
-		expect(history[0].result).toBe("All clear");
-		expect(history[0].completedAt).toBeDefined();
+		expect(history[0]!.status).toBe("success");
+		expect(history[0]!.result).toBe("All clear");
+		expect(history[0]!.completedAt).toBeDefined();
 	});
 
 	test("getHistory() returns executions in reverse chronological order", () => {
@@ -129,7 +129,7 @@ describe("RhythmStore execution tracking", () => {
 		store.logExecution({ rhythmId: rhythm.id, startedAt: new Date("2026-02-24T11:00:00Z"), status: "failure" });
 		const history = store.getHistory(rhythm.id);
 		expect(history.length).toBe(2);
-		expect(history[0].startedAt.getTime()).toBeGreaterThan(history[1].startedAt.getTime());
+		expect(history[0]!.startedAt.getTime()).toBeGreaterThan(history[1]!.startedAt.getTime());
 	});
 
 	test("getHistory() respects limit", () => {
@@ -187,7 +187,7 @@ describe("RhythmStore scheduling state", () => {
 		const now = new Date("2026-02-24T12:00:00Z");
 		const due = store.getDueRhythms(now);
 		expect(due.length).toBe(1);
-		expect(due[0].name).toBe("Due");
+		expect(due[0]!.name).toBe("Due");
 	});
 
 	test("remove() cascades to rhythm_executions", () => {

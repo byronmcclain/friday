@@ -102,7 +102,7 @@ describe("/arc protocol", () => {
 		);
 		expect(result.success).toBe(true);
 		expect(store.list().length).toBe(1);
-		expect(store.list()[0].cron).toBe("0 9 * * *");
+		expect(store.list()[0]!.cron).toBe("0 9 * * *");
 	});
 
 	test("create rejects invalid cron", async () => {

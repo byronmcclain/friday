@@ -81,8 +81,8 @@ describe("RhythmScheduler", () => {
 		await scheduler.tick();
 
 		const rhythms = store.list();
-		expect(rhythms[0].runCount).toBe(1);
-		expect(rhythms[0].lastResult).toBe("success");
+		expect(rhythms[0]!.runCount).toBe(1);
+		expect(rhythms[0]!.lastResult).toBe("success");
 	});
 
 	test("tick skips non-due rhythms", async () => {
@@ -101,7 +101,7 @@ describe("RhythmScheduler", () => {
 		await scheduler.tick();
 
 		const rhythms = store.list();
-		expect(rhythms[0].runCount).toBe(0);
+		expect(rhythms[0]!.runCount).toBe(0);
 	});
 
 	test("tick skips disabled rhythms", async () => {
@@ -120,7 +120,7 @@ describe("RhythmScheduler", () => {
 		await scheduler.tick();
 
 		const rhythms = store.list();
-		expect(rhythms[0].runCount).toBe(0);
+		expect(rhythms[0]!.runCount).toBe(0);
 	});
 
 	test("tick emits success signal", async () => {
@@ -236,7 +236,7 @@ describe("RhythmScheduler", () => {
 		await tickPromise;
 
 		const rhythms = store.list();
-		expect(rhythms[0].runCount).toBe(1);
+		expect(rhythms[0]!.runCount).toBe(1);
 
 		await slowScheduler.stop();
 	});

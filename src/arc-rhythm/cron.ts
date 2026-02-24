@@ -65,8 +65,8 @@ function parseField(
 
 	for (const part of resolved.split(",")) {
 		const stepMatch = part.match(/^(.+)\/(\d+)$/);
-		const step = stepMatch ? Number.parseInt(stepMatch[2], 10) : 1;
-		const range = stepMatch ? stepMatch[1] : part;
+		const step = stepMatch ? Number.parseInt(stepMatch[2]!, 10) : 1;
+		const range = stepMatch ? stepMatch[1]! : part;
 
 		if (range === "*") {
 			for (let i = spec.min; i <= spec.max; i += step) values.add(i);
@@ -75,8 +75,8 @@ function parseField(
 
 		const rangeMatch = range.match(/^(\d+)-(\d+)$/);
 		if (rangeMatch) {
-			const start = Number.parseInt(rangeMatch[1], 10);
-			const end = Number.parseInt(rangeMatch[2], 10);
+			const start = Number.parseInt(rangeMatch[1]!, 10);
+			const end = Number.parseInt(rangeMatch[2]!, 10);
 			if (start < spec.min || end > spec.max || start > end) {
 				return { error: `Range ${start}-${end} out of bounds (${spec.min}-${spec.max})` };
 			}
@@ -108,20 +108,20 @@ export function validate(expr: string): { valid: boolean; error?: string } {
 	}
 
 	for (let i = 0; i < 5; i++) {
-		const result = parseField(parts[i], FIELDS[i]);
+		const result = parseField(parts[i]!, FIELDS[i]!);
 		if ("error" in result) return { valid: false, error: result.error };
 	}
 
 	return { valid: true };
 }
 
-function parsedFields(expr: string): Set<number>[] {
+function parsedFields(expr: string): [Set<number>, Set<number>, Set<number>, Set<number>, Set<number>] {
 	const expanded = expandShorthand(expr);
 	const parts = expanded.split(/\s+/);
 	const result: Set<number>[] = [];
 
 	for (let i = 0; i < 5; i++) {
-		const parsed = parseField(parts[i], FIELDS[i]);
+		const parsed = parseField(parts[i]!, FIELDS[i]!);
 		if ("error" in parsed) throw new Error(parsed.error);
 		// Normalize day-of-week: 7 → 0 (both mean Sunday)
 		if (i === 4 && parsed.values.has(7)) {
@@ -131,7 +131,7 @@ function parsedFields(expr: string): Set<number>[] {
 		result.push(parsed.values);
 	}
 
-	return result;
+	return result as [Set<number>, Set<number>, Set<number>, Set<number>, Set<number>];
 }
 
 export function nextOccurrence(expr: string, after?: Date): Date {
@@ -150,7 +150,6 @@ export function nextOccurrence(expr: string, after?: Date): Date {
 
 	while (cursor < limit) {
 		if (!months.has(cursor.getUTCMonth() + 1)) {
-			// Advance to first day of next month
 			cursor.setUTCMonth(cursor.getUTCMonth() + 1, 1);
 			cursor.setUTCHours(0, 0, 0, 0);
 			continue;
@@ -193,7 +192,11 @@ export function describe(expr: string): string {
 
 	const expanded = expandShorthand(expr);
 	const parts = expanded.split(/\s+/);
-	const [min, hour, dom, mon, dow] = parts;
+	const min = parts[0] ?? "*";
+	const hour = parts[1] ?? "*";
+	const dom = parts[2] ?? "*";
+	const mon = parts[3] ?? "*";
+	const dow = parts[4] ?? "*";
 
 	const pieces: string[] = [];
 
@@ -202,7 +205,7 @@ export function describe(expr: string): string {
 	} else if (min !== "*" && hour !== "*") {
 		pieces.push(`At ${hour}:${min.padStart(2, "0")}`);
 	} else if (min.includes("/")) {
-		pieces.push(`Every ${min.split("/")[1]} minutes`);
+		pieces.push(`Every ${min.split("/")[1] ?? ""} minutes`);
 	} else if (min.includes(",")) {
 		pieces.push(`At minutes ${min}`);
 	} else if (min === "*" && hour === "*") {
