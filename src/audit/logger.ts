@@ -7,6 +7,8 @@ export class AuditLogger {
 	private head = 0;
 	private count = 0;
 
+	onLog?: (entry: AuditEntry) => void;
+
 	constructor() {
 		this.buffer = new Array(AuditLogger.MAX_ENTRIES);
 	}
@@ -16,6 +18,13 @@ export class AuditLogger {
 		this.buffer[this.head] = full;
 		this.head = (this.head + 1) % AuditLogger.MAX_ENTRIES;
 		if (this.count < AuditLogger.MAX_ENTRIES) this.count++;
+		if (this.onLog) {
+			try {
+				this.onLog(full);
+			} catch {
+				// Isolate callback errors from logging
+			}
+		}
 	}
 
 	entries(filter?: AuditFilter): AuditEntry[] {
