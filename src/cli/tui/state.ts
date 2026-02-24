@@ -15,6 +15,7 @@ export interface AppState {
 	messages: Message[];
 	isThinking: boolean;
 	welcomeInfo?: WelcomeInfo;
+	logPanelVisible: boolean;
 }
 
 export type AppAction =
@@ -22,12 +23,14 @@ export type AppAction =
 	| { type: "set-thinking"; value: boolean }
 	| { type: "set-phase"; phase: AppState["phase"] }
 	| { type: "set-welcome"; info: WelcomeInfo }
-	| { type: "clear-messages" };
+	| { type: "clear-messages" }
+	| { type: "toggle-log-panel" };
 
 export const initialState: AppState = {
 	phase: "splash",
 	messages: [],
 	isThinking: false,
+	logPanelVisible: false,
 };
 
 export function appReducer(state: AppState, action: AppAction): AppState {
@@ -42,6 +45,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 			return { ...state, welcomeInfo: action.info };
 		case "clear-messages":
 			return { ...state, messages: [] };
+		case "toggle-log-panel":
+			return { ...state, logPanelVisible: !state.logPanelVisible };
 	}
 }
 

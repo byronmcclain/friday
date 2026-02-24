@@ -128,3 +128,30 @@ describe("createMessage", () => {
 		expect(msg1.id).not.toBe(msg2.id);
 	});
 });
+
+describe("logPanelVisible", () => {
+	test("initialState has logPanelVisible false", () => {
+		expect(initialState.logPanelVisible).toBe(false);
+	});
+
+	test("toggle-log-panel flips false to true", () => {
+		const state = appReducer(initialState, { type: "toggle-log-panel" });
+		expect(state.logPanelVisible).toBe(true);
+	});
+
+	test("toggle-log-panel flips true back to false", () => {
+		let state = appReducer(initialState, { type: "toggle-log-panel" });
+		state = appReducer(state, { type: "toggle-log-panel" });
+		expect(state.logPanelVisible).toBe(false);
+	});
+
+	test("toggle-log-panel does not affect other state", () => {
+		const msg = createMessage("user", "Hello");
+		let state = appReducer(initialState, { type: "add-message", message: msg });
+		state = appReducer(state, { type: "set-thinking", value: true });
+		state = appReducer(state, { type: "toggle-log-panel" });
+		expect(state.messages).toHaveLength(1);
+		expect(state.isThinking).toBe(true);
+		expect(state.logPanelVisible).toBe(true);
+	});
+});
