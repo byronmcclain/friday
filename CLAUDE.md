@@ -90,6 +90,14 @@ src/
 │   ├── sensorium.ts       # Sensorium class — polling loop, snapshot management, alert evaluation
 │   ├── protocol.ts        # /env protocol (status, cpu, memory, docker, ports, git)
 │   └── tool.ts            # getEnvironmentStatus FridayTool
+├── arc-rhythm/
+│   ├── types.ts           # Rhythm, RhythmAction, RhythmExecution, constants
+│   ├── cron.ts            # Built-in cron parser: validate, nextOccurrence, describe
+│   ├── store.ts           # RhythmStore — SQLite CRUD, execution tracking, scheduling state
+│   ├── executor.ts        # RhythmExecutor — dispatches prompt/tool/protocol actions
+│   ├── scheduler.ts       # RhythmScheduler — polling loop, reentrant guard, auto-pause
+│   ├── protocol.ts        # /arc protocol (list, show, create, pause, resume, delete, history, run)
+│   └── tool.ts            # manage_rhythm FridayTool for Cortex
 ├── history/
 │   └── protocol.ts        # /history protocol (list, show, clear) — session persistence
 ├── server/
@@ -110,13 +118,13 @@ smarts/                    # Runtime-generated knowledge files (gitignored, user
 forge/                     # Friday-authored modules (gitignored, AI-generated)
 tests/
 ├── helpers/               # Shared test stubs (stubProvider, grokStub)
-├── unit/                  # Unit tests (bun:test) — 646 tests across 57 files
+├── unit/                  # Unit tests (bun:test) — 735 tests across 65 files
 └── integration/           # Integration tests — future
 ```
 
 ### Key Design Patterns
 
-- **FridayRuntime** (`src/core/runtime.ts`) is the composition root. It boots all subsystems in order: SignalBus, ClearanceManager, AuditLogger, NotificationManager, ProtocolRegistry, DirectiveStore/Engine, Memory, SmartsStore, Sensorium, Cortex, Recall Tool, then discovers and loads Modules.
+- **FridayRuntime** (`src/core/runtime.ts`) is the composition root. It boots all subsystems in order: SignalBus, ClearanceManager, AuditLogger, NotificationManager, ProtocolRegistry, DirectiveStore/Engine, Memory, SmartsStore, Sensorium, Cortex, Recall Tool, Arc Rhythm, then discovers and loads Modules.
 - **Cortex** (`src/core/cortex.ts`) is Friday's LLM brain. It owns conversation history, delegates to providers, and exposes tool registration for modules. When a SmartsStore is provided, Cortex enriches the system prompt with pinned and FTS5-matched knowledge per message. Replaces the old FridayCore.
 - **SMARTS** (`src/smarts/`) is Friday's dynamic knowledge system. Markdown files with YAML frontmatter in `smarts/` are indexed into FTS5, queried per-message to enrich prompts, and new knowledge is extracted from conversations on shutdown via SmartsCurator. The `/smart` protocol provides manual control (list, show, search, reload).
 - **SignalBus** (`src/core/events.ts`) is the reactive nervous system. Typed signals (file:changed, test:failed, etc.) flow through here, triggering directives and module behavior.
@@ -131,13 +139,14 @@ tests/
 - **TUI** (`src/cli/tui/`) is Friday's interactive terminal interface, built with OpenTUI (React for CLI). The `chat` command delegates to `launchTui()` which renders a React component tree: Header (shimmer animation), ChatArea (messages + thinking indicator), InputBar (command typeahead). State is managed via a reducer with phases: `splash → fading → booting → active → shutting-down`. TuiChannel bridges NotificationManager into TUI toasts. The splash screen uses chafa to convert the logo image to ANSI art with a fade animation. Mouse-enabled text selection with auto-copy to clipboard.
 - **History** (`src/history/protocol.ts`) provides the `/history` protocol (aliases: `/hist`) for browsing, viewing, and clearing past conversation sessions stored in SQLite.
 - **Recall (Deja Vu)** (`src/core/recall-tool.ts`) is Friday's conversational memory search. The `recall_memory` tool provides two modes: `search` (FTS5 keyword search across conversation summaries, returns session IDs + dates + snippets) and `recall` (retrieves full message transcript for a session). Conversations are auto-indexed on save via `memory.indexConversation()` with pruning of deleted sessions. Wired into Cortex as a registered tool at boot.
+- **Arc Rhythm** (`src/arc-rhythm/`) is Friday's autonomous scheduling subsystem — her heartbeat. RhythmStore persists rhythms and execution history to SQLite (shared database with Memory). RhythmScheduler ticks every 60s, finds due rhythms, and dispatches them through RhythmExecutor which routes prompt/tool/protocol actions through Cortex, the tool registry, or the ProtocolRegistry respectively. Auto-pause disables rhythms after 5 consecutive failures. Emits signals (`custom:arc-rhythm-executed`, `custom:arc-rhythm-failed`, `custom:arc-rhythm-paused`). The `/arc` protocol provides human CLI access; `manage_rhythm` tool provides LLM access. Built-in zero-dependency cron parser supports 5-field expressions, ranges, lists, steps, named days/months, and shorthands (@hourly, @daily, @weekly, @monthly).
 - **Operational Modules** — Beyond the filesystem module, Friday has 5 additional modules: **git** (status, diff, log, branch, stash, push, pull), **docker** (ps, logs, inspect, stats, exec), **code-exec** (sandboxed script execution), **web-fetch** (HTTP with SSRF protection), and **notify** (multi-channel dispatch). All use shared validation from `src/modules/validation.ts` for path traversal, SSRF, and flag injection protection.
 - **SMARTS Staleness Prevention** — SMARTS entries carry a `sessionId` field. On boot, `SmartsStore.pruneStale()` removes entries whose session hasn't been seen within a TTL window. The SmartsCurator filters volatile extractions (greetings, meta-commentary) and stamps `sessionId` on create/update for TTL renewal.
 - **Prompts** live in `src/core/prompts.ts` as exported constants. Friday's personality is defined here — keep it consistent when modifying. The system prompt includes current date/time injection and recall_memory tool usage guidance.
 
 ## Testing
 
-- 646 tests across 57 files (as of 2026-02-23)
+- 735 tests across 65 files (as of 2026-02-24)
 - Runtime/Cortex tests use `injectedProvider` (stub `LLMProvider`) to avoid needing `ANTHROPIC_API_KEY`
 - Shared test stubs live in `tests/helpers/stubs.ts` — import `stubProvider`/`grokStub` instead of defining inline
 - SQLite tests must clean up WAL files: unlink `db`, `db-wal`, and `db-shm` in afterEach
@@ -193,7 +202,8 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 - SMARTS staleness prevention: `docs/plans/2026-02-22-smarts-staleness-prevention-design.md`
 - TUI text selection & copy: `docs/plans/2026-02-22-tui-text-selection-copy-design.md`
 - Conversational memory recall (Deja Vu): `docs/plans/2026-02-23-conversational-memory-recall-design.md`
-- MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall
+- Arc Rhythm scheduling: `docs/plans/2026-02-24-arc-rhythm-scheduling-design.md`
+- MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler
 
 ## Worktrees
 
