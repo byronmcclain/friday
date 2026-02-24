@@ -45,6 +45,10 @@ export class SQLiteMemory {
     this.migrate();
   }
 
+  get database(): Database {
+    return this.db;
+  }
+
   private migrate(): void {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS kv (

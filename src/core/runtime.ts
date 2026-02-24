@@ -24,6 +24,11 @@ import { SENSORIUM_DEFAULTS } from "../sensorium/types.ts";
 import { createForgeProtocol } from "../modules/forge/protocol.ts";
 import type { ForgeHealthReport } from "../modules/forge/types.ts";
 import { createRecallTool } from "./recall-tool.ts";
+import { RhythmStore } from "../arc-rhythm/store.ts";
+import { RhythmExecutor } from "../arc-rhythm/executor.ts";
+import { RhythmScheduler } from "../arc-rhythm/scheduler.ts";
+import { createArcProtocol } from "../arc-rhythm/protocol.ts";
+import { createManageRhythmTool } from "../arc-rhythm/tool.ts";
 import { mkdir } from "node:fs/promises";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
@@ -41,7 +46,7 @@ export interface ProcessResult {
 	source: "protocol" | "cortex";
 }
 
-export type ShutdownStep = "sensorium" | "conversation" | "knowledge" | "modules" | "cleanup";
+export type ShutdownStep = "arc-rhythm" | "sensorium" | "conversation" | "knowledge" | "modules" | "cleanup";
 
 export class FridayRuntime {
 	private _cortex!: Cortex;
@@ -59,6 +64,8 @@ export class FridayRuntime {
 	private _summarizer?: ConversationSummarizer;
 	private _sensorium?: Sensorium;
 	private _memory?: SQLiteMemory;
+	private _rhythmStore?: RhythmStore;
+	private _rhythmScheduler?: RhythmScheduler;
 	private _fastModel!: string;
 	private _sessionId?: string;
 	private _sessionStartedAt?: Date;
@@ -223,6 +230,27 @@ export class FridayRuntime {
 				this._cortex.registerTool(createRecallTool(this._memory));
 			}
 
+			// Arc Rhythm — after Cortex and recall tool, before modules
+			if (this._memory) {
+				this._rhythmStore = new RhythmStore(this._memory.database);
+				const rhythmExecutor = new RhythmExecutor({
+					cortex: this._cortex,
+					protocols: this._protocols,
+					clearance: this._clearance,
+					audit: this._audit,
+				});
+				this._rhythmScheduler = new RhythmScheduler({
+					store: this._rhythmStore,
+					executor: rhythmExecutor,
+					signals: this._signals,
+					notifications: this._notifications,
+					audit: this._audit,
+				});
+				this._protocols.register(createArcProtocol(this._rhythmStore, this._rhythmScheduler));
+				this._cortex.registerTool(createManageRhythmTool(this._rhythmStore));
+				this._rhythmScheduler.start();
+			}
+
 			if (this._smarts) {
 				this._curator = new SmartsCurator(this._smarts, this._cortex.llmProvider, this._fastModel);
 			}
@@ -295,6 +323,13 @@ export class FridayRuntime {
 			this._modules = [];
 			try { this._directiveEngine?.stop(); } catch { /* best-effort */ }
 			try {
+				if (this._rhythmScheduler) {
+					this._rhythmScheduler.stop();
+					this._rhythmScheduler = undefined;
+					this._rhythmStore = undefined;
+				}
+			} catch { /* best-effort */ }
+			try {
 				if (this._sensorium) {
 					this._sensorium.stop();
 					this._sensorium = undefined;
@@ -358,6 +393,18 @@ export class FridayRuntime {
 			return;
 		}
 		this._booted = false;
+
+		// Stop Arc Rhythm scheduler before other cleanup
+		try {
+			if (this._rhythmScheduler) {
+				onProgress?.("arc-rhythm", "Stopping Arc Rhythm scheduler...");
+				await this._rhythmScheduler.stop();
+				this._rhythmScheduler = undefined;
+				this._rhythmStore = undefined;
+			}
+		} catch (err) {
+			console.warn("Arc Rhythm shutdown failed:", err instanceof Error ? err.message : err);
+		}
 
 		// Stop sensorium polling before cleanup
 		try {
