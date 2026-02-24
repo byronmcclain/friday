@@ -16,7 +16,7 @@ TUI-first. Module-driven. Built to think, remember, and adapt.
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tests](https://img.shields.io/badge/tests-646%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-735%20passing-brightgreen)]()
 [![Biome](https://img.shields.io/badge/lint-Biome-60a5fa?logo=biome)](https://biomejs.dev)
 
 <br />
@@ -99,6 +99,11 @@ Full interactive terminal UI built with OpenTUI (React for CLI). Features an MCU
 React-based web frontend (Vite + Tailwind) with real-time WebSocket connection to the Friday server. Features chat with markdown rendering, slash-command typeahead, collapsible sidebar with conversation history, SMARTS browser, notification panel, and a live Sensorium status bar.
 `bun run serve` · `bun run web:dev`
 
+### ⏱️ Arc Rhythm — Autonomous Scheduling
+
+Friday's heartbeat. Arc Rhythm is the autonomous scheduling subsystem — define recurring tasks with cron expressions and Friday executes them headlessly through Cortex, tool calls, or protocol dispatches. SQLite-persisted rhythms with execution history, reentrant guards, and auto-pause after 5 consecutive failures. Built-in zero-dependency cron parser with ranges, lists, steps, named days/months, and shorthands.
+`/arc list` · `/arc create "0 9 * * MON-FRI" daily standup` · `/arc history` · `/arc pause <id>`
+
 ### 💬 Conversation History
 
 Sessions persist to SQLite and can be browsed, resumed, or cleared. The `/history` protocol provides CLI access.
@@ -130,6 +135,7 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 | The workshop | **Forge** | Self-improvement — Friday authors and patches her own modules |
 | Heads-up display | **TUI** | Interactive terminal interface — boot splash, shimmer header, chat |
 | "I remember when..." | **Deja Vu** | Conversational memory recall — FTS5 search across past sessions |
+| Heartbeat / scheduler | **Arc Rhythm** | Autonomous scheduled task execution — cron-driven, headless |
 
 ---
 
@@ -140,7 +146,7 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 ```
 SignalBus → ClearanceManager → AuditLogger → NotificationManager
   → ProtocolRegistry → DirectiveStore/Engine → Memory → SmartsStore
-  → Sensorium → Cortex → Recall Tool → Module Discovery → Forge Module Discovery
+  → Sensorium → Cortex → Recall Tool → Arc Rhythm → Module Discovery → Forge Module Discovery
 ```
 
 ### Process Loop
@@ -190,6 +196,8 @@ User Input
 
 - **Recall (Deja Vu)** (`src/core/recall-tool.ts`) — Conversational memory search. The `recall_memory` tool provides `search` (FTS5 keyword search across conversation summaries) and `recall` (full transcript retrieval by session ID). Conversations are auto-indexed on save with pruning.
 
+- **Arc Rhythm** (`src/arc-rhythm/`) — Autonomous scheduling subsystem. RhythmStore persists rhythms and execution history to SQLite (shared database with Memory). RhythmScheduler ticks every 60s, dispatching due rhythms through RhythmExecutor which routes prompt/tool/protocol actions. Built-in zero-dependency cron parser. Auto-pause after 5 consecutive failures. Emits signals for execution results. `/arc` protocol for humans; `manage_rhythm` tool for LLM self-scheduling.
+
 ---
 
 ## CLI Usage
@@ -234,6 +242,13 @@ bun run serve
 | `/forge status <name>` | Detailed health of a forge module |
 | `/forge history <name>` | Version history of a forge module |
 | `/forge protect <name>` | Mark a forge module as immutable |
+| `/arc list` | List all scheduled rhythms |
+| `/arc create "cron" desc` | Create a new scheduled rhythm |
+| `/arc show <id>` | Detailed view of a rhythm |
+| `/arc pause <id>` / `resume` | Pause or resume a rhythm |
+| `/arc history [id]` | View execution history |
+| `/arc delete <id>` | Remove a rhythm |
+| `/arc run` | Trigger a manual scheduler tick |
 | `exit`, `quit`, `bye` | Ends the session |
 
 ### Provider Defaults
@@ -326,7 +341,7 @@ Bun loads `.env` automatically — no dotenv needed.
 
 ```bash
 bun run dev              # Auto-restart on file changes
-bun test                 # Run all tests (646 tests across 57 files)
+bun test                 # Run all tests (735 tests across 65 files)
 bun test --watch         # Watch mode
 bun test tests/unit/cortex.test.ts  # Single test file
 bun run lint             # Lint check
@@ -392,6 +407,14 @@ src/
 │   ├── sensorium.ts       # Polling loop, alerts, context block
 │   ├── protocol.ts        # /env protocol handler
 │   └── tool.ts            # LLM-accessible environment tool
+├── arc-rhythm/
+│   ├── types.ts           # Rhythm, RhythmAction, RhythmExecution, constants
+│   ├── cron.ts            # Built-in cron parser: validate, nextOccurrence, describe
+│   ├── store.ts           # RhythmStore — SQLite CRUD, execution tracking
+│   ├── executor.ts        # Dispatches prompt/tool/protocol actions
+│   ├── scheduler.ts       # Polling loop, reentrant guard, auto-pause
+│   ├── protocol.ts        # /arc protocol handler
+│   └── tool.ts            # manage_rhythm FridayTool for Cortex
 ├── history/
 │   └── protocol.ts        # /history protocol (list, show, clear)
 ├── server/
@@ -404,12 +427,12 @@ src/
 web/                       # React web UI (Vite + Tailwind)
 ├── src/
 │   ├── components/        # Layout, chat, sidebar, input components
-│   ├── hooks/             # useWebSocket, useChat, useSession, useSensorium, useSmarts
+│   ├── hooks/             # useWebSocket, useChat, useSession, useSensorium, useSmarts, useHistory, useNotifications
 │   ├── contexts/          # WebSocket, Chat, Session providers
 │   └── index.css          # Tailwind theme (Friday amber palette)
 tests/
 ├── helpers/               # Shared test stubs
-├── unit/                  # 646 tests across 57 files
+├── unit/                  # 735 tests across 65 files
 └── integration/           # Integration tests — future
 ```
 

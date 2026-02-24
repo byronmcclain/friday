@@ -153,6 +153,8 @@ tests/
 - `bun:sqlite` transactions: `db.transaction(() => { ... })()` — must invoke the returned function
 - `node:fs/promises` `appendFile` is an accepted exception where Bun has no native append API
 - TUI tests (`tui-*.test.ts`) cover ANSI parser, color utils, logo processor, state reducer, theme, and notification channel
+- `AuditEntry` interface requires `action`, `source`, `detail`, `success` fields — not `target` or `message`
+- Arc Rhythm tests use in-memory SQLite via `new Database(":memory:")` — no WAL cleanup needed
 
 ## Bun-Specific Rules
 
