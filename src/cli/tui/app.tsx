@@ -20,6 +20,10 @@ import {
 	type LogoData,
 } from "./lib/logo-processor.ts";
 import type { TypeaheadEntry } from "./filter-commands.ts";
+import { LogStore } from "./log-store.ts";
+import { LogPanel } from "./components/log-panel.tsx";
+import type { LogEntry } from "./log-types.ts";
+import type { AuditEntry } from "../../audit/types.ts";
 
 // Module-level renderer reference so shutdown can call destroy()
 let activeRenderer: Awaited<ReturnType<typeof createCliRenderer>> | null =
@@ -57,6 +61,20 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 	const processingRef = useRef(false);
 	const logoDataRef = useRef<LogoData | null>(null);
 	const [bootComplete, setBootComplete] = useState(false);
+	const logStoreRef = useRef(new LogStore());
+	const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
+
+	const pushLog = useCallback((level: LogEntry["level"], source: string, message: string, detail?: string) => {
+		const entry: LogEntry = {
+			id: crypto.randomUUID(),
+			timestamp: new Date(),
+			level,
+			source,
+			message,
+			detail,
+		};
+		logStoreRef.current.push(entry);
+	}, []);
 
 	const projectRoot = resolve(
 		dirname(fileURLToPath(import.meta.url)),
@@ -77,10 +95,28 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 		[options, projectRoot],
 	);
 
+	// Subscribe to LogStore changes to update React state
+	useEffect(() => {
+		const store = logStoreRef.current;
+		const cb = () => setLogEntries([...store.entries]);
+		store.subscribe(cb);
+		return () => store.unsubscribe(cb);
+	}, []);
+
 	// Boot runtime on mount
 	useEffect(() => {
 		const runtime = new FridayRuntime();
 		runtimeRef.current = runtime;
+
+		// Wire audit log callback to LogStore (before boot to capture boot-time entries)
+		runtime.audit.onLog = (entry: AuditEntry) => {
+			pushLog(
+				entry.success ? "success" : "error",
+				"audit",
+				entry.action,
+				entry.detail,
+			);
+		};
 
 		(async () => {
 			// Process logo during splash phase, sized to fit the terminal.
@@ -103,6 +139,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 				type: "add-message",
 				message: createMessage("system", "Booting Friday..."),
 			});
+			pushLog("info", "runtime", "Booting Friday...");
 			try {
 				await runtime.boot(bootConfig());
 
@@ -142,6 +179,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 					),
 				});
 				setBootComplete(true);
+				pushLog("success", "runtime", `Friday online. (${providerLabel}: ${modelLabel}, ${toolCount} tools)`);
 			} catch (error) {
 				const msg =
 					error instanceof Error
@@ -151,6 +189,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 					type: "add-message",
 					message: createMessage("system", `Boot failed: ${msg}`),
 				});
+				pushLog("error", "runtime", `Boot failed: ${msg}`);
 			}
 		})();
 	}, [bootConfig]);
@@ -161,6 +200,17 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			dispatch({ type: "set-phase", phase: "active" });
 		}
 	}, [state.phase, bootComplete]);
+
+	// Ctrl+L toggles the log panel
+	useEffect(() => {
+		const handler = (key: { ctrl: boolean; name: string }) => {
+			if (key.ctrl && key.name === "l") {
+				dispatch({ type: "toggle-log-panel" });
+			}
+		};
+		renderer.keyInput.on("keypress", handler);
+		return () => { renderer.keyInput.off("keypress", handler); };
+	}, [renderer]);
 
 	// Shutdown handler
 	const handleShutdown = useCallback(async () => {
@@ -174,11 +224,13 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 					type: "add-message",
 					message: createMessage("system", label),
 				});
+				pushLog("info", "runtime", label);
 			});
 			dispatch({
 				type: "add-message",
 				message: createMessage("system", "Shutdown complete."),
 			});
+			pushLog("success", "runtime", "Shutdown complete.");
 		} catch (error) {
 			const msg =
 				error instanceof Error ? error.message : "Unknown error";
@@ -384,6 +436,8 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 		? runtime.cortex.modelName
 		: (options.model ?? "...");
 
+	const panelWidth = Math.min(60, Math.floor(renderer.width * 0.3));
+
 	return (
 		<box
 			flexDirection="column"
@@ -394,18 +448,25 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			onMouseUp={handleMouseUp}
 		>
 			<Header provider={provider} model={model} />
-			<ChatArea
-				messages={state.messages}
-				isThinking={state.isThinking}
-				welcomeInfo={state.welcomeInfo}
-			/>
-			<InputBar
-				commands={commandsRef.current}
-				disabled={inputDisabled}
-				placeholder={placeholder}
-				onSubmit={handleSubmit}
-				onExit={handleShutdown}
-			/>
+			<box flexDirection="row" flexGrow={1}>
+				<box flexDirection="column" flexGrow={1}>
+					<ChatArea
+						messages={state.messages}
+						isThinking={state.isThinking}
+						welcomeInfo={state.welcomeInfo}
+					/>
+					<InputBar
+						commands={commandsRef.current}
+						disabled={inputDisabled}
+						placeholder={placeholder}
+						onSubmit={handleSubmit}
+						onExit={handleShutdown}
+					/>
+				</box>
+				{state.logPanelVisible && (
+					<LogPanel entries={logEntries} width={panelWidth} />
+				)}
+			</box>
 		</box>
 	);
 }
