@@ -53,14 +53,14 @@ export function LogPanel({ entries, width }: LogPanelProps) {
 			>
 				{entries.map((entry) => (
 					<text key={entry.id}>
-						<text fg={PALETTE.textMuted}>{formatTimestamp(entry.timestamp)}</text>
-						{" "}
-						<text fg={PALETTE.amberDim}>[{entry.source}]</text>
-						{" "}
-						<text fg={levelColor(entry.level)}>{levelIcon(entry.level)}</text>
-						{" "}
-						<text fg={PALETTE.textPrimary}>{entry.message}</text>
-						{entry.detail ? <text fg={PALETTE.textMuted}> — {entry.detail}</text> : null}
+						<span fg={PALETTE.textMuted}>{formatTimestamp(entry.timestamp)}</span>
+						<span>{" "}</span>
+						<span fg={PALETTE.amberDim}>{`[${entry.source}]`}</span>
+						<span>{" "}</span>
+						<span fg={levelColor(entry.level)}>{levelIcon(entry.level)}</span>
+						<span>{" "}</span>
+						<span fg={PALETTE.textPrimary}>{entry.message}</span>
+						{entry.detail ? <span fg={PALETTE.textMuted}>{` — ${entry.detail}`}</span> : null}
 					</text>
 				))}
 			</scrollbox>
