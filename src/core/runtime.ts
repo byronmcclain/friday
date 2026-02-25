@@ -31,6 +31,7 @@ import { createArcProtocol } from "../arc-rhythm/protocol.ts";
 import { createManageRhythmTool } from "../arc-rhythm/tool.ts";
 import { mkdir } from "node:fs/promises";
 import { loadGenesis, enforceGenesisPermissions } from "./genesis.ts";
+import { setProtectedPaths } from "../modules/filesystem/containment.ts";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
 	modulesDir?: string;
@@ -214,6 +215,7 @@ export class FridayRuntime {
 			if (config.genesisPath) {
 				genesisPrompt = await loadGenesis(config.genesisPath);
 				await enforceGenesisPermissions(config.genesisPath);
+				setProtectedPaths([config.genesisPath]);
 				this._audit.log({
 					action: "genesis:loaded",
 					source: "runtime",

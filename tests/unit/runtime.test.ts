@@ -613,4 +613,17 @@ describe("FridayRuntime — Genesis", () => {
 		await runtime.boot({ injectedProvider: stubProvider });
 		expect(runtime.isBooted).toBe(true);
 	});
+
+	test("sets protected paths when genesisPath is provided", async () => {
+		const { isProtectedPath } = await import(
+			"../../src/modules/filesystem/containment.ts"
+		);
+		await writeFile(TEST_GENESIS_PATH, "Custom identity");
+		runtime = new FridayRuntime();
+		await runtime.boot({
+			injectedProvider: stubProvider,
+			genesisPath: TEST_GENESIS_PATH,
+		});
+		expect(isProtectedPath(TEST_GENESIS_PATH)).toBe(true);
+	});
 });

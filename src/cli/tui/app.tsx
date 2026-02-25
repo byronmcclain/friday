@@ -6,6 +6,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { writeSync } from "node:fs";
 import { FridayRuntime } from "../../core/runtime.ts";
+import { resolveGenesisPath } from "../../core/genesis.ts";
 import type { ProviderName } from "../../core/types.ts";
 import { TuiChannel } from "./channels/tui-channel.ts";
 import { appReducer, initialState, isExitWord, createMessage } from "./state.ts";
@@ -91,6 +92,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			modulesDir: resolve(projectRoot, "src/modules"),
 			forgeDir: resolve(projectRoot, "forge"),
 			fresh: options.fresh,
+			genesisPath: resolveGenesisPath(),
 		}),
 		[options, projectRoot],
 	);
