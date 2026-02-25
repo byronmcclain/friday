@@ -126,8 +126,9 @@ function handleResume(store: RhythmStore, id: string): ProtocolResult {
 	const rhythm = store.get(id.trim());
 	if (!rhythm) return { success: false, summary: `Rhythm not found: ${id}` };
 
-	store.update(rhythm.id, { enabled: true });
-	return { success: true, summary: `Resumed rhythm "${rhythm.name}"` };
+	const next = nextOccurrence(rhythm.cron);
+	store.update(rhythm.id, { enabled: true, nextRun: next });
+	return { success: true, summary: `Resumed rhythm "${rhythm.name}" — next run: ${next.toISOString()}` };
 }
 
 function handleDelete(store: RhythmStore, id: string): ProtocolResult {
