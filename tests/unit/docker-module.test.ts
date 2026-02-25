@@ -64,6 +64,21 @@ describe("docker.ps", () => {
 	});
 });
 
+// ─── docker.run flag injection ──────────────────────────────────────
+describe("docker.run flag injection", () => {
+	test("rejects image starting with dash", async () => {
+		const result = await dockerRun.execute({ image: "--privileged" }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Invalid");
+	});
+
+	test("rejects name starting with dash", async () => {
+		const result = await dockerRun.execute({ image: "alpine", name: "--net=host" }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Invalid");
+	});
+});
+
 // ─── docker.build ───────────────────────────────────────────────────
 describe("docker.build", () => {
 	test("fails without tag parameter", async () => {
@@ -83,6 +98,12 @@ describe("docker.build", () => {
 		expect(names).toContain("context");
 		expect(names).toContain("dockerfile");
 		expect(names).toContain("buildArgs");
+	});
+
+	test("rejects tag starting with dash", async () => {
+		const result = await dockerBuild.execute({ tag: "--output=." }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Invalid");
 	});
 });
 
@@ -126,6 +147,12 @@ describe("docker.stop", () => {
 	test("declares exec-shell clearance", () => {
 		expect(dockerStop.clearance).toEqual(["exec-shell"]);
 	});
+
+	test("rejects container starting with dash", async () => {
+		const result = await dockerStop.execute({ container: "--force" }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Invalid");
+	});
 });
 
 // ─── docker.logs ────────────────────────────────────────────────────
@@ -146,5 +173,11 @@ describe("docker.logs", () => {
 		expect(names).toContain("tail");
 		expect(names).toContain("timestamps");
 		expect(names).toContain("since");
+	});
+
+	test("rejects container starting with dash", async () => {
+		const result = await dockerLogs.execute({ container: "--follow" }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("Invalid");
 	});
 });

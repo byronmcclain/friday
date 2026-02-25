@@ -1,4 +1,5 @@
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertSafeArg } from "../validation.ts";
 
 export const dockerStop: FridayTool = {
 	name: "docker.stop",
@@ -40,6 +41,9 @@ export const dockerStop: FridayTool = {
 				output: "Missing required parameter: container",
 			};
 		}
+
+		const containerCheck = assertSafeArg(container, "container");
+		if (containerCheck) return containerCheck;
 
 		try {
 			const remove = (args.remove as boolean) ?? false;

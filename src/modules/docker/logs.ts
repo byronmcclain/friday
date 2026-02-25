@@ -1,4 +1,5 @@
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertSafeArg } from "../validation.ts";
 
 const MAX_OUTPUT_BYTES = 500_000;
 
@@ -48,6 +49,9 @@ export const dockerLogs: FridayTool = {
 				output: "Missing required parameter: container",
 			};
 		}
+
+		const containerCheck = assertSafeArg(container, "container");
+		if (containerCheck) return containerCheck;
 
 		try {
 			const tail = Math.max(1, (args.tail as number) ?? 100);

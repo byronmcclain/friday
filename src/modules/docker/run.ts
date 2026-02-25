@@ -1,4 +1,5 @@
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertSafeArg } from "../validation.ts";
 
 const MAX_OUTPUT_BYTES = 500_000;
 const RUN_TIMEOUT_MS = 120_000; // 2 minutes
@@ -74,8 +75,15 @@ export const dockerRun: FridayTool = {
 			};
 		}
 
+		const imageCheck = assertSafeArg(image, "image");
+		if (imageCheck) return imageCheck;
+
 		try {
 			const name = args.name as string | undefined;
+			if (name) {
+				const nameCheck = assertSafeArg(name, "name");
+				if (nameCheck) return nameCheck;
+			}
 			const ports = (args.ports as string[]) ?? [];
 			const env = args.env as Record<string, string> | undefined;
 			const volumes = (args.volumes as string[]) ?? [];

@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertSafeArg } from "../validation.ts";
 
 const MAX_OUTPUT_BYTES = 500_000;
 const BUILD_TIMEOUT_MS = 300_000; // 5 minutes
@@ -45,6 +46,9 @@ export const dockerBuild: FridayTool = {
 		if (!tag) {
 			return { success: false, output: "Missing required parameter: tag" };
 		}
+
+		const tagCheck = assertSafeArg(tag, "tag");
+		if (tagCheck) return tagCheck;
 
 		try {
 			const buildContext = resolve(
