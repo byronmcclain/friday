@@ -242,6 +242,15 @@ This was added by hand.`;
     expect(store.all().length).toBe(countBefore);
   });
 
+  test("rejects duplicate entries that sanitize to the same filename", async () => {
+    await store.initialize(
+      { smartsDir: TEST_SMARTS_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },
+      memory,
+    );
+    await store.create({ name: "Bun Tips!", domain: "dev", tags: ["bun"], confidence: 0.8, source: "manual", content: "First" });
+    expect(store.create({ name: "Bun Tips?", domain: "dev", tags: ["bun"], confidence: 0.8, source: "manual", content: "Second" })).rejects.toThrow();
+  });
+
   test("create with duplicate name cleans up old embedding", async () => {
     await store.initialize(
       { smartsDir: TEST_SMARTS_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },

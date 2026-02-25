@@ -71,8 +71,9 @@ export class SmartsStore {
 
     for (let i = 0; i < parsed.length; i++) {
       const { entry } = parsed[i]!;
-      this.entries.set(entry.name, entry);
-      this.embeddingIds.set(entry.name, ids[i]!);
+      const key = this.sanitizeName(entry.name);
+      this.entries.set(key, entry);
+      this.embeddingIds.set(key, ids[i]!);
     }
   }
 
@@ -115,7 +116,8 @@ export class SmartsStore {
     for (const ftsResult of ftsResults) {
       const name = (ftsResult.metadata as { name?: string })?.name;
       if (!name) continue;
-      const entry = this.entries.get(name);
+      const key = this.sanitizeName(name);
+      const entry = this.entries.get(key);
       if (!entry) continue;
       if (entry.confidence < this.config.minConfidence) continue;
 
@@ -136,7 +138,8 @@ export class SmartsStore {
   }
 
   async getByName(name: string): Promise<SmartEntry | undefined> {
-    return this.entries.get(name);
+    const key = this.sanitizeName(name);
+    return this.entries.get(key);
   }
 
   private sanitizeName(name: string): string {
@@ -144,15 +147,22 @@ export class SmartsStore {
   }
 
   async create(entry: Omit<SmartEntry, "filePath">): Promise<SmartEntry> {
-    // Clean up existing entry with same name to avoid orphaned FTS5 embeddings
-    const existingEmbeddingId = this.embeddingIds.get(entry.name);
+    const safeName = this.sanitizeName(entry.name);
+    if (!safeName) throw new Error("Invalid SMART entry name");
+
+    // Check for collision: different display name but same sanitized key
+    const existing = this.entries.get(safeName);
+    if (existing && existing.name !== entry.name) {
+      throw new Error(`SMART entry name "${entry.name}" collides with existing "${existing.name}" (both sanitize to "${safeName}")`);
+    }
+
+    // Clean up existing entry with same sanitized name to avoid orphaned FTS5 embeddings
+    const existingEmbeddingId = this.embeddingIds.get(safeName);
     if (existingEmbeddingId) {
       await this.memory.forget(SMARTS_NAMESPACE, existingEmbeddingId);
     }
 
     const dir = resolve(this.config.smartsDir);
-    const safeName = this.sanitizeName(entry.name);
-    if (!safeName) throw new Error("Invalid SMART entry name");
     const filePath = `${dir}/${safeName}.md`;
     const resolvedFilePath = resolve(filePath);
     if (!resolvedFilePath.startsWith(`${dir}/`)) {
@@ -164,36 +174,37 @@ export class SmartsStore {
     await Bun.write(filePath, content);
 
     const full: SmartEntry = { ...stamped, filePath };
-    this.entries.set(entry.name, full);
+    this.entries.set(safeName, full);
 
     const embeddingId = await this.memory.embed(
       SMARTS_NAMESPACE,
       `${entry.name} ${entry.domain} ${entry.tags.join(" ")} ${entry.content}`,
       { name: entry.name },
     );
-    this.embeddingIds.set(entry.name, embeddingId);
+    this.embeddingIds.set(safeName, embeddingId);
 
     return full;
   }
 
   async update(name: string, content: string): Promise<void> {
-    const existing = this.entries.get(name);
+    const key = this.sanitizeName(name);
+    const existing = this.entries.get(key);
     if (!existing) return;
 
     const updated: SmartEntry = { ...existing, content, sessionId: this._currentSession };
     const serialized = serializeSmartFile(updated);
     await Bun.write(existing.filePath, serialized);
 
-    this.entries.set(name, updated);
+    this.entries.set(key, updated);
 
     // In-place FTS5 update: forget old embedding, embed new one
-    const oldEmbeddingId = this.embeddingIds.get(name);
+    const oldEmbeddingId = this.embeddingIds.get(key);
     if (oldEmbeddingId) {
       await this.memory.forget(SMARTS_NAMESPACE, oldEmbeddingId);
     }
     const embeddingContent = `${updated.name} ${updated.domain} ${updated.tags.join(" ")} ${updated.content}`;
-    const newId = await this.memory.embed(SMARTS_NAMESPACE, embeddingContent, { name });
-    this.embeddingIds.set(name, newId);
+    const newId = await this.memory.embed(SMARTS_NAMESPACE, embeddingContent, { name: existing.name });
+    this.embeddingIds.set(key, newId);
   }
 
   async reindex(): Promise<void> {
