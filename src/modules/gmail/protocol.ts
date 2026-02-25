@@ -3,7 +3,8 @@ import type {
 	ProtocolContext,
 	ProtocolResult,
 } from "../types.ts";
-import { getGmailClient, getGmailAuth } from "./state.ts";
+import { GmailClient } from "./client.ts";
+import { getGmailClient, getGmailAuth, setGmailClient } from "./state.ts";
 
 export const gmailProtocol: FridayProtocol = {
 	name: "gmail",
@@ -68,9 +69,16 @@ export const gmailProtocol: FridayProtocol = {
 				}
 
 				const url = auth.generateAuthUrl();
-				auth.startLocalCallback().catch(() => {
-					// Timeout or error — handled by the auth flow
-				});
+				auth.startLocalCallback()
+					.then(async (code) => {
+						await auth.exchangeCode(code);
+						const newClient = new GmailClient(auth);
+						await newClient.initialize();
+						setGmailClient(newClient);
+					})
+					.catch((err) => {
+						console.warn("[Gmail] OAuth callback failed:", err instanceof Error ? err.message : err);
+					});
 
 				return {
 					success: true,
