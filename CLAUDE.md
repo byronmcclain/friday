@@ -27,6 +27,11 @@ bun run typecheck      # TypeScript type checking (tsc --noEmit)
 bun run serve          # Start Friday web UI server (default port 3000)
 bun run web:dev        # Start Vite dev server for frontend (port 5173)
 bun run web:build      # Build frontend for production
+bun run start genesis init    # Seed GENESIS.md from built-in template
+bun run start genesis show    # Print current identity prompt
+bun run start genesis edit    # Open GENESIS.md in $EDITOR
+bun run start genesis check   # Validate file exists and permissions
+bun run start genesis path    # Print resolved file path
 ```
 
 ## Architecture
@@ -54,9 +59,10 @@ src/
 │   ├── clearance.ts       # ClearanceManager — permission gates (read-fs, exec-shell, etc.)
 │   ├── memory.ts          # SQLiteMemory — KV store, conversation history, FTS5 search, conversation indexing
 │   ├── recall-tool.ts     # recall_memory tool — FTS5 search across past conversations (Deja Vu)
+│   ├── genesis.ts         # Genesis — identity prompt loader (load/seed/check from ~/.friday/GENESIS.md)
 │   ├── notifications.ts   # NotificationManager — multi-channel alerts (terminal, log, slack, webhook)
 │   ├── types.ts           # Core types (FridayConfig, ConversationMessage, ProviderName)
-│   └── prompts.ts         # System prompts defining Friday's personality and behavior
+│   └── prompts.ts         # GENESIS_TEMPLATE — seed template for Friday's identity prompt
 ├── audit/
 │   ├── types.ts           # AuditEntry, AuditFilter interfaces
 │   └── logger.ts          # AuditLogger — action tracking with filtering
@@ -119,13 +125,13 @@ smarts/                    # Runtime-generated knowledge files (gitignored, user
 forge/                     # Friday-authored modules (gitignored, AI-generated)
 tests/
 ├── helpers/               # Shared test stubs (stubProvider, grokStub)
-├── unit/                  # Unit tests (bun:test) — 813 tests across 75 files
+├── unit/                  # Unit tests (bun:test)
 └── integration/           # Integration tests — future
 ```
 
 ### Key Design Patterns
 
-- **FridayRuntime** (`src/core/runtime.ts`) is the composition root. It boots all subsystems in order: SignalBus, ClearanceManager, AuditLogger, NotificationManager, ProtocolRegistry, DirectiveStore/Engine, Memory, SmartsStore, Sensorium, Cortex, Recall Tool, Arc Rhythm, then discovers and loads Modules.
+- **FridayRuntime** (`src/core/runtime.ts`) is the composition root. It boots all subsystems in order: SignalBus, ClearanceManager, AuditLogger, NotificationManager, ProtocolRegistry, DirectiveStore/Engine, Memory, SmartsStore, Sensorium, Genesis, Cortex, Recall Tool, Arc Rhythm, then discovers and loads Modules.
 - **Cortex** (`src/core/cortex.ts`) is Friday's LLM brain. It owns conversation history, delegates to providers, and exposes tool registration for modules. When a SmartsStore is provided, Cortex enriches the system prompt with pinned and FTS5-matched knowledge per message. Replaces the old FridayCore.
 - **SMARTS** (`src/smarts/`) is Friday's dynamic knowledge system. Markdown files with YAML frontmatter in `smarts/` are indexed into FTS5, queried per-message to enrich prompts, and new knowledge is extracted from conversations on shutdown via SmartsCurator. The `/smart` protocol provides manual control (list, show, search, reload).
 - **SignalBus** (`src/core/events.ts`) is the reactive nervous system. Typed signals (file:changed, test:failed, etc.) flow through here, triggering directives and module behavior.
@@ -144,11 +150,12 @@ tests/
 - **Operational Modules** — Beyond the filesystem module, Friday has 6 additional modules: **git** (status, diff, log, branch, stash, push, pull), **docker** (ps, logs, inspect, stats, exec), **code-exec** (sandboxed script execution), **web-fetch** (HTTP with SSRF protection), **notify** (multi-channel dispatch), and **gmail** (search, read, send, reply, modify, labels via Gmail API with OAuth 2.0). All use shared validation from `src/modules/validation.ts` for path traversal, SSRF, and flag injection protection.
 - **Gmail** (`src/modules/gmail/`) provides Friday's email identity via the Gmail API. `GmailAuth` handles OAuth 2.0 with encrypted token storage via `SecretStore` (AES-256-GCM, OS keychain). `GmailClient` wraps the googleapis SDK. Six tools for Cortex (`gmail.search`, `gmail.read`, `gmail.send`, `gmail.reply`, `gmail.modify`, `gmail.list_labels`), one `/gmail` protocol for humans (aliases: `/mail`, `/email`). Send/reply tools require `"email-send"` clearance. The `SecretStore` (`src/core/secrets.ts`) is a reusable core component.
 - **SMARTS Staleness Prevention** — SMARTS entries carry a `sessionId` field. On boot, `SmartsStore.pruneStale()` removes entries whose session hasn't been seen within a TTL window. The SmartsCurator filters volatile extractions (greetings, meta-commentary) and stamps `sessionId` on create/update for TTL renewal.
-- **Prompts** live in `src/core/prompts.ts` as exported constants. Friday's personality is defined here — keep it consistent when modifying. The system prompt includes current date/time injection and recall_memory tool usage guidance.
+- **Genesis** (`src/core/genesis.ts`) is Friday's identity prompt, loaded from `~/.friday/GENESIS.md` at boot. The file is protected: `chmod 600`, filesystem tools and Forge reject writes to it, and it lives outside the repo. The BOSS edits it via `friday genesis edit`. `GENESIS_TEMPLATE` in `src/core/prompts.ts` is the seed template used by `friday genesis init`. Override path with `FRIDAY_GENESIS_PATH` env var.
+- **Prompts** live in `src/core/prompts.ts` as exported constants. `GENESIS_TEMPLATE` is the seed template for Friday's identity — it gets written to `~/.friday/GENESIS.md` on first run. The system prompt includes current date/time injection and recall_memory tool usage guidance.
 
 ## Testing
 
-- 813 tests across 75 files (as of 2026-02-25)
+- 843 tests across 79 files (as of 2026-02-25)
 - Runtime/Cortex tests use `injectedProvider` (stub `LLMProvider`) to avoid needing `ANTHROPIC_API_KEY`
 - Shared test stubs live in `tests/helpers/stubs.ts` — import `stubProvider`/`grokStub` instead of defining inline
 - SQLite tests must clean up WAL files: unlink `db`, `db-wal`, and `db-shm` in afterEach
@@ -186,6 +193,7 @@ Optional: `ANTHROPIC_API_KEY` for Anthropic provider (`--provider anthropic`).
 Optional: `FRIDAY_REASONING_MODEL` and `FRIDAY_FAST_MODEL` to override default models (resolution: CLI flag > env var > provider default).
 Optional: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` for Gmail module (OAuth 2.0).
 Optional: `FRIDAY_SECRET_KEY` — fallback master key for SecretStore when OS keychain is unavailable.
+Optional: `FRIDAY_GENESIS_PATH` to override default `~/.friday/GENESIS.md` location.
 
 ## Docker
 
@@ -210,7 +218,8 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 - Conversational memory recall (Deja Vu): `docs/plans/2026-02-23-conversational-memory-recall-design.md`
 - Arc Rhythm scheduling: `docs/plans/2026-02-24-arc-rhythm-scheduling-design.md`
 - Gmail module design: `docs/plans/2026-02-25-gmail-module-design.md`
-- MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler
+- Genesis identity prompt design: `docs/plans/2026-02-25-genesis-identity-prompt-design.md`
+- MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler, Genesis=identity template
 
 ## Worktrees
 
@@ -223,7 +232,7 @@ Always use Context7 MCP (`resolve-library-id` then `query-docs`) to fetch up-to-
 
 ## Conventions
 
-- Friday's personality is defined in `src/core/prompts.ts` — changes there affect all interactions
+- Friday's personality is defined in `~/.friday/GENESIS.md` (loaded at boot) — seed template lives in `src/core/prompts.ts` as `GENESIS_TEMPLATE`
 - The user is a 30+ year programming veteran — Friday should match that expertise level in generated code
 - Interactive chat uses the OpenTUI-based TUI (`src/cli/tui/`) — not the legacy marked-terminal renderer
 - `renderMarkdown()` in `src/cli/render.ts` is still used by the web server, not the primary CLI chat
