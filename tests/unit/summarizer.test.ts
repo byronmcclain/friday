@@ -108,6 +108,31 @@ describe("ConversationSummarizer", () => {
 		expect(result).toBeUndefined();
 	});
 
+	test("truncates very long conversations without throwing", async () => {
+		let receivedContent = "";
+		const provider: LLMProvider = {
+			name: "truncate-check",
+			defaultModel: "tc",
+			defaultFastModel: "tc-fast",
+			chat: async (_system, messages) => {
+				const msg = messages[0];
+				receivedContent = typeof msg?.content === "string" ? msg.content : "";
+				return textResponse("Discussed many topics over a long conversation.");
+			},
+		};
+		const summarizer = new ConversationSummarizer(provider, "fast");
+		// Build a conversation with 200 messages, each ~500 chars → ~100k chars total
+		const messages: ConversationMessage[] = Array.from({ length: 200 }, (_, i) => ({
+			role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
+			content: `Message ${i}: ${"x".repeat(500)}`,
+		}));
+		const result = await summarizer.summarize(messages);
+		expect(result).toBe("Discussed many topics over a long conversation.");
+		// The conversation text sent to the provider should be truncated and include the omission marker
+		expect(receivedContent).toContain("[Earlier messages omitted]");
+		expect(receivedContent.length).toBeLessThanOrEqual(16_000 + "[Earlier messages omitted]\n\n".length);
+	});
+
 	test("returns undefined for empty text response", async () => {
 		const provider: LLMProvider = {
 			name: "empty",

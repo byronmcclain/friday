@@ -3,6 +3,7 @@ import { type ConversationMessage, getTextContent } from "./types.ts";
 import { withTimeout } from "../utils/timeout.ts";
 
 const MIN_MESSAGES_FOR_SUMMARY = 4;
+const MAX_SUMMARIZER_CHARS = 16_000;
 
 export const SUMMARY_PROMPT = `You are a conversation summarizer. Given the conversation below, write a concise 1-3 sentence summary that captures the main topic(s) and outcome(s).
 
@@ -22,9 +23,13 @@ export class ConversationSummarizer {
 		if (messages.length < MIN_MESSAGES_FOR_SUMMARY) return undefined;
 
 		try {
-			const conversationText = messages
+			let conversationText = messages
 				.map((m) => `${m.role}: ${getTextContent(m.content)}`)
 				.join("\n\n");
+
+			if (conversationText.length > MAX_SUMMARIZER_CHARS) {
+				conversationText = `[Earlier messages omitted]\n\n${conversationText.slice(-MAX_SUMMARIZER_CHARS)}`;
+			}
 
 			const response = await withTimeout(
 				this.provider.chat(
