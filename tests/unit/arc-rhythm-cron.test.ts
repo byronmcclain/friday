@@ -139,6 +139,15 @@ describe("cron parser", () => {
 			expect(next.getUTCMinutes()).toBe(30);
 			expect(next.getUTCHours()).toBe(10);
 		});
+
+		test("uses OR semantics when both DOM and DOW are non-wildcard", () => {
+			const after = new Date("2026-03-02T00:00:00Z"); // Monday
+			const next = nextOccurrence("0 9 1 * 1", after);
+			// March 2 is a Monday (DOW match), even though DOM is 2 not 1
+			// OR semantics: DOM=1 OR DOW=Monday — Monday March 2 should match
+			expect(next.getUTCDate()).toBe(2);
+			expect(next.getUTCDay()).toBe(1);
+		});
 	});
 
 	describe("describe()", () => {

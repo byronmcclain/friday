@@ -137,8 +137,9 @@ function parsedFields(expr: string): [Set<number>, Set<number>, Set<number>, Set
 export function nextOccurrence(expr: string, after?: Date): Date {
 	const [minutes, hours, daysOfMonth, months, daysOfWeek] =
 		parsedFields(expr);
-	const dowWildcard =
-		expandShorthand(expr).split(/\s+/)[4] === "*";
+	const expanded = expandShorthand(expr).split(/\s+/);
+	const dowWildcard = expanded[4] === "*";
+	const domWildcard = expanded[2] === "*";
 
 	const cursor = new Date(after ?? new Date());
 	// Start from the next minute
@@ -155,13 +156,21 @@ export function nextOccurrence(expr: string, after?: Date): Date {
 			continue;
 		}
 
-		if (!daysOfMonth.has(cursor.getUTCDate())) {
-			cursor.setUTCDate(cursor.getUTCDate() + 1);
-			cursor.setUTCHours(0, 0, 0, 0);
-			continue;
+		const domMatch = daysOfMonth.has(cursor.getUTCDate());
+		const dowMatch = daysOfWeek.has(cursor.getUTCDay());
+
+		let dayOk: boolean;
+		if (domWildcard && dowWildcard) {
+			dayOk = true;
+		} else if (domWildcard) {
+			dayOk = dowMatch;
+		} else if (dowWildcard) {
+			dayOk = domMatch;
+		} else {
+			dayOk = domMatch || dowMatch; // OR semantics per POSIX cron
 		}
 
-		if (!dowWildcard && !daysOfWeek.has(cursor.getUTCDay())) {
+		if (!dayOk) {
 			cursor.setUTCDate(cursor.getUTCDate() + 1);
 			cursor.setUTCHours(0, 0, 0, 0);
 			continue;
