@@ -70,7 +70,8 @@ src/
 │   ├── code-exec/         # Code execution module — sandboxed script runner
 │   ├── web-fetch/         # Web fetch module — HTTP requests with SSRF protection
 │   ├── notify/            # Notification module — multi-channel dispatch
-│   └── forge/             # The Forge — self-improvement system
+│   ├── forge/             # The Forge — self-improvement system
+│   └── gmail/             # Gmail module — read, search, send, reply, label, archive
 ├── protocols/
 │   ├── types.ts           # Re-exports from modules/types.ts
 │   └── registry.ts        # ProtocolRegistry — /command routing with aliases
@@ -118,7 +119,7 @@ smarts/                    # Runtime-generated knowledge files (gitignored, user
 forge/                     # Friday-authored modules (gitignored, AI-generated)
 tests/
 ├── helpers/               # Shared test stubs (stubProvider, grokStub)
-├── unit/                  # Unit tests (bun:test) — 735 tests across 65 files
+├── unit/                  # Unit tests (bun:test) — 813 tests across 75 files
 └── integration/           # Integration tests — future
 ```
 
@@ -140,13 +141,14 @@ tests/
 - **History** (`src/history/protocol.ts`) provides the `/history` protocol (aliases: `/hist`) for browsing, viewing, and clearing past conversation sessions stored in SQLite.
 - **Recall (Deja Vu)** (`src/core/recall-tool.ts`) is Friday's conversational memory search. The `recall_memory` tool provides two modes: `search` (FTS5 keyword search across conversation summaries, returns session IDs + dates + snippets) and `recall` (retrieves full message transcript for a session). Conversations are auto-indexed on save via `memory.indexConversation()` with pruning of deleted sessions. Wired into Cortex as a registered tool at boot.
 - **Arc Rhythm** (`src/arc-rhythm/`) is Friday's autonomous scheduling subsystem — her heartbeat. RhythmStore persists rhythms and execution history to SQLite (shared database with Memory). RhythmScheduler ticks every 60s, finds due rhythms, and dispatches them through RhythmExecutor which routes prompt/tool/protocol actions through Cortex, the tool registry, or the ProtocolRegistry respectively. Auto-pause disables rhythms after 5 consecutive failures. Emits signals (`custom:arc-rhythm-executed`, `custom:arc-rhythm-failed`, `custom:arc-rhythm-paused`). The `/arc` protocol provides human CLI access; `manage_rhythm` tool provides LLM access. Built-in zero-dependency cron parser supports 5-field expressions, ranges, lists, steps, named days/months, and shorthands (@hourly, @daily, @weekly, @monthly).
-- **Operational Modules** — Beyond the filesystem module, Friday has 5 additional modules: **git** (status, diff, log, branch, stash, push, pull), **docker** (ps, logs, inspect, stats, exec), **code-exec** (sandboxed script execution), **web-fetch** (HTTP with SSRF protection), and **notify** (multi-channel dispatch). All use shared validation from `src/modules/validation.ts` for path traversal, SSRF, and flag injection protection.
+- **Operational Modules** — Beyond the filesystem module, Friday has 6 additional modules: **git** (status, diff, log, branch, stash, push, pull), **docker** (ps, logs, inspect, stats, exec), **code-exec** (sandboxed script execution), **web-fetch** (HTTP with SSRF protection), **notify** (multi-channel dispatch), and **gmail** (search, read, send, reply, modify, labels via Gmail API with OAuth 2.0). All use shared validation from `src/modules/validation.ts` for path traversal, SSRF, and flag injection protection.
+- **Gmail** (`src/modules/gmail/`) provides Friday's email identity via the Gmail API. `GmailAuth` handles OAuth 2.0 with encrypted token storage via `SecretStore` (AES-256-GCM, OS keychain). `GmailClient` wraps the googleapis SDK. Six tools for Cortex (`gmail.search`, `gmail.read`, `gmail.send`, `gmail.reply`, `gmail.modify`, `gmail.list_labels`), one `/gmail` protocol for humans (aliases: `/mail`, `/email`). Send/reply tools require `"email-send"` clearance. The `SecretStore` (`src/core/secrets.ts`) is a reusable core component.
 - **SMARTS Staleness Prevention** — SMARTS entries carry a `sessionId` field. On boot, `SmartsStore.pruneStale()` removes entries whose session hasn't been seen within a TTL window. The SmartsCurator filters volatile extractions (greetings, meta-commentary) and stamps `sessionId` on create/update for TTL renewal.
 - **Prompts** live in `src/core/prompts.ts` as exported constants. Friday's personality is defined here — keep it consistent when modifying. The system prompt includes current date/time injection and recall_memory tool usage guidance.
 
 ## Testing
 
-- 735 tests across 65 files (as of 2026-02-24)
+- 813 tests across 75 files (as of 2026-02-25)
 - Runtime/Cortex tests use `injectedProvider` (stub `LLMProvider`) to avoid needing `ANTHROPIC_API_KEY`
 - Shared test stubs live in `tests/helpers/stubs.ts` — import `stubProvider`/`grokStub` instead of defining inline
 - SQLite tests must clean up WAL files: unlink `db`, `db-wal`, and `db-shm` in afterEach
@@ -182,6 +184,8 @@ Default to Bun APIs instead of Node.js equivalents or third-party packages:
 Requires `XAI_API_KEY` in `.env` for the default Grok provider. Bun loads `.env` automatically.
 Optional: `ANTHROPIC_API_KEY` for Anthropic provider (`--provider anthropic`).
 Optional: `FRIDAY_REASONING_MODEL` and `FRIDAY_FAST_MODEL` to override default models (resolution: CLI flag > env var > provider default).
+Optional: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` for Gmail module (OAuth 2.0).
+Optional: `FRIDAY_SECRET_KEY` — fallback master key for SecretStore when OS keychain is unavailable.
 
 ## Docker
 
@@ -205,6 +209,7 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 - TUI text selection & copy: `docs/plans/2026-02-22-tui-text-selection-copy-design.md`
 - Conversational memory recall (Deja Vu): `docs/plans/2026-02-23-conversational-memory-recall-design.md`
 - Arc Rhythm scheduling: `docs/plans/2026-02-24-arc-rhythm-scheduling-design.md`
+- Gmail module design: `docs/plans/2026-02-25-gmail-module-design.md`
 - MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler
 
 ## Worktrees
