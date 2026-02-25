@@ -28,6 +28,8 @@ export function parseFrontmatter(raw: string): ParsedSmart | null {
   const sessionIdRaw = fields.session_id ?? fields.sessionId;
   const sessionId = sessionIdRaw ? Number.parseInt(sessionIdRaw, 10) : undefined;
 
+  const createdAt = fields.created?.trim() || undefined;
+
   return {
     name: name.trim(),
     domain: domain.trim(),
@@ -35,6 +37,7 @@ export function parseFrontmatter(raw: string): ParsedSmart | null {
     confidence,
     source,
     ...(sessionId !== undefined && Number.isFinite(sessionId) ? { sessionId } : {}),
+    ...(createdAt ? { createdAt } : {}),
     content: body.trim(),
   };
 }
@@ -49,6 +52,7 @@ function quoteYaml(s: string): string {
 
 export function serializeSmartFile(entry: Omit<SmartEntry, "filePath">): string {
   const today = new Date().toISOString().split("T")[0];
+  const createdDate = entry.createdAt ?? today;
   const tagsLine = entry.tags.map((t) => `  - ${quoteYaml(t)}`).join("\n");
 
   return `---
@@ -58,7 +62,7 @@ tags:
 ${tagsLine}
 confidence: ${entry.confidence}
 source: ${quoteYaml(entry.source)}
-${entry.sessionId !== undefined ? `session_id: ${entry.sessionId}\n` : ""}created: ${today}
+${entry.sessionId !== undefined ? `session_id: ${entry.sessionId}\n` : ""}created: ${createdDate}
 updated: ${today}
 ---
 

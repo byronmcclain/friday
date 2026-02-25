@@ -139,6 +139,24 @@ Legacy content.`;
     expect(result!.sessionId).toBeUndefined();
   });
 
+  test("parses created date from frontmatter", () => {
+    const raw = `---
+name: "Test"
+domain: "dev"
+tags:
+  - "bun"
+confidence: 0.8
+source: manual
+created: 2026-01-15
+updated: 2026-01-20
+---
+
+Test content`;
+    const parsed = parseFrontmatter(raw);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.createdAt).toBe("2026-01-15");
+  });
+
   test("trims whitespace from body", () => {
     const raw = `---
 name: trimmed
@@ -206,6 +224,15 @@ describe("serializeSmartFile", () => {
       content: "Test content.",
     });
     expect(output).not.toContain("session_id");
+  });
+
+  test("preserves original created date through round-trip", () => {
+    const raw = `---\nname: "Test"\ndomain: "dev"\ntags:\n  - "bun"\nconfidence: 0.8\nsource: manual\ncreated: 2026-01-15\nupdated: 2026-01-20\n---\n\nTest content`;
+    const parsed = parseFrontmatter(raw);
+    expect(parsed!.createdAt).toBe("2026-01-15");
+    const serialized = serializeSmartFile(parsed!);
+    const reparsed = parseFrontmatter(serialized);
+    expect(reparsed!.createdAt).toBe("2026-01-15");
   });
 
   test("round-trips through parse", () => {
