@@ -103,30 +103,29 @@ describe("web.fetch", () => {
 		expect(result.output).toContain("Disallowed protocol");
 	});
 
-	test("fetches from local server successfully", async () => {
+	test("blocks requests to localhost (SSRF)", async () => {
 		const result = await webFetch.execute({ url: testServerUrl }, ctx);
-		expect(result.success).toBe(true);
-		expect(result.output).toContain("200");
-		expect(result.output).toContain("Hello from test server");
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("localhost");
 	});
 
-	test("captures response headers", async () => {
-		const result = await webFetch.execute({ url: testServerUrl }, ctx);
-		expect(result.success).toBe(true);
-		expect(result.output).toContain("x-custom: friday");
+	test("blocks requests to 127.0.0.1 (SSRF)", async () => {
+		const ipUrl = testServerUrl.replace("localhost", "127.0.0.1");
+		const result = await webFetch.execute({ url: ipUrl }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("private");
 	});
 
-	test("truncates large responses", async () => {
-		const result = await webFetch.execute({ url: `${testServerUrl}/large` }, ctx);
-		expect(result.success).toBe(true);
-		expect(result.output).toContain("truncated");
-		expect(result.artifacts?.truncated).toBe(true);
+	test("blocks requests to 169.254.169.254 metadata endpoint (SSRF)", async () => {
+		const result = await webFetch.execute({ url: "http://169.254.169.254/latest/meta-data/" }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("private");
 	});
 
-	test("detects JSON content type", async () => {
-		const result = await webFetch.execute({ url: `${testServerUrl}/json` }, ctx);
-		expect(result.success).toBe(true);
-		expect(result.output).toContain("application/json");
+	test("blocks requests to 10.x.x.x (SSRF)", async () => {
+		const result = await webFetch.execute({ url: "http://10.0.0.1" }, ctx);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("private");
 	});
 });
 

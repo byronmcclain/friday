@@ -35,6 +35,58 @@ export function assertAllowedProtocol(url: string): ToolResult | null {
 }
 
 /**
+ * Block requests to private/loopback/link-local IP addresses (SSRF protection).
+ * Returns null if safe, or a ToolResult rejection to early-return.
+ */
+export function assertNotPrivateIP(url: string): ToolResult | null {
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		return { success: false, output: `Invalid URL: ${url}` };
+	}
+	const host = parsed.hostname;
+
+	// IPv6 loopback
+	if (host === "[::1]" || host === "::1") {
+		return {
+			success: false,
+			output: "Requests to loopback addresses are not permitted",
+		};
+	}
+
+	// IPv4 private/reserved ranges
+	const ipMatch = host.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+	if (ipMatch) {
+		const [, a, b] = ipMatch.map(Number);
+		if (
+			a === 127 ||
+			a === 10 ||
+			(a === 172 && b! >= 16 && b! <= 31) ||
+			(a === 192 && b === 168) ||
+			(a === 169 && b === 254) ||
+			a === 0
+		) {
+			return {
+				success: false,
+				output:
+					"Requests to private/link-local addresses are not permitted",
+			};
+		}
+	}
+
+	// DNS-based loopback
+	if (host === "localhost" || host.endsWith(".local")) {
+		return {
+			success: false,
+			output: "Requests to localhost are not permitted",
+		};
+	}
+
+	return null;
+}
+
+/**
  * Validate and coerce a value to a non-negative integer.
  * Prevents type confusion from `as number` casts on LLM-provided args.
  * Returns { value: number } on success, or a ToolResult rejection.

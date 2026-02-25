@@ -1,5 +1,5 @@
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
-import { assertAllowedProtocol } from "../validation.ts";
+import { assertAllowedProtocol, assertNotPrivateIP } from "../validation.ts";
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const MAX_TIMEOUT_MS = 60_000;
@@ -56,6 +56,9 @@ export const webFetch: FridayTool = {
 
 		const protocolCheck = assertAllowedProtocol(url);
 		if (protocolCheck) return protocolCheck;
+
+		const privateIpCheck = assertNotPrivateIP(url);
+		if (privateIpCheck) return privateIpCheck;
 
 		const method = ((args.method as string) ?? "GET").toUpperCase();
 		const headers = (args.headers as Record<string, string>) ?? {};

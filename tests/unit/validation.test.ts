@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { assertSafeArg, assertAllowedProtocol, assertInteger } from "../../src/modules/validation.ts";
+import { assertSafeArg, assertAllowedProtocol, assertInteger, assertNotPrivateIP } from "../../src/modules/validation.ts";
 
 describe("assertSafeArg", () => {
 	test("returns null for safe values", () => {
@@ -63,6 +63,79 @@ describe("assertAllowedProtocol", () => {
 
 	test("rejects invalid URLs", () => {
 		const result = assertAllowedProtocol("not-a-url");
+		expect(result).not.toBeNull();
+		expect(result!.output).toContain("Invalid URL");
+	});
+});
+
+describe("assertNotPrivateIP", () => {
+	test("allows public URLs", () => {
+		expect(assertNotPrivateIP("https://example.com")).toBeNull();
+		expect(assertNotPrivateIP("https://8.8.8.8")).toBeNull();
+		expect(assertNotPrivateIP("https://1.1.1.1")).toBeNull();
+	});
+
+	test("blocks 127.x.x.x loopback", () => {
+		const result = assertNotPrivateIP("http://127.0.0.1");
+		expect(result).not.toBeNull();
+		expect(result!.success).toBe(false);
+		expect(result!.output).toContain("private");
+	});
+
+	test("blocks 10.x.x.x private range", () => {
+		const result = assertNotPrivateIP("http://10.0.0.1");
+		expect(result).not.toBeNull();
+		expect(result!.success).toBe(false);
+	});
+
+	test("blocks 172.16-31.x.x private range", () => {
+		expect(assertNotPrivateIP("http://172.16.0.1")).not.toBeNull();
+		expect(assertNotPrivateIP("http://172.31.255.255")).not.toBeNull();
+		// 172.15 and 172.32 should be allowed
+		expect(assertNotPrivateIP("http://172.15.0.1")).toBeNull();
+		expect(assertNotPrivateIP("http://172.32.0.1")).toBeNull();
+	});
+
+	test("blocks 192.168.x.x private range", () => {
+		const result = assertNotPrivateIP("http://192.168.1.1");
+		expect(result).not.toBeNull();
+		expect(result!.success).toBe(false);
+	});
+
+	test("blocks 169.254.x.x link-local", () => {
+		const result = assertNotPrivateIP("http://169.254.169.254");
+		expect(result).not.toBeNull();
+		expect(result!.success).toBe(false);
+	});
+
+	test("blocks 0.x.x.x reserved range", () => {
+		const result = assertNotPrivateIP("http://0.0.0.0");
+		expect(result).not.toBeNull();
+		expect(result!.success).toBe(false);
+	});
+
+	test("blocks IPv6 loopback", () => {
+		const result = assertNotPrivateIP("http://[::1]");
+		expect(result).not.toBeNull();
+		expect(result!.success).toBe(false);
+		expect(result!.output).toContain("loopback");
+	});
+
+	test("blocks localhost hostname", () => {
+		const result = assertNotPrivateIP("http://localhost");
+		expect(result).not.toBeNull();
+		expect(result!.success).toBe(false);
+		expect(result!.output).toContain("localhost");
+	});
+
+	test("blocks .local domains", () => {
+		const result = assertNotPrivateIP("http://myhost.local");
+		expect(result).not.toBeNull();
+		expect(result!.success).toBe(false);
+	});
+
+	test("rejects invalid URLs", () => {
+		const result = assertNotPrivateIP("not-a-url");
 		expect(result).not.toBeNull();
 		expect(result!.output).toContain("Invalid URL");
 	});
