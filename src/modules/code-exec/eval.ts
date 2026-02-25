@@ -1,3 +1,4 @@
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
 
@@ -85,11 +86,8 @@ export const codeEval: FridayTool = {
 			Math.max(1000, (args.timeout as number) ?? DEFAULT_TIMEOUT_MS),
 		);
 
-		// Create a temporary sandbox directory
-		const sandboxDir = resolve(
-			context.workingDirectory,
-			`.friday-sandbox-${Date.now()}`,
-		);
+		// Create a temporary sandbox directory under OS tmpdir (not working directory)
+		const sandboxDir = resolve(tmpdir(), `.friday-sandbox-${Date.now()}`);
 
 		try {
 			// Write the code to a temp file (Bun.write creates parent dirs)

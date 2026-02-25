@@ -109,12 +109,30 @@ describe("code.eval", () => {
 		expect(result.output).toContain("Missing");
 	});
 
+	test("sandbox is created under tmpdir, not working directory", async () => {
+		const result = await codeEval.execute(
+			{ code: 'console.log(process.cwd());' },
+			ctx,
+		);
+		expect(result.success).toBe(true);
+		// The CWD printed by the sandbox script should be under OS tmpdir, not the working directory
+		const osTmpdir = realpathSync(tmpdir());
+		const lines = result.output.split("\n");
+		const cwdLine = lines.find((l) => l.includes(osTmpdir));
+		expect(cwdLine).toBeDefined();
+		// It should NOT be under the working directory
+		const { readdirSync } = await import("node:fs");
+		const entries = readdirSync(testDir);
+		const sandboxDirs = entries.filter((e) => e.startsWith(".friday-sandbox-"));
+		expect(sandboxDirs).toHaveLength(0);
+	});
+
 	test("cleans up sandbox directory", async () => {
 		await codeEval.execute(
 			{ code: 'console.log("cleanup test");' },
 			ctx,
 		);
-		// Verify no sandbox dirs remain
+		// Verify no sandbox dirs remain in working directory
 		const { readdirSync } = await import("node:fs");
 		const entries = readdirSync(testDir);
 		const sandboxDirs = entries.filter((e) => e.startsWith(".friday-sandbox-"));
