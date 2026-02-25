@@ -570,3 +570,47 @@ describe("FridayRuntime — Forge integration", () => {
 		await runtime.shutdown();
 	});
 });
+
+const TEST_GENESIS_DIR = "/tmp/friday-test-genesis-runtime";
+const TEST_GENESIS_PATH = `${TEST_GENESIS_DIR}/GENESIS.md`;
+
+describe("FridayRuntime — Genesis", () => {
+	let runtime: FridayRuntime;
+
+	beforeEach(async () => {
+		await mkdir(TEST_GENESIS_DIR, { recursive: true });
+	});
+
+	afterEach(async () => {
+		if (runtime?.isBooted) {
+			await runtime.shutdown();
+		}
+		await rm(TEST_GENESIS_DIR, { recursive: true, force: true });
+	});
+
+	test("boots successfully with genesisPath", async () => {
+		await writeFile(TEST_GENESIS_PATH, "Custom Friday identity");
+		runtime = new FridayRuntime();
+		await runtime.boot({
+			injectedProvider: stubProvider,
+			genesisPath: TEST_GENESIS_PATH,
+		});
+		expect(runtime.isBooted).toBe(true);
+	});
+
+	test("fails to boot when genesis file is missing", async () => {
+		runtime = new FridayRuntime();
+		await expect(
+			runtime.boot({
+				injectedProvider: stubProvider,
+				genesisPath: `${TEST_GENESIS_DIR}/nonexistent.md`,
+			}),
+		).rejects.toThrow("GENESIS.md not found");
+	});
+
+	test("boots without genesisPath (backwards compatible)", async () => {
+		runtime = new FridayRuntime();
+		await runtime.boot({ injectedProvider: stubProvider });
+		expect(runtime.isBooted).toBe(true);
+	});
+});

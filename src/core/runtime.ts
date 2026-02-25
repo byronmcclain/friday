@@ -30,6 +30,7 @@ import { RhythmScheduler } from "../arc-rhythm/scheduler.ts";
 import { createArcProtocol } from "../arc-rhythm/protocol.ts";
 import { createManageRhythmTool } from "../arc-rhythm/tool.ts";
 import { mkdir } from "node:fs/promises";
+import { loadGenesis, enforceGenesisPermissions } from "./genesis.ts";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
 	modulesDir?: string;
@@ -39,6 +40,7 @@ export interface RuntimeConfig extends Partial<FridayConfig> {
 	forgeDir?: string;
 	fresh?: boolean;
 	enableSensorium?: boolean;
+	genesisPath?: string;
 }
 
 export interface ProcessResult {
@@ -207,6 +209,19 @@ export class FridayRuntime {
 				this._protocols.register(createEnvProtocol(this._sensorium));
 			}
 
+			// Load GENESIS.md — Friday's identity prompt (before Cortex)
+			let genesisPrompt: string | undefined;
+			if (config.genesisPath) {
+				genesisPrompt = await loadGenesis(config.genesisPath);
+				await enforceGenesisPermissions(config.genesisPath);
+				this._audit.log({
+					action: "genesis:loaded",
+					source: "runtime",
+					detail: `Identity loaded from ${config.genesisPath} (${genesisPrompt.length} chars)`,
+					success: true,
+				});
+			}
+
 			this._cortex = new Cortex({
 				provider: providerName,
 				model: reasoningModel,
@@ -218,6 +233,7 @@ export class FridayRuntime {
 				audit: this._audit,
 				signals: this._signals,
 				toolMemory: this._memory?.scoped("tools"),
+				genesisPrompt,
 			});
 
 			// Register sensorium tool on Cortex (needs Cortex to exist)
