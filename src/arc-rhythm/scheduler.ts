@@ -96,7 +96,7 @@ export class RhythmScheduler {
 				result.error,
 			);
 
-			const computedNext = nextOccurrence(rhythm.cron);
+			const computedNext = nextOccurrence(rhythm.cron, rhythm.nextRun);
 			this.store.markExecuted(rhythm.id, result.status, computedNext);
 
 			if (result.status === "success") {

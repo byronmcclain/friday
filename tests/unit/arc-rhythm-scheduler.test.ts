@@ -198,6 +198,24 @@ describe("RhythmScheduler", () => {
 		expect(emitted).toContain("custom:arc-rhythm-paused");
 	});
 
+	test("computes next occurrence relative to rhythm's original nextRun, not wall clock", async () => {
+		const rhythm = store.create({
+			name: "test",
+			description: "test",
+			cron: "*/5 * * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "test" },
+			nextRun: new Date("2026-01-01T00:05:00Z"),
+			clearance: [],
+		});
+
+		await scheduler.tick();
+
+		const updated = store.get(rhythm.id);
+		expect(updated!.nextRun.getUTCMinutes()).toBe(10);
+	});
+
 	test("reentrant guard skips rhythm that is already running", async () => {
 		const clearance = new ClearanceManager(["system", "provider"]);
 		const slowCortex = new Cortex({
