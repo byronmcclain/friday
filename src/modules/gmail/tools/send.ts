@@ -72,7 +72,7 @@ export const gmailSend: FridayTool = {
 				args.bcc as string,
 			);
 
-			context.audit.log({
+			await context.audit.log({
 				action: "tool:gmail.send",
 				source: "gmail.send",
 				detail: `Sent email to ${to}: ${subject}`,

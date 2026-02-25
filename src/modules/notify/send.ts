@@ -181,7 +181,7 @@ async function dispatchNotification(
 		};
 	}
 
-	context.audit.log({
+	await context.audit.log({
 		action: "tool:notify.send",
 		source: "notify.send",
 		detail: `Sent ${channel} notification: ${title}`,

@@ -45,7 +45,7 @@ export const gmailSearch: FridayTool = {
 				typeof args.max_results === "number" ? args.max_results : 10;
 			const result = await client.listMessages(query, maxResults);
 
-			context.audit.log({
+			await context.audit.log({
 				action: "tool:gmail.search",
 				source: "gmail.search",
 				detail: `Searched: "${query}" — ${result.messages.length} results`,

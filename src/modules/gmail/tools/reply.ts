@@ -46,7 +46,7 @@ export const gmailReply: FridayTool = {
 		try {
 			const result = await client.replyToThread(threadId, body);
 
-			context.audit.log({
+			await context.audit.log({
 				action: "tool:gmail.reply",
 				source: "gmail.reply",
 				detail: `Replied to thread ${threadId}`,

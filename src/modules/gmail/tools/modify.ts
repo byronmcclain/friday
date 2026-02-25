@@ -108,7 +108,7 @@ export const gmailModify: FridayTool = {
 					break;
 			}
 
-			context.audit.log({
+			await context.audit.log({
 				action: "tool:gmail.modify",
 				source: "gmail.modify",
 				detail: `Modified message ${id}: ${action}${label ? ` (${label})` : ""}`,

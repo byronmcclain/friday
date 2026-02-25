@@ -35,7 +35,7 @@ export const gmailRead: FridayTool = {
 		try {
 			const message = await client.getMessage(id);
 
-			context.audit.log({
+			await context.audit.log({
 				action: "tool:gmail.read",
 				source: "gmail.read",
 				detail: `Read message: ${message.subject}`,

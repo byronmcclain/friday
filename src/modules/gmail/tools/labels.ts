@@ -22,7 +22,7 @@ export const gmailListLabels: FridayTool = {
 		try {
 			const labels = await client.listLabels();
 
-			context.audit.log({
+			await context.audit.log({
 				action: "tool:gmail.list_labels",
 				source: "gmail.list_labels",
 				detail: `Listed ${labels.length} labels`,
