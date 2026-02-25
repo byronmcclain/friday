@@ -190,7 +190,7 @@ This is test knowledge.`,
 			defaultModel: "capture",
 			defaultFastModel: "capture-fast",
 			chat: async (systemPrompt) => {
-				if (systemPrompt.includes("knowledge extraction")) {
+				if (systemPrompt.includes("strict knowledge extraction system")) {
 					extractionTriggered = true;
 				}
 				return textResponse("[]");
@@ -219,7 +219,7 @@ This is test knowledge.`,
 			defaultModel: "capture",
 			defaultFastModel: "capture-fast",
 			chat: async (systemPrompt) => {
-				if (systemPrompt.includes("knowledge extraction")) {
+				if (systemPrompt.includes("strict knowledge extraction system")) {
 					extractionTriggered = true;
 				}
 				return textResponse("[]");
