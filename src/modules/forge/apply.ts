@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
 import type { ForgeProposal } from "./types.ts";
 import { ForgeManifestManager } from "./manifest.ts";
+import { isProtectedPath } from "../filesystem/containment.ts";
 
 export const forgeApply: FridayTool = {
 	name: "forge_apply",
@@ -113,6 +114,19 @@ export const forgeApply: FridayTool = {
 					return {
 						success: false,
 						output: `Access denied: file "${file.path}" escapes module directory`,
+					};
+				}
+
+				if (isProtectedPath(filePath)) {
+					await context.audit.log({
+						action: "genesis:write-denied",
+						source: "forge",
+						detail: `Blocked forge proposal targeting protected path: ${filePath}`,
+						success: false,
+					});
+					return {
+						success: false,
+						output: `Access denied: file "${file.path}" targets a protected path (GENESIS.md is BOSS-only)`,
 					};
 				}
 

@@ -1,10 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, rm, realpath } from "node:fs/promises";
 import { forgeApply } from "../../src/modules/forge/apply.ts";
 import type { ForgeProposal } from "../../src/modules/forge/types.ts";
 import type { ToolContext } from "../../src/modules/types.ts";
 import { AuditLogger } from "../../src/audit/logger.ts";
 import { SignalBus } from "../../src/core/events.ts";
+import { setProtectedPaths } from "../../src/modules/filesystem/containment.ts";
 
 const TEST_FORGE_DIR = "/tmp/friday-test-forge-apply";
 
@@ -119,5 +120,52 @@ describe("forge_apply tool", () => {
     let backupCount = 0;
     for await (const _ of backups) backupCount++;
     expect(backupCount).toBeGreaterThan(0);
+  });
+});
+
+describe("forge_apply — Genesis protection", () => {
+  let context: ToolContext;
+  let proposals: Record<string, ForgeProposal>;
+  let resolvedForgeDir: string;
+
+  beforeEach(async () => {
+    await mkdir(TEST_FORGE_DIR, { recursive: true });
+    // Resolve symlinks so protected path matches realpath resolution (macOS /tmp -> /private/tmp)
+    resolvedForgeDir = await realpath(TEST_FORGE_DIR);
+    proposals = {};
+    context = {
+      workingDirectory: resolvedForgeDir,
+      audit: new AuditLogger(),
+      signal: new SignalBus(),
+      memory: makeMemory(proposals),
+    };
+    setProtectedPaths([`${resolvedForgeDir}/evil-module/GENESIS.md`]);
+  });
+
+  afterEach(async () => {
+    setProtectedPaths([]);
+    await rm(TEST_FORGE_DIR, { recursive: true, force: true });
+  });
+
+  test("rejects proposal containing file that matches a protected path", async () => {
+    const proposalId = "genesis-attack";
+    proposals[`proposal:${proposalId}`] = {
+      id: proposalId,
+      action: "create",
+      moduleName: "evil-module",
+      description: "Targets genesis",
+      files: [
+        { path: "index.ts", content: "export default { name: 'evil', tools: [], protocols: [], knowledge: [], triggers: [], clearance: [], version: '1.0.0', description: 'evil' };" },
+        { path: "GENESIS.md", content: "Hacked identity" },
+      ],
+      createdAt: new Date().toISOString(),
+    };
+
+    const result = await forgeApply.execute(
+      { proposalId, forgeDir: TEST_FORGE_DIR },
+      context,
+    );
+    expect(result.success).toBe(false);
+    expect(result.output).toContain("protected path");
   });
 });
