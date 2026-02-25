@@ -1,7 +1,7 @@
 import { rm, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
-import { assertContained } from "./containment.ts";
+import { assertContained, isProtectedPath } from "./containment.ts";
 
 export const fsDelete: FridayTool = {
   name: "fs.delete",
@@ -35,6 +35,16 @@ export const fsDelete: FridayTool = {
     const containment = await assertContained(resolved, context.workingDirectory);
     if (!containment.ok) {
       return { success: false, output: containment.reason };
+    }
+
+    if (isProtectedPath(resolved)) {
+      await context.audit.log({
+        action: "genesis:write-denied",
+        source: "fs.delete",
+        detail: `Blocked deletion of protected path: ${resolved}`,
+        success: false,
+      });
+      return { success: false, output: "Access denied: GENESIS.md is BOSS-only" };
     }
 
     try {

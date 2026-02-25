@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
-import { assertContained } from "./containment.ts";
+import { assertContained, getProtectedPaths } from "./containment.ts";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_TIMEOUT_MS = 300_000;
@@ -50,6 +50,19 @@ export const bashExec: FridayTool = {
     const cwdCheck = await assertContained(cwd, context.workingDirectory);
     if (!cwdCheck.ok) {
       return { success: false, output: `Access denied: cwd escapes working directory` };
+    }
+
+    // Best-effort check: reject commands that reference protected paths
+    for (const pp of getProtectedPaths()) {
+      if (command.includes(pp)) {
+        await context.audit.log({
+          action: "genesis:write-denied",
+          source: "bash.exec",
+          detail: `Blocked command referencing protected path: ${command.slice(0, 200)}`,
+          success: false,
+        });
+        return { success: false, output: "Access denied: command references a protected path (GENESIS.md is BOSS-only)" };
+      }
     }
 
     const timeout = Math.min(

@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
-import { assertContained } from "./containment.ts";
+import { assertContained, isProtectedPath } from "./containment.ts";
 
 export const fsWrite: FridayTool = {
   name: "fs.write",
@@ -49,6 +49,16 @@ export const fsWrite: FridayTool = {
     const containment = await assertContained(resolved, context.workingDirectory);
     if (!containment.ok) {
       return { success: false, output: containment.reason };
+    }
+
+    if (isProtectedPath(resolved)) {
+      await context.audit.log({
+        action: "genesis:write-denied",
+        source: "fs.write",
+        detail: `Blocked write to protected path: ${resolved}`,
+        success: false,
+      });
+      return { success: false, output: "Access denied: GENESIS.md is BOSS-only" };
     }
 
     try {
