@@ -218,24 +218,18 @@ export class SQLiteMemory {
   }
 
   async cleanupOrphanedConversationEmbeddings(): Promise<void> {
-    const keys = this.db
-      .query<{ key: string }, [string]>("SELECT key FROM kv WHERE namespace = ?")
-      .all("conversations");
+    const orphaned = this.db.query<{ key: string; value: string }, [string]>(
+      `SELECT kv.key, kv.value FROM kv
+       LEFT JOIN conversations ON conversations.id = kv.key
+       WHERE kv.namespace = ? AND kv.key != 'backfill-done' AND conversations.id IS NULL`,
+    ).all("conversations");
 
-    for (const { key } of keys) {
-      if (key === "backfill-done") continue;
-
-      const exists = this.db
-        .query<{ id: string }, [string]>("SELECT id FROM conversations WHERE id = ?")
-        .get(key);
-
-      if (!exists) {
-        const embeddingId = await this.get<string>("conversations", key);
-        if (embeddingId) {
-          await this.forget("conversations", embeddingId);
-        }
-        await this.delete("conversations", key);
-      }
+    for (const { key, value } of orphaned) {
+      try {
+        const embeddingId = JSON.parse(value) as string;
+        await this.forget("conversations", embeddingId);
+      } catch { /* best-effort */ }
+      this.db.query("DELETE FROM kv WHERE namespace = ? AND key = ?").run("conversations", key);
     }
   }
 
