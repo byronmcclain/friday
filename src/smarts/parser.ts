@@ -80,7 +80,7 @@ function parseYamlFields(yaml: string): Record<string, string> {
       currentKey = kvMatch[1]!;
       fields[currentKey] = unescapeYaml(kvMatch[2]!.trim().replace(/^(['"])(.*)\1$/, "$2"));
     } else if (currentKey && line.match(/^\s+-\s+/)) {
-      fields[currentKey] = `${fields[currentKey] || ""},${line.replace(/^\s+-\s+/, "").trim()}`;
+      fields[currentKey] = `${fields[currentKey] || ""}\x1F${line.replace(/^\s+-\s+/, "").trim()}`;
     }
   }
 
@@ -101,6 +101,13 @@ function parseYamlArray(value: string): string[] {
   }
   if (value === "") {
     return [];
+  }
+  // Block-list items are joined with \x1F (unit separator) to avoid comma corruption
+  if (value.includes("\x1F")) {
+    return value
+      .split("\x1F")
+      .map((s) => stripQuotes(s.trim()))
+      .filter(Boolean);
   }
   return value
     .split(",")

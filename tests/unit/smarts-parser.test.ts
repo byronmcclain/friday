@@ -139,6 +139,12 @@ Legacy content.`;
     expect(result!.sessionId).toBeUndefined();
   });
 
+  test("handles tags containing commas in block-list format", () => {
+    const raw = `---\nname: "Test"\ndomain: "dev"\ntags:\n  - "TypeScript, strict mode"\n  - "Bun runtime"\nconfidence: 0.8\nsource: manual\n---\n\nContent`;
+    const parsed = parseFrontmatter(raw);
+    expect(parsed!.tags).toEqual(["TypeScript, strict mode", "Bun runtime"]);
+  });
+
   test("parses created date from frontmatter", () => {
     const raw = `---
 name: "Test"
