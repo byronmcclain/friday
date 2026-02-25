@@ -102,13 +102,18 @@ export class Sensorium {
 
 	async pollFast(): Promise<void> {
 		if (this._polling) return;
-		if (!this._snapshot) {
-			await this.poll();
-			return;
-		}
-
 		this._polling = true;
 		try {
+			if (!this._snapshot) {
+				const machineResult = await gatherMachine(this._prevCpuTimes);
+				this._prevCpuTimes = machineResult.cpuTimes;
+				const { cpuTimes: _, ...machine } = machineResult;
+				const [containers, dev] = await Promise.all([gatherContainers(), gatherDev()]);
+				this._snapshot = { timestamp: new Date(), machine, containers, dev };
+				this.evaluateAlerts(this._snapshot);
+				return;
+			}
+
 			const machineResult = await gatherMachine(this._prevCpuTimes);
 			this._prevCpuTimes = machineResult.cpuTimes;
 
