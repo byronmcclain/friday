@@ -73,6 +73,7 @@ export class FridayRuntime {
 	private _sessionId?: string;
 	private _sessionStartedAt?: Date;
 	private _booted = false;
+	private _booting = false;
 	private _restartRequested = false;
 	private _forgeHealthReport?: ForgeHealthReport;
 
@@ -129,6 +130,9 @@ export class FridayRuntime {
 	}
 
 	async boot(config: RuntimeConfig = {}): Promise<void> {
+		if (this._booting) throw new Error("Boot already in progress");
+		this._booting = true;
+		try {
 		if (this._booted) await this.shutdown();
 
 		try {
@@ -368,6 +372,9 @@ export class FridayRuntime {
 				}
 			} catch { /* best-effort */ }
 			throw err;
+		}
+		} finally {
+			this._booting = false;
 		}
 	}
 
