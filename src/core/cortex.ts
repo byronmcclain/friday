@@ -251,25 +251,35 @@ export class Cortex {
   }
 
   private async buildSystemPrompt(userMessage: string): Promise<string> {
+    const MAX_SMARTS_SECTIONS = 8;
+    const MAX_SMARTS_CHARS = 4000;
+
     let prompt = this.genesisPrompt ?? GENESIS_TEMPLATE;
 
     // SMARTS knowledge enrichment
     if (this.smartsStore) {
       const sections: string[] = [];
+      let totalChars = 0;
 
       for (const name of this.pinnedSmarts) {
+        if (sections.length >= MAX_SMARTS_SECTIONS || totalChars >= MAX_SMARTS_CHARS) break;
         const entry = await this.smartsStore.getByName(name);
         if (entry) {
           const title = entry.content.split("\n")[0]?.replace(/^#+\s*/, "") || entry.name;
-          sections.push(`### ${title} (confidence: ${entry.confidence})\n${entry.content}`);
+          const section = `### ${title} (confidence: ${entry.confidence})\n${entry.content}`;
+          sections.push(section);
+          totalChars += section.length;
         }
       }
 
       const relevant = await this.smartsStore.findRelevant(userMessage);
       for (const entry of relevant) {
+        if (sections.length >= MAX_SMARTS_SECTIONS || totalChars >= MAX_SMARTS_CHARS) break;
         if (this.pinnedSmarts.has(entry.name)) continue;
         const title = entry.content.split("\n")[0]?.replace(/^#+\s*/, "") || entry.name;
-        sections.push(`### ${title} (confidence: ${entry.confidence})\n${entry.content}`);
+        const section = `### ${title} (confidence: ${entry.confidence})\n${entry.content}`;
+        sections.push(section);
+        totalChars += section.length;
       }
 
       if (sections.length > 0) {
