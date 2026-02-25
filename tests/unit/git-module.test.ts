@@ -207,6 +207,15 @@ describe("git.commit", () => {
 		expect(result.success).toBe(false);
 	});
 
+	test("rejects files outside working directory", async () => {
+		const result = await gitCommit.execute(
+			{ message: "test", files: ["../../etc/passwd"] },
+			ctx,
+		);
+		expect(result.success).toBe(false);
+		expect(result.output).toContain("outside working directory");
+	});
+
 	test("declares git-write clearance", () => {
 		expect(gitCommit.clearance).toEqual(["git-write"]);
 	});

@@ -1,4 +1,6 @@
+import { resolve } from "node:path";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertSafeArg } from "../validation.ts";
 
 export const gitCommit: FridayTool = {
 	name: "git.commit",
@@ -44,6 +46,22 @@ export const gitCommit: FridayTool = {
 		try {
 			const files = (args.files as string[]) ?? [];
 			const allowEmpty = (args.allowEmpty as boolean) ?? false;
+
+			// Validate file paths
+			for (const file of files) {
+				const argCheck = assertSafeArg(file, "file");
+				if (argCheck) return argCheck;
+				const resolved = resolve(context.workingDirectory, file);
+				if (
+					!resolved.startsWith(`${context.workingDirectory}/`) &&
+					resolved !== context.workingDirectory
+				) {
+					return {
+						success: false,
+						output: `Access denied: file "${file}" resolves outside working directory`,
+					};
+				}
+			}
 
 			// Stage files if specified
 			if (files.length > 0) {
