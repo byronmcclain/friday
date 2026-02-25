@@ -16,7 +16,7 @@ TUI-first. Module-driven. Built to think, remember, and adapt.
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tests](https://img.shields.io/badge/tests-735%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-843%20passing-brightgreen)]()
 [![Biome](https://img.shields.io/badge/lint-Biome-60a5fa?logo=biome)](https://biomejs.dev)
 
 <br />
@@ -249,7 +249,7 @@ flowchart TB
     TOOLS --> Validation
 ```
 
-Seven operational modules ship with Friday:
+Eight operational modules ship with Friday:
 
 | Module | Tools | Clearance | Security |
 |---|---|---|---|
@@ -260,6 +260,7 @@ Seven operational modules ship with Friday:
 | **Web Fetch** | fetch (HTTP requests) | `network` | SSRF protection (private IP blocking) |
 | **Notify** | send (multi-channel dispatch) | -- | Channel validation |
 | **Forge** | propose, apply, validate, restart, status | `provider`, `write-fs`, `read-fs`, `exec-shell`, `system`, `forge-modify` | Core module protection |
+| **Gmail** | search, read, send, reply, modify, list_labels | `network`, `email-send` | OAuth 2.0, encrypted token storage |
 
 Every tool call flows through the same pipeline: Cortex receives a `tool_use` from the LLM → checks clearance via `ClearanceManager.checkAll()` → calls `tool.execute()` with a `ToolContext` (working directory, audit logger, signal emitter, scoped memory) → returns the result to the LLM.
 
@@ -563,7 +564,7 @@ flowchart TB
     F --> H[AuditLogger.log: blocked]
 ```
 
-**10 clearance types** control every capability boundary:
+**11 clearance types** control every capability boundary:
 
 | Clearance | What It Gates |
 |---|---|
@@ -577,6 +578,7 @@ flowchart TB
 | `provider` | Calling the LLM provider |
 | `system` | System-level operations (restart, env access) |
 | `forge-modify` | Creating or patching forge modules |
+| `email-send` | Sending or replying to emails |
 
 The **AuditLogger** records every action with structured entries: `action` (what happened), `source` (who did it), `detail` (human-readable description), `success` (boolean), and optional `metadata` (signal name, directive ID, etc.). This creates a complete trail of everything Friday does.
 
@@ -595,6 +597,7 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 | Suit function | **Tool** | Single executable action within a module |
 | Event sensors | **Signal** | Internal event that triggers directives and modules |
 | Security clearance | **Clearance** | Permission gate for tools, directives, and modules |
+| Identity template | **Genesis** | Friday's personality — loaded from `~/.friday/GENESIS.md` |
 | Mission log | **Audit Log** | Record of every action, reason, and result |
 | Alert system | **Notification** | Multi-channel alerts (terminal, Slack, webhook) |
 | Field knowledge | **SMARTS** | Dynamic knowledge base — learns from conversations |
@@ -603,6 +606,7 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 | Heads-up display | **TUI** | Interactive terminal interface — boot splash, shimmer header, chat |
 | "I remember when..." | **Deja Vu** | Conversational memory recall — FTS5 search across past sessions |
 | Heartbeat / scheduler | **Arc Rhythm** | Autonomous scheduled task execution — cron-driven, headless |
+| Email identity | **Gmail** | Email via Gmail API — search, read, send, reply with OAuth 2.0 |
 
 ---
 
@@ -626,6 +630,7 @@ graph TB
     RT --> MEM["SQLiteMemory"]
     RT --> SM["SmartsStore"]
     RT --> SEN["Sensorium"]
+    RT --> GEN["Genesis"]
     RT --> CX["Cortex"]
     RT --> RC["Recall Tool"]
     RT --> ARC["Arc Rhythm"]
@@ -635,6 +640,8 @@ graph TB
     DE -->|reads from| DS
     DE -->|checks| CL
     DE -->|logs to| AU
+
+    GEN -->|identity prompt| CX
 
     CX -->|queries| SM
     CX -->|reads| SEN
@@ -676,7 +683,8 @@ flowchart LR
     F --> G[SQLiteMemory]
     G --> H[SmartsStore]
     H --> I[Sensorium]
-    I --> J[Cortex]
+    I --> GEN[Genesis]
+    GEN --> J[Cortex]
     J --> K[Recall Tool]
     K --> L["Arc Rhythm<br/>(store + executor + scheduler)"]
     L --> M[Module Discovery]
@@ -735,6 +743,11 @@ bun run start chat --fast-model grok-4-1-fast-non-reasoning
 # Combine flags
 bun run start chat --provider grok --model grok-3
 
+# Manage Friday's identity prompt
+bun run start genesis init     # Seed GENESIS.md from template
+bun run start genesis show     # Print current identity prompt
+bun run start genesis edit     # Open GENESIS.md in $EDITOR
+
 # Start the web UI server
 bun run serve
 ```
@@ -766,6 +779,11 @@ bun run serve
 | `/arc history [id]` | View execution history |
 | `/arc delete <id>` | Remove a rhythm |
 | `/arc run` | Trigger a manual scheduler tick |
+| `/gmail inbox` | View recent inbox messages |
+| `/gmail search <query>` | Search emails |
+| `/gmail read <id>` | Read a specific email |
+| `/gmail send` | Compose and send an email |
+| `/gmail labels` | List Gmail labels |
 | `exit`, `quit`, `bye` | Ends the session |
 
 ### Provider Defaults
@@ -848,6 +866,16 @@ FRIDAY_REASONING_MODEL=claude-sonnet-4-20250514
 
 # Optional: Override fast model for utility tasks (CLI: --fast-model)
 FRIDAY_FAST_MODEL=claude-haiku-4-5-20251001
+
+# Optional: Gmail module (OAuth 2.0)
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+
+# Optional: Fallback master key for SecretStore (when OS keychain unavailable)
+FRIDAY_SECRET_KEY=...
+
+# Optional: Override identity prompt path (default: ~/.friday/GENESIS.md)
+FRIDAY_GENESIS_PATH=...
 ```
 
 Bun loads `.env` automatically — no dotenv needed.
@@ -858,7 +886,7 @@ Bun loads `.env` automatically — no dotenv needed.
 
 ```bash
 bun run dev              # Auto-restart on file changes
-bun test                 # Run all tests (735 tests across 65 files)
+bun test                 # Run all tests (843 tests across 79 files)
 bun test --watch         # Watch mode
 bun test tests/unit/cortex.test.ts  # Single test file
 bun run lint             # Lint check
@@ -895,9 +923,11 @@ src/
 │   ├── clearance.ts       # Permission gates
 │   ├── memory.ts          # SQLite persistence, FTS5 search, conversation indexing
 │   ├── recall-tool.ts     # recall_memory tool — conversation memory search (Deja Vu)
+│   ├── genesis.ts         # Identity prompt loader (~/.friday/GENESIS.md)
+│   ├── secrets.ts         # SecretStore — AES-256-GCM encrypted storage
 │   ├── notifications.ts   # Multi-channel notification system
 │   ├── types.ts           # Core TypeScript interfaces
-│   └── prompts.ts         # Friday's personality
+│   └── prompts.ts         # GENESIS_TEMPLATE — seed template for identity prompt
 ├── audit/                 # Action tracking and filtering
 ├── modules/
 │   ├── types.ts           # FridayModule, FridayTool interfaces
@@ -909,7 +939,8 @@ src/
 │   ├── code-exec/         # Sandboxed script execution
 │   ├── web-fetch/         # HTTP requests with SSRF protection
 │   ├── notify/            # Multi-channel notification dispatch
-│   └── forge/             # The Forge — self-improvement system
+│   ├── forge/             # The Forge — self-improvement system
+│   └── gmail/             # Gmail — email via OAuth 2.0
 ├── protocols/             # Protocol registry and routing
 ├── directives/            # Autonomous rule engine
 ├── smarts/
@@ -949,7 +980,7 @@ web/                       # React web UI (Vite + Tailwind)
 │   └── index.css          # Tailwind theme (Friday amber palette)
 tests/
 ├── helpers/               # Shared test stubs
-├── unit/                  # 735 tests across 65 files
+├── unit/                  # 843 tests across 79 files
 └── integration/           # Integration tests — future
 ```
 
