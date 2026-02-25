@@ -108,6 +108,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 
 	// Boot runtime on mount
 	useEffect(() => {
+		let cancelled = false;
 		const runtime = new FridayRuntime();
 		runtimeRef.current = runtime;
 
@@ -123,6 +124,8 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 				}
 			}
 
+			if (cancelled) return;
+
 			// If logo failed to load, skip splash and go straight to booting
 			if (!logoDataRef.current) {
 				dispatch({ type: "set-phase", phase: "booting" });
@@ -135,6 +138,8 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			pushLog("info", "runtime", "Booting Friday...");
 			try {
 				await runtime.boot(bootConfig());
+
+				if (cancelled) return;
 
 				// Wire audit log callback to LogStore (after boot so _audit exists)
 				runtime.audit.onLog = (entry: AuditEntry) => {
@@ -181,9 +186,11 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 						`Friday online. (${providerLabel}: ${modelLabel}, ${toolCount} tools)`,
 					),
 				});
+				if (cancelled) return;
 				setBootComplete(true);
 				pushLog("success", "runtime", `Friday online. (${providerLabel}: ${modelLabel}, ${toolCount} tools)`);
 			} catch (error) {
+				if (cancelled) return;
 				const msg =
 					error instanceof Error
 						? error.message
@@ -195,6 +202,8 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 				pushLog("error", "runtime", `Boot failed: ${msg}`);
 			}
 		})();
+
+		return () => { cancelled = true; };
 	}, [bootConfig]);
 
 	// Activate when both splash is done and boot is complete
