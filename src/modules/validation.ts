@@ -5,11 +5,14 @@ import type { ToolResult } from "./types.ts";
  * Returns null if safe, or a ToolResult rejection to early-return.
  */
 export function assertSafeArg(value: string, label: string): ToolResult | null {
-	if (!value) {
+	if (!value || !value.trim()) {
 		return { success: false, output: `Invalid ${label}: must not be empty` };
 	}
-	if (value.startsWith("-")) {
-		return { success: false, output: `Invalid ${label}: must not start with "-"` };
+	if (value.trim().startsWith("-")) {
+		return {
+			success: false,
+			output: `Invalid ${label}: must not start with "-"`,
+		};
 	}
 	return null;
 }

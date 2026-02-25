@@ -20,6 +20,18 @@ describe("assertSafeArg", () => {
 		expect(result).not.toBeNull();
 		expect(result!.success).toBe(false);
 	});
+
+	test("rejects values with leading whitespace before dash", () => {
+		const result = assertSafeArg(" -rf", "flag");
+		expect(result).not.toBeNull();
+		expect(result!.success).toBe(false);
+	});
+
+	test("rejects whitespace-only values", () => {
+		const result = assertSafeArg("   ", "label");
+		expect(result).not.toBeNull();
+		expect(result!.success).toBe(false);
+	});
 });
 
 describe("assertAllowedProtocol", () => {
