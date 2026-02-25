@@ -100,10 +100,9 @@ export class WebhookChannel implements NotificationChannel {
         body: JSON.stringify(notification),
         signal: controller.signal,
       });
-      // Consume response body to free the connection
-      await response.text();
+      const body = await response.text();
       if (!response.ok) {
-        throw new Error(`Webhook failed: ${response.status} ${response.statusText}`);
+        throw new Error(`Webhook failed: ${response.status} ${response.statusText} — ${body.slice(0, 200)}`);
       }
     } finally {
       clearTimeout(timeout);
@@ -136,10 +135,9 @@ export class SlackChannel implements NotificationChannel {
         }),
         signal: controller.signal,
       });
-      // Consume response body to free the connection
-      await response.text();
+      const body = await response.text();
       if (!response.ok) {
-        throw new Error(`Slack webhook failed: ${response.status} ${response.statusText}`);
+        throw new Error(`Slack webhook failed: ${response.status} ${response.statusText} — ${body.slice(0, 200)}`);
       }
     } finally {
       clearTimeout(timeout);
