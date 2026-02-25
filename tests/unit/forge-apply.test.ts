@@ -22,6 +22,25 @@ function makeMemory(proposals: Record<string, ForgeProposal>) {
   };
 }
 
+function makeContext(opts: { proposal: Omit<ForgeProposal, "id" | "createdAt"> & { moduleName: string } }): ToolContext {
+  const proposalId = opts.proposal.moduleName === "../etc" ? "test-escape" : "test-file-escape";
+  const proposal: ForgeProposal = {
+    id: proposalId,
+    action: opts.proposal.action as "create" | "patch",
+    moduleName: opts.proposal.moduleName,
+    description: opts.proposal.description,
+    files: opts.proposal.files,
+    createdAt: new Date().toISOString(),
+  };
+  const proposals: Record<string, ForgeProposal> = { [`proposal:${proposalId}`]: proposal };
+  return {
+    workingDirectory: TEST_FORGE_DIR,
+    audit: new AuditLogger(),
+    signal: new SignalBus(),
+    memory: makeMemory(proposals),
+  };
+}
+
 describe("forge_apply tool", () => {
   let context: ToolContext;
   let proposals: Record<string, ForgeProposal>;
@@ -84,6 +103,24 @@ describe("forge_apply tool", () => {
     const written = Bun.file(`${TEST_FORGE_DIR}/weather/index.ts`);
     expect(await written.exists()).toBe(true);
     expect(await written.text()).toBe("export default { name: 'weather' };");
+  });
+
+  test("rejects module names that escape forge directory via prefix collision", async () => {
+    const result = await forgeApply.execute(
+      { proposalId: "test-escape", forgeDir: "/tmp/forge" },
+      makeContext({ proposal: { moduleName: "../etc", files: [], action: "create", description: "x" } }),
+    );
+    expect(result.success).toBe(false);
+    expect(result.output).toContain("escapes forge directory");
+  });
+
+  test("rejects file paths that escape module directory via prefix collision", async () => {
+    const result = await forgeApply.execute(
+      { proposalId: "test-file-escape", forgeDir: "/tmp/forge" },
+      makeContext({ proposal: { moduleName: "test-mod", files: [{ path: "../../etc/passwd", content: "x" }], action: "create", description: "x" } }),
+    );
+    expect(result.success).toBe(false);
+    expect(result.output).toContain("escapes module directory");
   });
 
   test("creates backup for patch action", async () => {

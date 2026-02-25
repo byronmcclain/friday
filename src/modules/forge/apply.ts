@@ -58,10 +58,12 @@ export const forgeApply: FridayTool = {
 		const resolvedForge = await realpath(forgeDir).catch(
 			() => resolve(forgeDir),
 		);
-		const resolvedModule = resolve(resolvedForge, proposal.moduleName);
+		const resolvedModule = await realpath(
+			resolve(resolvedForge, proposal.moduleName),
+		).catch(() => resolve(resolvedForge, proposal.moduleName));
 
-		// Path containment check
-		if (!resolvedModule.startsWith(resolvedForge)) {
+		// Path containment check (trailing slash prevents prefix collisions like forge → forge-evil)
+		if (!resolvedModule.startsWith(`${resolvedForge}/`)) {
 			return {
 				success: false,
 				output: "Access denied: module path escapes forge directory",
@@ -108,9 +110,12 @@ export const forgeApply: FridayTool = {
 			const written: string[] = [];
 			for (const file of proposal.files) {
 				const filePath = resolve(resolvedModule, file.path);
+				const resolvedFilePath = await realpath(filePath).catch(
+					() => filePath,
+				);
 
-				// Path containment per-file
-				if (!filePath.startsWith(resolvedModule)) {
+				// Path containment per-file (trailing slash prevents prefix collisions)
+				if (!resolvedFilePath.startsWith(`${resolvedModule}/`)) {
 					return {
 						success: false,
 						output: `Access denied: file "${file.path}" escapes module directory`,
