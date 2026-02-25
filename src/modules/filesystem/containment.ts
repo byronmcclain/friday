@@ -35,3 +35,23 @@ export async function assertContained(
 
 	return { ok: false, reason: "Access denied: path escapes working directory" };
 }
+
+/** Paths that cannot be written/deleted by Friday's tools */
+let protectedPaths: string[] = [];
+
+/** Set the list of protected paths (called at boot) */
+export function setProtectedPaths(paths: string[]): void {
+	protectedPaths = paths.map((p) => resolve(p));
+}
+
+/** Check if a resolved path matches a protected path */
+export function isProtectedPath(path: string): boolean {
+	if (path.endsWith("/")) return false;
+	const resolved = resolve(path);
+	return protectedPaths.some((pp) => resolved === pp);
+}
+
+/** Get the current list of protected paths (for best-effort shell command checking) */
+export function getProtectedPaths(): readonly string[] {
+	return protectedPaths;
+}
