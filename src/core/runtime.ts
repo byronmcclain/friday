@@ -144,6 +144,7 @@ export class FridayRuntime {
 				"provider",
 				"system",
 				"forge-modify",
+				"email-send",
 			]);
 			this._audit = new AuditLogger();
 			this._notifications = new NotificationManager([new TerminalChannel()]);
