@@ -84,6 +84,13 @@ export const forgePropose: FridayTool = {
 				output: "Missing required parameter: moduleName",
 			};
 		}
+		if (/[/\\]/.test(moduleName) || moduleName.includes("..")) {
+			return {
+				success: false,
+				output:
+					"Invalid moduleName: must not contain path separators or '..'",
+			};
+		}
 		if (!description) {
 			return {
 				success: false,

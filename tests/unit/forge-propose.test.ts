@@ -51,6 +51,15 @@ describe("forge_propose tool", () => {
     expect(result.output).toContain("action");
   });
 
+  test("rejects module names with path separators", async () => {
+    const result = await forgePropose.execute(
+      { moduleName: "../core", description: "hack", files: [], action: "create" },
+      context,
+    );
+    expect(result.success).toBe(false);
+    expect(result.output).toContain("path separators");
+  });
+
   test("generates proposal with unique ID and stores in memory", async () => {
     let storedKey = "";
     let storedValue: unknown;
