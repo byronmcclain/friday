@@ -64,6 +64,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 	const [bootComplete, setBootComplete] = useState(false);
 	const logStoreRef = useRef(new LogStore());
 	const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
+	const isShuttingDownRef = useRef(false);
 
 	const pushLog = useCallback((level: LogEntry["level"], source: string, message: string, detail?: string) => {
 		const entry: LogEntry = {
@@ -227,7 +228,8 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 	// Shutdown handler
 	const handleShutdown = useCallback(async () => {
 		const runtime = runtimeRef.current;
-		if (!runtime || state.phase === "shutting-down") return;
+		if (!runtime || isShuttingDownRef.current) return;
+		isShuttingDownRef.current = true;
 
 		dispatch({ type: "set-phase", phase: "shutting-down" });
 		try {
@@ -258,7 +260,8 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			restoreTerminal();
 			process.exit(0);
 		}, 500);
-	}, [state.phase]);
+		isShuttingDownRef.current = false;
+	}, []);
 
 	// Auto-copy selected text on mouse release
 	const handleMouseUp = useCallback(() => {
