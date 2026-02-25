@@ -93,6 +93,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			forgeDir: resolve(projectRoot, "forge"),
 			fresh: options.fresh,
 			genesisPath: resolveGenesisPath(),
+			channels: [],
 		}),
 		[options, projectRoot],
 	);

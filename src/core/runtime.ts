@@ -7,7 +7,7 @@ import { AuditLogger } from "../audit/logger.ts";
 import { ProtocolRegistry } from "../protocols/registry.ts";
 import { DirectiveStore } from "../directives/store.ts";
 import { DirectiveEngine } from "../directives/engine.ts";
-import { NotificationManager, TerminalChannel } from "./notifications.ts";
+import { NotificationManager, TerminalChannel, type NotificationChannel } from "./notifications.ts";
 import { discoverModules, discoverForgeModules } from "../modules/loader.ts";
 import type { FridayModule } from "../modules/types.ts";
 import { SmartsStore } from "../smarts/store.ts";
@@ -42,6 +42,7 @@ export interface RuntimeConfig extends Partial<FridayConfig> {
 	fresh?: boolean;
 	enableSensorium?: boolean;
 	genesisPath?: string;
+	channels?: NotificationChannel[];
 }
 
 export interface ProcessResult {
@@ -151,7 +152,7 @@ export class FridayRuntime {
 				"email-send",
 			]);
 			this._audit = new AuditLogger();
-			this._notifications = new NotificationManager([new TerminalChannel()]);
+			this._notifications = new NotificationManager(config.channels ?? [new TerminalChannel()]);
 			this._protocols = new ProtocolRegistry();
 			this._directives = new DirectiveStore();
 			this._directiveEngine = new DirectiveEngine({
