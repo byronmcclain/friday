@@ -2,6 +2,7 @@ import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
 import { assertSafeArg } from "../validation.ts";
 
 const MAX_OUTPUT_BYTES = 500_000;
+const LOGS_TIMEOUT_MS = 30_000;
 
 export const dockerLogs: FridayTool = {
 	name: "docker.logs",
@@ -68,10 +69,29 @@ export const dockerLogs: FridayTool = {
 			if (since) cmdParts.push("--since", since);
 			cmdParts.push(container);
 
-			const result = await Bun.$`${cmdParts}`.quiet().nothrow();
+			const proc = Bun.spawn(cmdParts, {
+				stdout: "pipe",
+				stderr: "pipe",
+			});
 
-			const stderr = result.stderr.toString().trim();
-			if (result.exitCode !== 0) {
+			const timeout = setTimeout(() => proc.kill(), LOGS_TIMEOUT_MS);
+
+			let stdout: string;
+			let stderr: string;
+			let exitCode: number;
+			try {
+				const [stdoutBuf, stderrBuf] = await Promise.all([
+					new Response(proc.stdout).text(),
+					new Response(proc.stderr).text(),
+				]);
+				exitCode = await proc.exited;
+				stdout = stdoutBuf;
+				stderr = stderrBuf.trim();
+			} finally {
+				clearTimeout(timeout);
+			}
+
+			if (exitCode !== 0) {
 				return {
 					success: false,
 					output: stderr || `Failed to get logs for ${container}`,
@@ -79,7 +99,6 @@ export const dockerLogs: FridayTool = {
 			}
 
 			// Docker logs may write to both stdout and stderr
-			let stdout = result.stdout.toString();
 			if (stdout.length > MAX_OUTPUT_BYTES) {
 				stdout = `${stdout.slice(0, MAX_OUTPUT_BYTES)}\n... (truncated)`;
 			}

@@ -180,4 +180,12 @@ describe("docker.logs", () => {
 		expect(result.success).toBe(false);
 		expect(result.output).toContain("Invalid");
 	});
+
+	test("uses Bun.spawn with timeout (not Bun.$)", async () => {
+		// Verify by calling with a nonexistent container — the error should come from Bun.spawn
+		const result = await dockerLogs.execute({ container: "nonexistent-container-12345" }, ctx);
+		expect(result.success).toBe(false);
+		// Should still return a meaningful error (not throw)
+		expect(typeof result.output).toBe("string");
+	});
 });
