@@ -115,6 +115,16 @@ describe("SQLiteMemory conversation indexing", () => {
 		expect(all).toHaveLength(0);
 	});
 
+	test("deleteAllConversations cleans up FTS5 embeddings", async () => {
+		const session = makeSession("s1", "test summary");
+		await memory.saveConversation(session);
+		const results = await memory.searchConversations("test");
+		expect(results.length).toBeGreaterThan(0);
+		await memory.deleteAllConversations();
+		const afterResults = await memory.searchConversations("test");
+		expect(afterResults.length).toBe(0);
+	});
+
 	test("saveConversation cleans up orphaned embeddings on prune", async () => {
 		const s1 = makeSession("will-survive", "Survivor conversation.", new Date("2026-02-22T10:00:00Z"));
 		const s2 = makeSession("will-die", "Doomed conversation.", new Date("2026-01-01T10:00:00Z"));

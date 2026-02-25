@@ -64,8 +64,8 @@ async function handleShow(memory: SQLiteMemory, id: string): Promise<ProtocolRes
 }
 
 async function handleClear(memory: SQLiteMemory): Promise<ProtocolResult> {
-  const sessions = await memory.getConversationHistory(10000);
-  const count = sessions.length;
+  const row = memory.database.query<{ n: number }, []>("SELECT COUNT(*) AS n FROM conversations").get();
+  const count = row?.n ?? 0;
   await memory.deleteAllConversations();
   return { success: true, summary: `Cleared ${count} conversation(s).` };
 }

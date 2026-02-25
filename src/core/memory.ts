@@ -178,6 +178,8 @@ export class SQLiteMemory {
   }
 
   async deleteAllConversations(): Promise<void> {
+    await this.purgeNamespace("conversations");
+    this.db.query("DELETE FROM kv WHERE namespace = ?").run("conversations");
     this.db.query("DELETE FROM conversations").run();
   }
 
