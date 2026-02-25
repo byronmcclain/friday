@@ -1,5 +1,5 @@
 import type { FridayConfig, ConversationMessage, ContentBlock } from "./types.ts";
-import { SYSTEM_PROMPT } from "./prompts.ts";
+import { GENESIS_TEMPLATE } from "./prompts.ts";
 import {
   createProvider,
   DEFAULT_PROVIDER,
@@ -248,7 +248,7 @@ export class Cortex {
   }
 
   private async buildSystemPrompt(userMessage: string): Promise<string> {
-    let prompt = SYSTEM_PROMPT;
+    let prompt = GENESIS_TEMPLATE;
 
     // SMARTS knowledge enrichment
     if (this.smartsStore) {

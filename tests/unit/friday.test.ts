@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { SYSTEM_PROMPT } from "../../src/core/prompts.ts";
+import { GENESIS_TEMPLATE } from "../../src/core/prompts.ts";
 import { Cortex } from "../../src/core/cortex.ts";
 import type { LLMProvider } from "../../src/providers/types.ts";
 import { PROVIDER_DEFAULTS } from "../../src/providers/index.ts";
@@ -10,12 +10,12 @@ import { stubProvider, grokStub, textResponse } from "../helpers/stubs.ts";
 
 describe("Cortex", () => {
   test("system prompt is defined and non-empty", () => {
-    expect(SYSTEM_PROMPT).toBeDefined();
-    expect(SYSTEM_PROMPT.length).toBeGreaterThan(0);
+    expect(GENESIS_TEMPLATE).toBeDefined();
+    expect(GENESIS_TEMPLATE.length).toBeGreaterThan(0);
   });
 
   test("system prompt includes Friday's identity", () => {
-    expect(SYSTEM_PROMPT).toContain("Friday");
+    expect(GENESIS_TEMPLATE).toContain("Friday");
   });
 
   test("defaults to grok provider", () => {
@@ -143,7 +143,7 @@ describe("Cortex — SMARTS integration", () => {
     expect(capturedPrompt).toContain("Security Basics");
   });
 
-  test("includes base SYSTEM_PROMPT in enriched prompt", async () => {
+  test("includes base GENESIS_TEMPLATE in enriched prompt", async () => {
     const cortex = new Cortex({
       injectedProvider: capturingProvider,
       smartsStore,
@@ -155,7 +155,7 @@ describe("Cortex — SMARTS integration", () => {
   test("works without smartsStore (backwards compatible)", async () => {
     const cortex = new Cortex({ injectedProvider: capturingProvider });
     await cortex.chat("Hello");
-    expect(capturedPrompt).toContain(SYSTEM_PROMPT);
+    expect(capturedPrompt).toContain(GENESIS_TEMPLATE);
     expect(capturedPrompt).not.toContain("Active Knowledge");
     // Without sensorium, falls back to a standalone Current Time section
     expect(capturedPrompt).toContain("## Current Time");
