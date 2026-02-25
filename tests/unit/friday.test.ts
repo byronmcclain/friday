@@ -77,6 +77,27 @@ describe("Cortex", () => {
     } catch {}
     expect(cortex.historyLength).toBe(0);
   });
+
+  test("uses genesisPrompt when provided", async () => {
+    let capturedPrompt = "";
+    const capturingProvider: LLMProvider = {
+      name: "capturing",
+      defaultModel: "capture",
+      defaultFastModel: "capture-fast",
+      chat: async (systemPrompt) => {
+        capturedPrompt = systemPrompt;
+        return textResponse("ok");
+      },
+    };
+
+    const cortex = new Cortex({
+      injectedProvider: capturingProvider,
+      genesisPrompt: "You are a custom identity.",
+    });
+    await cortex.chat("Hello");
+    expect(capturedPrompt).toContain("You are a custom identity.");
+    expect(capturedPrompt).not.toContain("Female Replacement Intelligent Digital Assistant Youth");
+  });
 });
 
 const TEST_DB_CORTEX = "/tmp/friday-test-cortex-smarts.db";

@@ -24,6 +24,7 @@ export interface CortexConfig extends Partial<FridayConfig> {
   audit?: AuditLogger;
   signals?: SignalBus;
   toolMemory?: ScopedMemory;
+  genesisPrompt?: string;
 }
 
 export class Cortex {
@@ -40,6 +41,7 @@ export class Cortex {
   private signals?: SignalBus;
   private toolMemory?: ScopedMemory;
   private pinnedSmarts = new Set<string>();
+  private genesisPrompt?: string;
 
   constructor(config: CortexConfig = {}) {
     const providerName = config.provider ?? DEFAULT_PROVIDER;
@@ -55,6 +57,7 @@ export class Cortex {
     this.audit = config.audit;
     this.signals = config.signals;
     this.toolMemory = config.toolMemory;
+    this.genesisPrompt = config.genesisPrompt;
   }
 
   get providerName(): string {
@@ -248,7 +251,7 @@ export class Cortex {
   }
 
   private async buildSystemPrompt(userMessage: string): Promise<string> {
-    let prompt = GENESIS_TEMPLATE;
+    let prompt = this.genesisPrompt ?? GENESIS_TEMPLATE;
 
     // SMARTS knowledge enrichment
     if (this.smartsStore) {
