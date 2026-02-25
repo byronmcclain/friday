@@ -3,6 +3,8 @@ import type { Cortex } from "../core/cortex.ts";
 import type { ProtocolRegistry } from "../protocols/registry.ts";
 import type { ClearanceManager } from "../core/clearance.ts";
 import type { AuditLogger } from "../audit/logger.ts";
+import type { SignalBus } from "../core/events.ts";
+import type { ScopedMemory } from "../core/memory.ts";
 import type { ToolContext, ProtocolContext } from "../modules/types.ts";
 
 export interface ExecutorConfig {
@@ -10,6 +12,8 @@ export interface ExecutorConfig {
 	protocols: ProtocolRegistry;
 	clearance: ClearanceManager;
 	audit: AuditLogger;
+	signals?: SignalBus;
+	memory?: ScopedMemory;
 }
 
 export interface ExecutionResult {
@@ -23,12 +27,16 @@ export class RhythmExecutor {
 	private protocols: ProtocolRegistry;
 	private clearance: ClearanceManager;
 	private audit: AuditLogger;
+	private signals?: SignalBus;
+	private memory?: ScopedMemory;
 
 	constructor(config: ExecutorConfig) {
 		this.cortex = config.cortex;
 		this.protocols = config.protocols;
 		this.clearance = config.clearance;
 		this.audit = config.audit;
+		this.signals = config.signals;
+		this.memory = config.memory;
 	}
 
 	async execute(rhythm: Rhythm): Promise<ExecutionResult> {
@@ -129,8 +137,8 @@ export class RhythmExecutor {
 		return {
 			workingDirectory: process.cwd(),
 			audit: this.audit,
-			signal: { emit: async () => {} },
-			memory: {
+			signal: this.signals ?? { emit: async () => {} },
+			memory: this.memory ?? {
 				get: async () => undefined,
 				set: async () => {},
 				delete: async () => {},

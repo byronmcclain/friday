@@ -262,6 +262,8 @@ export class FridayRuntime {
 					protocols: this._protocols,
 					clearance: this._clearance,
 					audit: this._audit,
+					signals: this._signals,
+					memory: this._memory?.scoped("arc-rhythm"),
 				});
 				this._rhythmScheduler = new RhythmScheduler({
 					store: this._rhythmStore,
