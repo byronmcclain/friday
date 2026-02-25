@@ -16,6 +16,54 @@ function createMemoryStub(): ScopedMemory {
 	};
 }
 
+describe("SecretStore.decodeEnvKey", () => {
+	test("decodes valid base64 string that produces exactly 32 bytes", () => {
+		// Generate a 32-byte key and encode as base64
+		const original = Buffer.alloc(32);
+		for (let i = 0; i < 32; i++) original[i] = i + 65; // ASCII A-Z...
+		const b64 = original.toString("base64");
+		const decoded = SecretStore.decodeEnvKey(b64);
+		expect(decoded.length).toBe(32);
+		expect(decoded).toEqual(original);
+	});
+
+	test("treats plain string as UTF-8 padded to 32 bytes", () => {
+		const plainKey = "my-simple-password";
+		const decoded = SecretStore.decodeEnvKey(plainKey);
+		expect(decoded.length).toBe(32);
+		// First bytes should match the plain string
+		const expected = Buffer.alloc(32);
+		Buffer.from(plainKey, "utf-8").copy(expected);
+		expect(decoded).toEqual(expected);
+	});
+
+	test("truncates long UTF-8 string to 32 bytes", () => {
+		const longKey = "A".repeat(64);
+		const decoded = SecretStore.decodeEnvKey(longKey);
+		expect(decoded.length).toBe(32);
+		expect(decoded.toString("utf-8")).toBe("A".repeat(32));
+	});
+
+	test("pads short UTF-8 string with zero bytes", () => {
+		const shortKey = "abc";
+		const decoded = SecretStore.decodeEnvKey(shortKey);
+		expect(decoded.length).toBe(32);
+		expect(decoded[0]).toBe(97); // 'a'
+		expect(decoded[3]).toBe(0); // zero padding
+	});
+
+	test("base64 key that decodes to non-32-byte length is treated as plain string", () => {
+		// "aGVsbG8=" decodes to "hello" (5 bytes, not 32)
+		const decoded = SecretStore.decodeEnvKey("aGVsbG8=");
+		expect(decoded.length).toBe(32);
+		// Should be treated as UTF-8 of the literal string "aGVsbG8="
+		const expected = Buffer.alloc(32);
+		Buffer.from("aGVsbG8=", "utf-8").copy(expected);
+		expect(decoded).toEqual(expected);
+	});
+});
+
+
 describe("SecretStore", () => {
 	test("encrypt then decrypt returns original value", async () => {
 		const secrets = new SecretStore(createMemoryStub(), {

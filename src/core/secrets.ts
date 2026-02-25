@@ -33,7 +33,14 @@ export class SecretStore {
 			return this.masterKey;
 		}
 
-		// Try OS keychain
+		// Env var — handle both base64 and plain string formats
+		const envKey = process.env.FRIDAY_SECRET_KEY;
+		if (envKey) {
+			this.masterKey = SecretStore.decodeEnvKey(envKey);
+			return this.masterKey;
+		}
+
+		// Try OS keychain (returns base64-encoded key)
 		const existing = await this.readKeychain();
 		if (existing) {
 			this.masterKey = Buffer.from(existing, "base64");
@@ -47,12 +54,25 @@ export class SecretStore {
 		return this.masterKey;
 	}
 
-	private async readKeychain(): Promise<string | null> {
-		// Env var fallback
-		if (process.env.FRIDAY_SECRET_KEY) {
-			return process.env.FRIDAY_SECRET_KEY;
+	/** Decode FRIDAY_SECRET_KEY: if valid base64 producing exactly 32 bytes, use as-is; otherwise treat as UTF-8 padded/truncated to 32 bytes. */
+	static decodeEnvKey(envKey: string): Buffer {
+		try {
+			const decoded = Buffer.from(envKey, "base64");
+			// Verify it round-trips cleanly and is exactly 32 bytes
+			if (decoded.length === 32 && decoded.toString("base64") === envKey) {
+				return decoded;
+			}
+		} catch {
+			// Not valid base64
 		}
+		// Treat as plain UTF-8 string — pad or truncate to 32 bytes
+		const raw = Buffer.from(envKey, "utf-8");
+		const key = Buffer.alloc(32);
+		raw.copy(key, 0, 0, Math.min(raw.length, 32));
+		return key;
+	}
 
+	private async readKeychain(): Promise<string | null> {
 		const platform = process.platform;
 		try {
 			if (platform === "darwin") {
