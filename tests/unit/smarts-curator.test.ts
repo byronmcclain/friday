@@ -150,7 +150,7 @@ That's what I found.`),
 		expect(usedModel).toBe("custom-fast-model");
 	});
 
-	test("falls back to defaultModel when no fast model given", async () => {
+	test("falls back to defaultFastModel when no fast model given", async () => {
 		let usedModel = "";
 		const modelCapture: LLMProvider = {
 			name: "model-capture",
@@ -163,7 +163,13 @@ That's what I found.`),
 		};
 		const curator = new SmartsCurator(store, modelCapture);
 		await curator.extractFromConversation(makeMessages(10));
-		expect(usedModel).toBe("default-reasoning");
+		expect(usedModel).toBe("default-fast");
+	});
+
+	test("falls back to defaultFastModel not expensive reasoning model", () => {
+		const provider = { defaultModel: "expensive-model", defaultFastModel: "cheap-model" } as LLMProvider;
+		const curator = new SmartsCurator(store, provider);
+		expect(curator["model"]).toBe("cheap-model");
 	});
 
 	test("handles provider error gracefully", async () => {

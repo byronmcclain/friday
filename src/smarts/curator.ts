@@ -120,7 +120,7 @@ export class SmartsCurator {
 		private provider: LLMProvider,
 		fastModel?: string,
 	) {
-		this.model = fastModel ?? provider.defaultModel;
+		this.model = fastModel ?? provider.defaultFastModel;
 	}
 
 	async extractFromConversation(messages: ConversationMessage[]): Promise<void> {
