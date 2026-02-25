@@ -11,7 +11,7 @@ export interface WelcomeInfo {
 }
 
 export interface AppState {
-	phase: "splash" | "fading" | "booting" | "active" | "shutting-down";
+	phase: "splash" | "booting" | "active" | "shutting-down";
 	messages: Message[];
 	isThinking: boolean;
 	welcomeInfo?: WelcomeInfo;

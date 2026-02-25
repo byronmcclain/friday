@@ -402,7 +402,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 	);
 
 	// Gate chat behind splash completion
-	if (state.phase === "splash" || state.phase === "fading") {
+	if (state.phase === "splash") {
 		if (logoDataRef.current) {
 			return (
 				<box

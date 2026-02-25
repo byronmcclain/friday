@@ -86,12 +86,12 @@ describe("TUI state reducer", () => {
 		expect(state.phase).toBe("splash");
 	});
 
-	test("set-phase accepts fading phase", () => {
+	test("set-phase accepts booting phase", () => {
 		const state = appReducer(initialState, {
 			type: "set-phase",
-			phase: "fading",
+			phase: "booting",
 		});
-		expect(state.phase).toBe("fading");
+		expect(state.phase).toBe("booting");
 	});
 
 	test("initialState phase is splash", () => {
