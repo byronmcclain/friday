@@ -61,6 +61,11 @@ export class RhythmScheduler {
 		}
 	}
 
+	async executeById(rhythmId: string): Promise<void> {
+		if (this.inflight.has(rhythmId)) throw new Error("Rhythm is already running");
+		await this.executeRhythm(rhythmId);
+	}
+
 	async tick(): Promise<void> {
 		const now = new Date();
 		const due = this.store.getDueRhythms(now);

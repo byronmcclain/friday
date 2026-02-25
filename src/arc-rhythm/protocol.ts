@@ -38,7 +38,7 @@ export function createArcProtocol(
 				case "history":
 					return handleHistory(store, rest);
 				case "run":
-					return handleRun(scheduler, rest);
+					return handleRun(store, scheduler, rest);
 				default:
 					return { success: false, summary: `Unknown subcommand: ${subcommand}. Use: list, show, create, pause, resume, delete, history, run` };
 			}
@@ -158,9 +158,19 @@ function handleHistory(store: RhythmStore, rest: string): ProtocolResult {
 }
 
 async function handleRun(
+	store: RhythmStore,
 	scheduler: RhythmScheduler,
-	_id: string,
+	id: string,
 ): Promise<ProtocolResult> {
-	await scheduler.tick();
-	return { success: true, summary: "Manual tick completed." };
+	const rhythmId = id.trim();
+	if (!rhythmId) return { success: false, summary: "Usage: /arc run <id>" };
+	const rhythm = store.get(rhythmId);
+	if (!rhythm) return { success: false, summary: `Rhythm not found: ${rhythmId}` };
+	try {
+		await scheduler.executeById(rhythm.id);
+		return { success: true, summary: `Ran rhythm "${rhythm.name}"` };
+	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err);
+		return { success: false, summary: `Failed to run rhythm: ${msg}` };
+	}
 }
