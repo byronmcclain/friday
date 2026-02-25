@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { ConversationMessage, ContentBlock } from "../core/types.ts";
+import type { ConversationMessage, ContentBlock, ToolUseBlock } from "../core/types.ts";
 import type { ChatOptions, ChatResponse, ToolDefinition, LLMProvider } from "./types.ts";
 import { toJsonSchema } from "./tool-schema.ts";
 
@@ -64,7 +64,7 @@ export function toGrokMessages(
 
     // Assistant message with text and/or tool_use blocks
     const textBlocks = blocks.filter((b) => b.type === "text");
-    const toolUseBlocks = blocks.filter((b) => b.type === "tool_use");
+    const toolUseBlocks = blocks.filter((b): b is ToolUseBlock => b.type === "tool_use");
 
     const textContent = textBlocks
       .map((b) => (b.type === "text" ? b.text : ""))
@@ -76,19 +76,14 @@ export function toGrokMessages(
     };
 
     if (toolUseBlocks.length > 0) {
-      grokMsg.tool_calls = toolUseBlocks
-        .filter((b) => b.type === "tool_use")
-        .map((b) => {
-          if (b.type !== "tool_use") throw new Error("unreachable");
-          return {
-            id: b.id,
-            type: "function" as const,
-            function: {
-              name: b.name,
-              arguments: JSON.stringify(b.input),
-            },
-          };
-        });
+      grokMsg.tool_calls = toolUseBlocks.map((b) => ({
+        id: b.id,
+        type: "function" as const,
+        function: {
+          name: b.name,
+          arguments: JSON.stringify(b.input),
+        },
+      }));
     }
 
     result.push(grokMsg);

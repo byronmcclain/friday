@@ -4,6 +4,7 @@ import { PALETTE } from "../theme.ts";
 import { lerpColor } from "../lib/color-utils.ts";
 import type { LogoData } from "../lib/logo-processor.ts";
 import type { ParsedLine } from "../lib/ansi-parser.ts";
+import { version } from "../../../../package.json";
 
 const HOLD_MS = 2000;
 const FADE_MS = 1500;
@@ -114,7 +115,7 @@ export function SplashScreen({ logoData, onComplete }: SplashScreenProps) {
 				<text fg={subtitleColor} wrapMode="none">
 					Female Replacement Intelligent Digital Assistant Youth
 				</text>
-				<text fg={versionColor} wrapMode="none">── v0.1.0 ──</text>
+				<text fg={versionColor} wrapMode="none">{`── v${version} ──`}</text>
 			</box>
 		</box>
 	);

@@ -116,8 +116,9 @@ export const forgeValidate: FridayTool = {
 					error: stderr.slice(0, 500),
 				});
 			}
-		} catch {
-			steps.push({ name: "typecheck", passed: true }); // Skip if tsc not available
+		} catch (err: unknown) {
+			const isNotFound = err && typeof err === "object" && "code" in err && (err as { code: string }).code === "ENOENT";
+			steps.push({ name: "typecheck", passed: isNotFound });
 		}
 
 		// Step 4: Lint (best-effort, non-blocking)
@@ -143,8 +144,9 @@ export const forgeValidate: FridayTool = {
 					error: stdout.slice(0, 500),
 				});
 			}
-		} catch {
-			steps.push({ name: "lint", passed: true }); // Skip if biome not available
+		} catch (err: unknown) {
+			const isNotFound = err && typeof err === "object" && "code" in err && (err as { code: string }).code === "ENOENT";
+			steps.push({ name: "lint", passed: isNotFound });
 		}
 
 		const allPassed = steps.every((s) => s.passed);

@@ -22,7 +22,6 @@ export function validateModule(mod: FridayModule): ValidationResult {
 
 export async function discoverModules(modulesDir: string): Promise<FridayModule[]> {
   const modules: FridayModule[] = [];
-  const { resolve } = await import("node:path");
   const glob = new Bun.Glob("*/index.ts");
   const resolvedDir = resolve(modulesDir);
 

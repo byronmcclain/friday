@@ -51,7 +51,7 @@ function expandShorthand(expr: string): string {
 function replaceNames(token: string, names: Record<string, number>): string {
 	let result = token;
 	for (const [name, value] of Object.entries(names)) {
-		result = result.replace(new RegExp(name, "gi"), String(value));
+		result = result.replace(new RegExp(`\\b${name}\\b`, "gi"), String(value));
 	}
 	return result;
 }
