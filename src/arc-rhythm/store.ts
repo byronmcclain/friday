@@ -64,6 +64,7 @@ export interface LogExecutionInput {
 }
 
 export class RhythmStore {
+	private static readonly MAX_HISTORY_PER_RHYTHM = 100;
 	private db: Database;
 
 	constructor(db: Database) {
@@ -106,6 +107,7 @@ export class RhythmStore {
 		`);
 		this.db.run("CREATE INDEX IF NOT EXISTS idx_rhythm_executions_rhythm_id ON rhythm_executions(rhythm_id)");
 		this.db.run("CREATE INDEX IF NOT EXISTS idx_rhythm_executions_started_at ON rhythm_executions(started_at)");
+		this.db.run("CREATE INDEX IF NOT EXISTS idx_rhythm_executions_rhythm_started ON rhythm_executions(rhythm_id, started_at DESC)");
 		this.db.run("CREATE INDEX IF NOT EXISTS idx_rhythms_next_run ON rhythms(next_run)");
 		this.db.run("CREATE INDEX IF NOT EXISTS idx_rhythms_enabled ON rhythms(enabled)");
 	}
@@ -251,6 +253,19 @@ export class RhythmStore {
 				`UPDATE rhythm_executions SET status = ?, completed_at = ?, result = ?, error = ? WHERE id = ?`,
 			)
 			.run(status, new Date().toISOString(), result ?? null, error ?? null, id);
+
+		// Prune old execution entries beyond the retention limit
+		this.db
+			.query<void, [string, string, number]>(
+				`DELETE FROM rhythm_executions WHERE rhythm_id = (
+					SELECT rhythm_id FROM rhythm_executions WHERE id = ?
+				) AND id NOT IN (
+					SELECT id FROM rhythm_executions WHERE rhythm_id = (
+						SELECT rhythm_id FROM rhythm_executions WHERE id = ?
+					) ORDER BY started_at DESC LIMIT ?
+				)`,
+			)
+			.run(id, id, RhythmStore.MAX_HISTORY_PER_RHYTHM);
 	}
 
 	getHistory(rhythmId?: string, limit = 20): RhythmExecution[] {

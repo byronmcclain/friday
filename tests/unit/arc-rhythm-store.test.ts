@@ -190,6 +190,25 @@ describe("RhythmStore scheduling state", () => {
 		expect(due[0]!.name).toBe("Due");
 	});
 
+	test("completeExecution() prunes history beyond 100 entries per rhythm", () => {
+		const rhythm = store.create({ name: "Prunable", description: "", cron: "* * * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
+		// Create 105 executions
+		const execIds: string[] = [];
+		for (let i = 0; i < 105; i++) {
+			const exec = store.logExecution({
+				rhythmId: rhythm.id,
+				startedAt: new Date(Date.now() + i * 1000),
+				status: "running",
+			});
+			execIds.push(exec.id);
+		}
+		// Complete the last execution — triggers pruning
+		store.completeExecution(execIds[104]!, "success", "done");
+		// Should retain only 100 entries
+		const allHistory = store.getHistory(rhythm.id, 200);
+		expect(allHistory.length).toBe(100);
+	});
+
 	test("remove() cascades to rhythm_executions", () => {
 		const rhythm = store.create({ name: "A", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
 		store.logExecution({ rhythmId: rhythm.id, startedAt: new Date(), status: "success" });
