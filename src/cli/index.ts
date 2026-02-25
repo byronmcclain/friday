@@ -4,6 +4,7 @@ import boxen from "boxen";
 import { version, description } from "../../package.json";
 import { chatCommand } from "./commands/chat.ts";
 import { serveCommand } from "./commands/serve.ts";
+import { genesisCommand } from "./commands/genesis.ts";
 
 const program = new Command();
 
@@ -28,6 +29,7 @@ program
 // Register commands
 chatCommand(program);
 serveCommand(program);
+genesisCommand(program);
 
 // Default action: start interactive chat
 program.action(async () => {
