@@ -105,7 +105,7 @@ export async function enforceGenesisPermissions(path: string): Promise<void> {
 	}
 	try {
 		await chmod(path, 0o600);
-	} catch {
-		/* file may not exist yet */
+	} catch (err) {
+		console.warn(`[Genesis] Could not enforce permissions on ${path}:`, err instanceof Error ? err.message : err);
 	}
 }
