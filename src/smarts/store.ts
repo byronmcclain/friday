@@ -209,10 +209,19 @@ export class SmartsStore {
 
   async reindex(): Promise<void> {
     await this.memory.purgeNamespace(SMARTS_NAMESPACE);
-    this.entries.clear();
-    this.embeddingIds.clear();
-    const dir = resolve(this.config.smartsDir);
-    await this.scanAndIndex(dir);
+    const newEntries = new Map<string, SmartEntry>();
+    const newEmbeddingIds = new Map<string, string>();
+    const oldEntries = this.entries;
+    const oldEmbeddingIds = this.embeddingIds;
+    this.entries = newEntries;
+    this.embeddingIds = newEmbeddingIds;
+    try {
+      await this.scanAndIndex(resolve(this.config.smartsDir));
+    } catch (err) {
+      this.entries = oldEntries;
+      this.embeddingIds = oldEmbeddingIds;
+      throw err;
+    }
   }
 
   domains(): string[] {
