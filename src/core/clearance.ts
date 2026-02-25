@@ -8,7 +8,8 @@ export type ClearanceName =
   | "git-write"
   | "provider"
   | "system"
-  | "forge-modify";
+  | "forge-modify"
+  | "email-send";
 
 export interface ClearanceCheck {
   granted: boolean;
