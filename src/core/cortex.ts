@@ -115,7 +115,16 @@ export class Cortex {
           success: true,
         });
         if (this.debugLogPath) {
-          await Bun.write(this.debugLogPath, systemPrompt);
+          try {
+            await Bun.write(this.debugLogPath, systemPrompt);
+          } catch {
+            this.audit?.log({
+              action: "debug:write-failed",
+              source: "cortex",
+              detail: `Failed to write ${this.debugLogPath}`,
+              success: false,
+            });
+          }
         }
       }
       const toolDefs = this.toToolDefinitions();
