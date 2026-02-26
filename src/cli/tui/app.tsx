@@ -51,6 +51,7 @@ interface FridayAppProps {
 		model?: string;
 		fastModel?: string;
 		fresh?: boolean;
+		debug?: boolean;
 	};
 	renderer: Awaited<ReturnType<typeof createCliRenderer>>;
 }
@@ -492,6 +493,7 @@ export async function launchTui(options: {
 	model?: string;
 	fastModel?: string;
 	fresh?: boolean;
+	debug?: boolean;
 }): Promise<void> {
 	if (!process.stdin.isTTY) {
 		console.error(

@@ -22,13 +22,15 @@ export function chatCommand(program: Command): void {
 			"--fresh",
 			"Start a fresh session without loading previous conversation",
 		)
-		.action(async (options) => {
+		.action(async function (this: Command, options) {
+			const globalOpts = this.optsWithGlobals();
 			const { launchTui } = await import("../tui/app.tsx");
 			await launchTui({
 				provider: options.provider,
 				model: options.model,
 				fastModel: options.fastModel,
 				fresh: options.fresh,
+				debug: globalOpts.debug,
 			});
 		});
 }

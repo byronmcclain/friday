@@ -14,6 +14,7 @@ program
   .name("friday")
   .description(description)
   .version(version)
+  .option("--debug", "Enable debug prompt logging")
   .hook("preAction", () => {
     if (bannerShown) return;
     bannerShown = true;
