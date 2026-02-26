@@ -72,7 +72,7 @@ describe("FridayRuntime", () => {
 	test("shutdown calls onProgress callback for each step", async () => {
 		runtime = new FridayRuntime();
 		await runtime.boot({ injectedProvider: stubProvider });
-		const validSteps: ShutdownStep[] = ["sensorium", "conversation", "knowledge", "modules", "cleanup"];
+		const validSteps: ShutdownStep[] = ["arc-rhythm", "vox", "sensorium", "conversation", "knowledge", "modules", "cleanup"];
 		const captured: Array<{ step: ShutdownStep; label: string }> = [];
 		await runtime.shutdown((step, label) => {
 			captured.push({ step, label });

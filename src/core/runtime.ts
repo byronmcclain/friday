@@ -32,6 +32,11 @@ import { createManageRhythmTool } from "../arc-rhythm/tool.ts";
 import { mkdir } from "node:fs/promises";
 import { loadGenesis, enforceGenesisPermissions } from "./genesis.ts";
 import { setProtectedPaths } from "../modules/filesystem/containment.ts";
+import { Vox } from "./voice/vox.ts";
+import { VOX_DEFAULTS } from "./voice/types.ts";
+import { VoiceChannel } from "./voice/channel.ts";
+import { createVoiceProtocol } from "./voice/protocol.ts";
+import type { GrokVoice } from "./voice/types.ts";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
 	modulesDir?: string;
@@ -41,6 +46,7 @@ export interface RuntimeConfig extends Partial<FridayConfig> {
 	forgeDir?: string;
 	fresh?: boolean;
 	enableSensorium?: boolean;
+	enableVox?: boolean;
 	genesisPath?: string;
 	channels?: NotificationChannel[];
 }
@@ -50,7 +56,7 @@ export interface ProcessResult {
 	source: "protocol" | "cortex";
 }
 
-export type ShutdownStep = "arc-rhythm" | "sensorium" | "conversation" | "knowledge" | "modules" | "cleanup";
+export type ShutdownStep = "arc-rhythm" | "vox" | "sensorium" | "conversation" | "knowledge" | "modules" | "cleanup";
 
 export class FridayRuntime {
 	private _cortex!: Cortex;
@@ -70,6 +76,7 @@ export class FridayRuntime {
 	private _memory?: SQLiteMemory;
 	private _rhythmStore?: RhythmStore;
 	private _rhythmScheduler?: RhythmScheduler;
+	private _vox?: Vox;
 	private _fastModel!: string;
 	private _sessionId?: string;
 	private _sessionStartedAt?: Date;
@@ -118,6 +125,10 @@ export class FridayRuntime {
 		return this._sensorium;
 	}
 
+	get vox(): Vox | undefined {
+		return this._vox;
+	}
+
 	get notifications(): NotificationManager | undefined {
 		return this._booted ? this._notifications : undefined;
 	}
@@ -150,6 +161,7 @@ export class FridayRuntime {
 				"system",
 				"forge-modify",
 				"email-send",
+				"audio-output",
 			]);
 			this._audit = new AuditLogger();
 			this._notifications = new NotificationManager(config.channels ?? [new TerminalChannel()]);
@@ -230,6 +242,18 @@ export class FridayRuntime {
 				});
 			}
 
+			// Vox — voice output (before Cortex so vox ref can be passed in)
+			if (config.enableVox !== false) {
+				const voice = (process.env.FRIDAY_VOICE as GrokVoice) ?? VOX_DEFAULTS.defaultVoice;
+				this._vox = new Vox({
+					config: { ...VOX_DEFAULTS, defaultVoice: voice },
+					signals: this._signals,
+					notifications: this._notifications,
+				});
+				this._notifications.addChannel(new VoiceChannel(this._vox));
+				this._protocols.register(createVoiceProtocol(this._vox));
+			}
+
 			this._cortex = new Cortex({
 				provider: providerName,
 				model: reasoningModel,
@@ -242,6 +266,7 @@ export class FridayRuntime {
 				signals: this._signals,
 				toolMemory: this._memory?.scoped("tools"),
 				genesisPrompt,
+				vox: this._vox,
 			});
 
 			// Register sensorium tool on Cortex (needs Cortex to exist)
@@ -356,6 +381,12 @@ export class FridayRuntime {
 				}
 			} catch { /* best-effort */ }
 			try {
+				if (this._vox) {
+					this._vox.stop();
+					this._vox = undefined;
+				}
+			} catch { /* best-effort */ }
+			try {
 				if (this._sensorium) {
 					this._sensorium.stop();
 					this._sensorium = undefined;
@@ -433,6 +464,17 @@ export class FridayRuntime {
 			}
 		} catch (err) {
 			console.warn("Arc Rhythm shutdown failed:", err instanceof Error ? err.message : err);
+		}
+
+		// Stop Vox voice output
+		try {
+			if (this._vox) {
+				onProgress?.("vox", "Stopping voice output...");
+				this._vox.stop();
+				this._vox = undefined;
+			}
+		} catch (err) {
+			console.warn("Vox shutdown failed:", err instanceof Error ? err.message : err);
 		}
 
 		// Stop sensorium polling before cleanup
