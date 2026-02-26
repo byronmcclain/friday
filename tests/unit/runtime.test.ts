@@ -627,3 +627,35 @@ describe("FridayRuntime — Genesis", () => {
 		expect(isProtectedPath(TEST_GENESIS_PATH)).toBe(true);
 	});
 });
+
+describe("FridayRuntime — debug mode", () => {
+	test("passes debug flag to Cortex when enabled", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({
+			injectedProvider: stubProvider,
+			enableSensorium: false,
+			enableVox: false,
+			debug: true,
+		});
+
+		const entries = runtime.audit.entries({ action: "debug:enabled" });
+		expect(entries).toHaveLength(1);
+		expect(entries[0]!.detail).toContain("debug-prompt.log");
+
+		await runtime.shutdown();
+	});
+
+	test("does not log debug:enabled when debug is false", async () => {
+		const runtime = new FridayRuntime();
+		await runtime.boot({
+			injectedProvider: stubProvider,
+			enableSensorium: false,
+			enableVox: false,
+		});
+
+		const entries = runtime.audit.entries({ action: "debug:enabled" });
+		expect(entries).toHaveLength(0);
+
+		await runtime.shutdown();
+	});
+});
