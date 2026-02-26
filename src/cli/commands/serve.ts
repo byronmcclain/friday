@@ -18,7 +18,8 @@ export function serveCommand(program: Command): void {
 			DEFAULT_PROVIDER,
 		)
 		.option("-m, --model <model>", "Default model (defaults per provider)")
-		.action(async (options) => {
+		.action(async function (this: Command, options) {
+			const globalOpts = this.optsWithGlobals();
 			const port = Number.parseInt(options.port, 10);
 			if (Number.isNaN(port) || port < 1 || port > 65535) {
 				console.error(chalk.red("Invalid port number"));
@@ -35,6 +36,7 @@ export function serveCommand(program: Command): void {
 					smartsDir: resolve(projectRoot, "smarts"),
 					dataDir: resolve(projectRoot, "data"),
 					modulesDir: resolve(projectRoot, "src/modules"),
+					debug: globalOpts.debug,
 				},
 			});
 

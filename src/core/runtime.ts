@@ -49,6 +49,7 @@ export interface RuntimeConfig extends Partial<FridayConfig> {
 	enableVox?: boolean;
 	genesisPath?: string;
 	channels?: NotificationChannel[];
+	debug?: boolean;
 }
 
 export interface ProcessResult {
