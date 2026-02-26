@@ -27,6 +27,8 @@ export interface CortexConfig extends Partial<FridayConfig> {
   toolMemory?: ScopedMemory;
   genesisPrompt?: string;
   vox?: Vox;
+  debug?: boolean;
+  projectRoot?: string;
 }
 
 export class Cortex {
@@ -45,6 +47,8 @@ export class Cortex {
   private pinnedSmarts = new Set<string>();
   private genesisPrompt?: string;
   private vox?: Vox;
+  private debug: boolean;
+  private debugLogPath?: string;
 
   constructor(config: CortexConfig = {}) {
     const providerName = config.provider ?? DEFAULT_PROVIDER;
@@ -62,6 +66,10 @@ export class Cortex {
     this.toolMemory = config.toolMemory;
     this.genesisPrompt = config.genesisPrompt;
     this.vox = config.vox;
+    this.debug = config.debug ?? false;
+    if (this.debug && config.projectRoot) {
+      this.debugLogPath = `${config.projectRoot}/debug-prompt.log`;
+    }
   }
 
   get providerName(): string {
@@ -99,6 +107,17 @@ export class Cortex {
 
     try {
       const systemPrompt = await this.buildSystemPrompt(userMessage);
+      if (this.debug) {
+        this.audit?.log({
+          action: "debug:system-prompt",
+          source: "cortex",
+          detail: systemPrompt,
+          success: true,
+        });
+        if (this.debugLogPath) {
+          await Bun.write(this.debugLogPath, systemPrompt);
+        }
+      }
       const toolDefs = this.toToolDefinitions();
       const options = {
         model: this.model,

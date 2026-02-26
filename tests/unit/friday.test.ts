@@ -6,6 +6,7 @@ import { PROVIDER_DEFAULTS } from "../../src/providers/index.ts";
 import { SmartsStore } from "../../src/smarts/store.ts";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 import { mkdir, writeFile, rm, unlink } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { stubProvider, grokStub, textResponse } from "../helpers/stubs.ts";
 
 describe("Cortex", () => {
@@ -259,5 +260,104 @@ describe("Cortex — Sensorium integration", () => {
     await cortex.chat("Hello");
 
     expect(capturedPrompt).not.toContain("[ENVIRONMENT]");
+  });
+});
+
+const DEBUG_LOG_PATH = "/tmp/debug-prompt.log";
+
+describe("Cortex — debug prompt logging", () => {
+  afterEach(async () => {
+    await unlink(DEBUG_LOG_PATH).catch(() => {});
+  });
+
+  test("writes system prompt to debug-prompt.log when debug enabled", async () => {
+    let capturedPrompt = "";
+    const capturingProvider: LLMProvider = {
+      name: "capturing",
+      defaultModel: "capture",
+      defaultFastModel: "capture-fast",
+      chat: async (systemPrompt) => {
+        capturedPrompt = systemPrompt;
+        return textResponse("ok");
+      },
+    };
+
+    const cortex = new Cortex({
+      injectedProvider: capturingProvider,
+      debug: true,
+      projectRoot: "/tmp",
+    });
+    await cortex.chat("Hello");
+
+    const fileContent = await Bun.file(DEBUG_LOG_PATH).text();
+    expect(fileContent).toBe(capturedPrompt);
+  });
+
+  test("logs audit entry with action debug:system-prompt when debug enabled", async () => {
+    const { AuditLogger } = await import("../../src/audit/logger.ts");
+    const audit = new AuditLogger();
+
+    const cortex = new Cortex({
+      injectedProvider: stubProvider,
+      debug: true,
+      projectRoot: "/tmp",
+      audit,
+    });
+    await cortex.chat("Hello");
+
+    const entries = audit.entries({ action: "debug:system-prompt" });
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.source).toBe("cortex");
+    expect(entries[0]!.detail.length).toBeGreaterThan(0);
+  });
+
+  test("does NOT write debug-prompt.log when debug is false", async () => {
+    const cortex = new Cortex({
+      injectedProvider: stubProvider,
+      debug: false,
+      projectRoot: "/tmp",
+    });
+    await cortex.chat("Hello");
+
+    expect(existsSync(DEBUG_LOG_PATH)).toBe(false);
+  });
+
+  test("does NOT write debug-prompt.log when debug is true but no projectRoot", async () => {
+    const cortex = new Cortex({
+      injectedProvider: stubProvider,
+      debug: true,
+    });
+    await cortex.chat("Hello");
+
+    expect(existsSync(DEBUG_LOG_PATH)).toBe(false);
+  });
+
+  test("overwrites debug-prompt.log on each chat() call", async () => {
+    let capturedPrompt = "";
+    const capturingProvider: LLMProvider = {
+      name: "capturing",
+      defaultModel: "capture",
+      defaultFastModel: "capture-fast",
+      chat: async (systemPrompt) => {
+        capturedPrompt = systemPrompt;
+        return textResponse("ok");
+      },
+    };
+
+    // Pre-seed file with known content that differs from any system prompt
+    await Bun.write(DEBUG_LOG_PATH, "STALE CONTENT");
+
+    const cortex = new Cortex({
+      injectedProvider: capturingProvider,
+      debug: true,
+      projectRoot: "/tmp",
+    });
+
+    await cortex.chat("Hello");
+    const content = await Bun.file(DEBUG_LOG_PATH).text();
+
+    expect(content).not.toBe("STALE CONTENT");
+    expect(content).toBe(capturedPrompt);
+    expect(content.length).toBeGreaterThan(0);
   });
 });
