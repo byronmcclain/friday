@@ -269,6 +269,8 @@ export class FridayRuntime {
 				toolMemory: this._memory?.scoped("tools"),
 				genesisPrompt,
 				vox: this._vox,
+				debug: config.debug,
+				projectRoot: process.cwd(),
 			});
 
 			// Register sensorium tool on Cortex (needs Cortex to exist)
@@ -365,6 +367,15 @@ export class FridayRuntime {
 				detail: `Friday online. Provider: ${this._cortex.providerName}, Modules: ${this._modules.length}`,
 				success: true,
 			});
+
+			if (config.debug) {
+				this._audit.log({
+					action: "debug:enabled",
+					source: "runtime",
+					detail: "Debug prompt logging active — system prompts will be written to debug-prompt.log",
+					success: true,
+				});
+			}
 		} catch (err) {
 			this._booted = false;
 			// Unload any successfully-loaded modules
