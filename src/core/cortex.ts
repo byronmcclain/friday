@@ -14,6 +14,7 @@ import { type Sensorium, formatDateTime } from "../sensorium/sensorium.ts";
 import type { AuditLogger } from "../audit/logger.ts";
 import type { SignalBus, SignalEmitter } from "./events.ts";
 import type { ScopedMemory } from "./memory.ts";
+import type { Vox } from "./voice/vox.ts";
 
 export interface CortexConfig extends Partial<FridayConfig> {
   injectedProvider?: LLMProvider;
@@ -25,6 +26,7 @@ export interface CortexConfig extends Partial<FridayConfig> {
   signals?: SignalBus;
   toolMemory?: ScopedMemory;
   genesisPrompt?: string;
+  vox?: Vox;
 }
 
 export class Cortex {
@@ -42,6 +44,7 @@ export class Cortex {
   private toolMemory?: ScopedMemory;
   private pinnedSmarts = new Set<string>();
   private genesisPrompt?: string;
+  private vox?: Vox;
 
   constructor(config: CortexConfig = {}) {
     const providerName = config.provider ?? DEFAULT_PROVIDER;
@@ -58,6 +61,7 @@ export class Cortex {
     this.signals = config.signals;
     this.toolMemory = config.toolMemory;
     this.genesisPrompt = config.genesisPrompt;
+    this.vox = config.vox;
   }
 
   get providerName(): string {
@@ -114,6 +118,9 @@ export class Cortex {
             role: "assistant",
             content: response.text,
           });
+          if (this.vox && this.vox.mode !== "off") {
+            this.vox.speak(response.text).catch(() => {});
+          }
           return response.text;
         }
 
