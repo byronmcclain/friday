@@ -62,7 +62,14 @@ src/
 │   ├── genesis.ts         # Genesis — identity prompt loader (load/seed/check from ~/.friday/GENESIS.md)
 │   ├── notifications.ts   # NotificationManager — multi-channel alerts (terminal, log, slack, webhook)
 │   ├── types.ts           # Core types (FridayConfig, ConversationMessage, ProviderName)
-│   └── prompts.ts         # GENESIS_TEMPLATE — seed template for Friday's identity prompt
+│   ├── prompts.ts         # GENESIS_TEMPLATE — seed template for Friday's identity prompt
+│   └── voice/             # Vox — voice output subsystem (TTS via Grok Voice Agent API)
+│       ├── types.ts        # VoiceMode, GrokVoice, VoxConfig, VoxOptions, VOX_DEFAULTS
+│       ├── audio.ts        # pcmToWav, detectPlayer, playAudio, cleanupTempFile
+│       ├── prompt.ts       # classifyContent, buildTtsPrompt, FRIDAY_VOICE_IDENTITY
+│       ├── vox.ts          # Vox class — WebSocket lifecycle, modes, speak/cancel, idle eviction
+│       ├── channel.ts      # VoiceChannel — notification bridge (NotificationChannel impl)
+│       └── protocol.ts     # /voice protocol (on, off, whisper, test, status)
 ├── audit/
 │   ├── types.ts           # AuditEntry, AuditFilter interfaces
 │   └── logger.ts          # AuditLogger — action tracking with filtering
@@ -131,7 +138,7 @@ tests/
 
 ### Key Design Patterns
 
-- **FridayRuntime** (`src/core/runtime.ts`) is the composition root. It boots all subsystems in order: SignalBus, ClearanceManager, AuditLogger, NotificationManager, ProtocolRegistry, DirectiveStore/Engine, Memory, SmartsStore, Sensorium, Genesis, Cortex, Recall Tool, Arc Rhythm, then discovers and loads Modules.
+- **FridayRuntime** (`src/core/runtime.ts`) is the composition root. It boots all subsystems in order: SignalBus, ClearanceManager, AuditLogger, NotificationManager, ProtocolRegistry, DirectiveStore/Engine, Memory, SmartsStore, Sensorium, Genesis, Vox, Cortex, Recall Tool, Arc Rhythm, then discovers and loads Modules.
 - **Cortex** (`src/core/cortex.ts`) is Friday's LLM brain. It owns conversation history, delegates to providers, and exposes tool registration for modules. When a SmartsStore is provided, Cortex enriches the system prompt with pinned and FTS5-matched knowledge per message. Replaces the old FridayCore.
 - **SMARTS** (`src/smarts/`) is Friday's dynamic knowledge system. Markdown files with YAML frontmatter in `smarts/` are indexed into FTS5, queried per-message to enrich prompts, and new knowledge is extracted from conversations on shutdown via SmartsCurator. The `/smart` protocol provides manual control (list, show, search, reload).
 - **SignalBus** (`src/core/events.ts`) is the reactive nervous system. Typed signals (file:changed, test:failed, etc.) flow through here, triggering directives and module behavior.
@@ -152,10 +159,11 @@ tests/
 - **SMARTS Staleness Prevention** — SMARTS entries carry a `sessionId` field. On boot, `SmartsStore.pruneStale()` removes entries whose session hasn't been seen within a TTL window. The SmartsCurator filters volatile extractions (greetings, meta-commentary) and stamps `sessionId` on create/update for TTL renewal.
 - **Genesis** (`src/core/genesis.ts`) is Friday's identity prompt, loaded from `~/.friday/GENESIS.md` at boot. The file is protected: `chmod 600`, filesystem tools and Forge reject writes to it, and it lives outside the repo. The BOSS edits it via `friday genesis edit`. `GENESIS_TEMPLATE` in `src/core/prompts.ts` is the seed template used by `friday genesis init`. Override path with `FRIDAY_GENESIS_PATH` env var.
 - **Prompts** live in `src/core/prompts.ts` as exported constants. `GENESIS_TEMPLATE` is the seed template for Friday's identity — it gets written to `~/.friday/GENESIS.md` on first run. The system prompt includes current date/time injection and recall_memory tool usage guidance.
+- **Vox** (`src/core/voice/`) is Friday's voice output — her mouth. Uses the xAI Grok Voice Agent API via persistent WebSocket to speak responses aloud. Three modes: Off (default), On, Whisper. Dynamic TTS prompt system classifies content (tables, code, lists) and adjusts instructions per utterance. Persistent WebSocket with 60s idle eviction. Fire-and-forget speech after Cortex chat responses. VoiceChannel bridges notifications into speech. `/voice` protocol for human control (aliases: `/vox`, `/speak`). Default voice: Eve (override with `FRIDAY_VOICE` env var). Platform-detected audio: `afplay` (macOS), `paplay` (Linux), PowerShell (Windows).
 
 ## Testing
 
-- 843 tests across 79 files (as of 2026-02-25)
+- 939 tests across 87 files (as of 2026-02-26)
 - Runtime/Cortex tests use `injectedProvider` (stub `LLMProvider`) to avoid needing `ANTHROPIC_API_KEY`
 - Shared test stubs live in `tests/helpers/stubs.ts` — import `stubProvider`/`grokStub` instead of defining inline
 - SQLite tests must clean up WAL files: unlink `db`, `db-wal`, and `db-shm` in afterEach
@@ -194,6 +202,7 @@ Optional: `FRIDAY_REASONING_MODEL` and `FRIDAY_FAST_MODEL` to override default m
 Optional: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` for Gmail module (OAuth 2.0).
 Optional: `FRIDAY_SECRET_KEY` — fallback master key for SecretStore when OS keychain is unavailable.
 Optional: `FRIDAY_GENESIS_PATH` to override default `~/.friday/GENESIS.md` location.
+Optional: `FRIDAY_VOICE` to override default voice (Eve). Available: Ara, Eve, Rex, Sal, Leo.
 
 ## Docker
 
@@ -219,7 +228,9 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 - Arc Rhythm scheduling: `docs/plans/2026-02-24-arc-rhythm-scheduling-design.md`
 - Gmail module design: `docs/plans/2026-02-25-gmail-module-design.md`
 - Genesis identity prompt design: `docs/plans/2026-02-25-genesis-identity-prompt-design.md`
-- MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler, Genesis=identity template
+- Vox voice output: `docs/plans/2026-02-25-vox-voice-output-design.md`
+- Vox implementation plan: `docs/plans/2026-02-25-vox-implementation-plan.md`
+- MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler, Genesis=identity template, Vox=voice
 
 ## Worktrees
 
