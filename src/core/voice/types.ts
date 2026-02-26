@@ -1,5 +1,6 @@
 import type { SignalBus } from "../events.ts";
 import type { NotificationManager } from "../notifications.ts";
+import type { ClearanceManager } from "../clearance.ts";
 
 export type VoiceMode = "off" | "on" | "whisper";
 
@@ -17,6 +18,7 @@ export interface VoxOptions {
 	config: VoxConfig;
 	signals: SignalBus;
 	notifications: NotificationManager;
+	clearance?: ClearanceManager;
 }
 
 export const VOX_DEFAULTS: VoxConfig = {

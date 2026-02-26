@@ -249,6 +249,7 @@ export class FridayRuntime {
 					config: { ...VOX_DEFAULTS, defaultVoice: voice },
 					signals: this._signals,
 					notifications: this._notifications,
+					clearance: this._clearance,
 				});
 				this._notifications.addChannel(new VoiceChannel(this._vox));
 				this._protocols.register(createVoiceProtocol(this._vox));

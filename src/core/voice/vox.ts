@@ -1,5 +1,5 @@
 import type { SignalBus } from "../events.ts";
-import type { NotificationManager } from "../notifications.ts";
+import type { ClearanceManager } from "../clearance.ts";
 import type { VoiceMode, GrokVoice, VoxConfig, VoxOptions } from "./types.ts";
 import { buildTtsPrompt } from "./prompt.ts";
 import { pcmToWav, playAudio, cleanupTempFile, detectPlayer } from "./audio.ts";
@@ -24,10 +24,11 @@ export class Vox {
 	private _mode: VoiceMode = "off";
 	private _config: VoxConfig;
 	private _signals: SignalBus;
-	private _notifications: NotificationManager;
+	private _clearance?: ClearanceManager;
 	private _ws: WebSocket | null = null;
 	private _connected = false;
 	private _idleTimer: ReturnType<typeof setTimeout> | null = null;
+	private _speakTimeout: ReturnType<typeof setTimeout> | null = null;
 	private _activeProc: { kill(): void } | null = null;
 	private _activeTmpFile: string | null = null;
 	private _speaking = false;
@@ -38,7 +39,7 @@ export class Vox {
 	constructor(options: VoxOptions) {
 		this._config = options.config;
 		this._signals = options.signals;
-		this._notifications = options.notifications;
+		this._clearance = options.clearance;
 	}
 
 	get mode(): VoiceMode {
@@ -78,6 +79,7 @@ export class Vox {
 	 */
 	async speak(text: string): Promise<void> {
 		if (this._mode === "off") return;
+		if (this._clearance && !this._clearance.check("audio-output").granted) return;
 		if (!this.apiKeyAvailable) return;
 		if (!text.trim()) return;
 
@@ -140,10 +142,17 @@ export class Vox {
 
 			// Wait for response.done or timeout
 			await new Promise<void>((resolve) => {
-				this._speakResolve = resolve;
+				this._speakResolve = () => {
+					if (this._speakTimeout) {
+						clearTimeout(this._speakTimeout);
+						this._speakTimeout = null;
+					}
+					resolve();
+				};
 
 				// Per-utterance timeout
-				setTimeout(() => {
+				this._speakTimeout = setTimeout(() => {
+					this._speakTimeout = null;
 					if (this._speaking) {
 						this._speaking = false;
 						this._speakResolve = null;
@@ -176,6 +185,10 @@ export class Vox {
 	private cancelPlayback(): void {
 		this._speaking = false;
 		this._audioChunks = [];
+		if (this._speakTimeout) {
+			clearTimeout(this._speakTimeout);
+			this._speakTimeout = null;
+		}
 		if (this._speakResolve) {
 			this._speakResolve();
 			this._speakResolve = null;
@@ -240,13 +253,16 @@ export class Vox {
 			});
 
 			ws.addEventListener("message", (event) => {
-				this.handleMessage(event.data as string);
+				if (typeof event.data === "string") {
+					this.handleMessage(event.data);
+				}
 			});
 
 			ws.addEventListener("error", () => {
 				clearTimeout(timeout);
 				this._connected = false;
 				this._ws = null;
+				reject(new Error("WebSocket connection error"));
 			});
 
 			ws.addEventListener("close", () => {
