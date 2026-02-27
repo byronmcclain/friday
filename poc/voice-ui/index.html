@@ -338,10 +338,60 @@
       particles.push(new Particle(i));
     }
 
+    // --- State machine ---
+    const STATES = { IDLE: 'idle', LISTENING: 'listening', THINKING: 'thinking', SPEAKING: 'speaking', ERROR: 'error' };
+    let currentState = STATES.IDLE;
+    let stateTransition = 1; // 0..1
+    const TRANSITION_SPEED = 0.002; // ~500ms
+    let speedMultiplier = 1;
+
+    // --- Control state placeholders ---
+    let whisperMode = false;
+    let muted = false;
+    let sessionEnded = false;
+
+    // --- Particle physics ---
+    function updateParticles(dt) {
+      for (const p of particles) {
+        if (currentState === STATES.IDLE) {
+          // Home-seeking spring force
+          p.vx += (p.homeX - p.x) * 0.0005 * dt;
+          p.vy += (p.homeY - p.y) * 0.0005 * dt;
+          p.vz += (p.homeZ - p.z) * 0.0005 * dt;
+
+          // Random Brownian jitter
+          p.vx += (Math.random() - 0.5) * 0.00002 * dt;
+          p.vy += (Math.random() - 0.5) * 0.00002 * dt;
+          p.vz += (Math.random() - 0.5) * 0.00002 * dt;
+        }
+
+        // Damping
+        p.vx *= 0.98;
+        p.vy *= 0.98;
+        p.vz *= 0.98;
+
+        // Apply velocity
+        p.x += p.vx;
+        p.y += p.vy;
+        p.z += p.vz;
+      }
+
+      // Advance transition toward 1
+      if (stateTransition < 1) {
+        stateTransition = Math.min(1, stateTransition + TRANSITION_SPEED * dt);
+      }
+    }
+
     // --- Render loop ---
     const canvasRect = canvas.parentElement.getBoundingClientRect();
+    let lastTime = performance.now();
 
-    function render() {
+    function render(now) {
+      const dt = (now - lastTime) * speedMultiplier;
+      lastTime = now;
+
+      updateParticles(dt);
+
       const w = canvasRect.width;
       const h = canvasRect.height;
 
