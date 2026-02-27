@@ -3,9 +3,9 @@ export interface ChatStream {
 	/** Async iterable of text chunks as they arrive */
 	textStream: AsyncIterable<string>;
 	/** Resolves to the full text when streaming completes */
-	fullText: Promise<string>;
+	fullText: PromiseLike<string>;
 	/** Resolves to token usage after completion */
-	usage: Promise<{
+	usage: PromiseLike<{
 		inputTokens: number | undefined;
 		outputTokens: number | undefined;
 	}>;

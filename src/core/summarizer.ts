@@ -52,7 +52,7 @@ export class ConversationSummarizer {
 
 			if (this.model) {
 				const result = await withTimeout(
-					generateText({ model: this.model, prompt: fullPrompt, maxTokens: 256 }),
+					generateText({ model: this.model, prompt: fullPrompt, maxOutputTokens: 256 }),
 					30_000,
 					"conversation summarization",
 				);

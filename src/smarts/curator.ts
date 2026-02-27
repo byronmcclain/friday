@@ -161,7 +161,7 @@ export class SmartsCurator {
 					generateText({
 						model: this.languageModel,
 						prompt: `${prompt}\n\n${conversationText}`,
-						maxTokens: 4096,
+						maxOutputTokens: 4096,
 					}),
 					30_000,
 					"SMARTS knowledge extraction",

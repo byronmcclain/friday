@@ -194,7 +194,7 @@ export class Cortex {
 			...(hasTools
 				? { stopWhen: stepCountIs(this.maxToolIterations) }
 				: {}),
-			maxTokens: this.maxTokens,
+			maxOutputTokens: this.maxTokens,
 		});
 
 		const fullTextPromise = result.text.then(async (text: string) => {
