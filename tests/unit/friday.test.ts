@@ -101,6 +101,36 @@ describe("Cortex", () => {
   });
 });
 
+describe("Cortex — truncation warning", () => {
+  test("appends truncation warning when response is truncated", async () => {
+    const truncatingProvider: LLMProvider = {
+      name: "stub",
+      defaultModel: "stub-model",
+      defaultFastModel: "stub-fast",
+      chat: async () => ({ type: "text" as const, text: "partial output", truncated: true }),
+    };
+    const cortex = new Cortex({ injectedProvider: truncatingProvider });
+    const result = await cortex.chat("tell me everything");
+
+    expect(result).toContain("partial output");
+    expect(result).toContain("[Response truncated");
+  });
+
+  test("does not append truncation warning on normal response", async () => {
+    const normalProvider: LLMProvider = {
+      name: "stub",
+      defaultModel: "stub-model",
+      defaultFastModel: "stub-fast",
+      chat: async () => ({ type: "text" as const, text: "full output", truncated: false }),
+    };
+    const cortex = new Cortex({ injectedProvider: normalProvider });
+    const result = await cortex.chat("hello");
+
+    expect(result).toBe("full output");
+    expect(result).not.toContain("[Response truncated");
+  });
+});
+
 const TEST_DB_CORTEX = "/tmp/friday-test-cortex-smarts.db";
 const TEST_SMARTS_DIR_CORTEX = "/tmp/friday-test-cortex-smarts";
 

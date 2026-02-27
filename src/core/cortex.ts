@@ -54,7 +54,7 @@ export class Cortex {
     const providerName = config.provider ?? DEFAULT_PROVIDER;
     this.provider = config.injectedProvider ?? createProvider(providerName);
     this.model = config.model ?? PROVIDER_DEFAULTS[providerName].model;
-    this.maxTokens = config.maxTokens ?? 4096;
+    this.maxTokens = config.maxTokens ?? 12288;
     this.conversationHistory = [];
     this.tools = new Map();
     this.clearance = config.clearance;
@@ -142,14 +142,18 @@ export class Cortex {
         );
 
         if (response.type === "text") {
+          let text = response.text;
+          if (response.truncated) {
+            text += "\n\n⚠ [Response truncated — hit token limit]";
+          }
           this.conversationHistory.push({
             role: "assistant",
-            content: response.text,
+            content: text,
           });
           if (this.vox && this.vox.mode !== "off") {
-            this.vox.speak(response.text).catch(() => {});
+            this.vox.speak(text).catch(() => {});
           }
-          return response.text;
+          return text;
         }
 
         // tool_use response — record assistant's tool calls
