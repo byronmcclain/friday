@@ -33,13 +33,12 @@ serveCommand(program);
 genesisCommand(program);
 
 // Default action: start interactive chat
+// Global options (--debug) are already parsed on `program` and accessible
+// via optsWithGlobals() in the chat action — no need to forward through args.
 program.action(async () => {
   const chat = program.commands.find((cmd) => cmd.name() === "chat");
   if (chat) {
-    const globalOpts = program.opts();
-    const args: string[] = [];
-    if (globalOpts.debug) args.push("--debug");
-    await chat.parseAsync(args, { from: "user" });
+    await chat.parseAsync([], { from: "user" });
   }
 });
 
