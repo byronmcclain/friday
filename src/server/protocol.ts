@@ -29,6 +29,7 @@ export type ServerMessage =
 			content: string;
 			source: "cortex" | "protocol";
 	  }
+	| { type: "chat:chunk"; requestId: string; text: string }
 	| {
 			type: "protocol:response";
 			requestId: string;

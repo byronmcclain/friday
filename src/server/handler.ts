@@ -156,13 +156,47 @@ export class WebSocketHandler {
 
 		switch (msg.type) {
 			case "chat": {
-				const result = await this.runtime.process(msg.content);
-				send({
-					type: "chat:response",
-					requestId: msg.id,
-					content: result.output,
-					source: result.source,
-				});
+				// Protocol inputs bypass streaming — route through runtime.process()
+				if (this.runtime.protocols.isProtocol(msg.content)) {
+					const result = await this.runtime.process(msg.content);
+					send({
+						type: "chat:response",
+						requestId: msg.id,
+						content: result.output,
+						source: result.source,
+					});
+					break;
+				}
+
+				// Stream Cortex response as chunks
+				try {
+					const stream = await this.runtime.cortex.chatStream(msg.content);
+					for await (const chunk of stream.textStream) {
+						send({
+							type: "chat:chunk",
+							requestId: msg.id,
+							text: chunk,
+						});
+					}
+					const fullText = await stream.fullText;
+					send({
+						type: "chat:response",
+						requestId: msg.id,
+						content: fullText,
+						source: "cortex",
+					});
+				} catch (streamErr) {
+					const message =
+						streamErr instanceof Error
+							? streamErr.message
+							: String(streamErr);
+					send({
+						type: "error",
+						requestId: msg.id,
+						code: "STREAM_ERROR",
+						message,
+					});
+				}
 				break;
 			}
 			case "protocol": {

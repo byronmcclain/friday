@@ -42,16 +42,30 @@ describe("WebSocketHandler", () => {
 		expect(runtime.isBooted).toBe(true);
 	});
 
-	test("handles chat after boot", async () => {
+	test("handles chat after boot — streams chunks then final response", async () => {
 		await handler.handle('{"type":"session:boot","id":"1"}', mockSend);
 		sent = [];
 		await handler.handle(
 			'{"type":"chat","id":"2","content":"hello"}',
 			mockSend,
 		);
-		expect(sent).toHaveLength(1);
-		expect(sent[0]!.type).toBe("chat:response");
-		expect((sent[0] as any).requestId).toBe("2");
+		// Streaming: at least 1 chat:chunk + 1 final chat:response
+		expect(sent.length).toBeGreaterThanOrEqual(2);
+
+		const chunks = sent.filter((m) => m.type === "chat:chunk");
+		const responses = sent.filter((m) => m.type === "chat:response");
+		expect(chunks.length).toBeGreaterThanOrEqual(1);
+		expect(responses).toHaveLength(1);
+
+		// All chunks carry the correct requestId
+		for (const chunk of chunks) {
+			expect((chunk as any).requestId).toBe("2");
+			expect(typeof (chunk as any).text).toBe("string");
+		}
+
+		// Final response carries the correct requestId and source
+		expect((responses[0] as any).requestId).toBe("2");
+		expect((responses[0] as any).source).toBe("cortex");
 	});
 
 	test("handles protocol command after boot", async () => {
