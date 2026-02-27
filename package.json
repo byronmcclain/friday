@@ -22,15 +22,19 @@
     "serve": "bun run src/main.ts serve"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.48",
+    "@ai-sdk/xai": "^3.0.59",
     "@anthropic-ai/sdk": "^0.78.0",
     "@opentui-ui/toast": "^0.0.5",
     "@opentui/core": "^0.1.81",
     "@opentui/react": "^0.1.81",
+    "ai": "^6.0.103",
     "boxen": "^8.0.1",
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
     "googleapis": "^171.4.0",
-    "openai": "^6.22.0"
+    "openai": "^6.22.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/bun": "latest",
