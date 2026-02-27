@@ -18,7 +18,11 @@ export type ClientMessage =
 	| { type: "history:list"; id: string; count?: number }
 	| { type: "history:load"; id: string; sessionId: string }
 	| { type: "smarts:list"; id: string }
-	| { type: "smarts:search"; id: string; query: string };
+	| { type: "smarts:search"; id: string; query: string }
+	| { type: "session:identify"; id: string; clientType: "chat" | "voice" | "tui" }
+	| { type: "voice:start"; id: string; voice?: string }
+	| { type: "voice:stop"; id: string }
+	| { type: "voice:mode"; id: string; mode: "on" | "whisper" };
 
 // ─── Server → Client ────────────────────────────────────────────
 
@@ -54,7 +58,15 @@ export type ServerMessage =
 			body: string;
 			source: string;
 	  }
-	| { type: "error"; requestId?: string; code: string; message: string };
+	| { type: "error"; requestId?: string; code: string; message: string }
+	| { type: "session:ready"; requestId: string; provider: string; model: string; capabilities: string[] }
+	| { type: "voice:state"; state: "idle" | "listening" | "thinking" | "speaking" | "error" }
+	| { type: "voice:transcript"; role: "user" | "assistant"; delta: string; done: boolean }
+	| { type: "voice:audio"; delta: string }
+	| { type: "voice:started"; requestId: string }
+	| { type: "voice:stopped"; requestId: string }
+	| { type: "voice:error"; code: string; message: string }
+	| { type: "conversation:message"; role: "user" | "assistant"; content: string; source: "voice" | "chat" | "tui" };
 
 // ─── Validators ─────────────────────────────────────────────────
 
@@ -67,6 +79,10 @@ const VALID_TYPES = new Set([
 	"history:load",
 	"smarts:list",
 	"smarts:search",
+	"session:identify",
+	"voice:start",
+	"voice:stop",
+	"voice:mode",
 ]);
 
 const REQUIRED_FIELDS: Record<string, string[]> = {
@@ -78,6 +94,10 @@ const REQUIRED_FIELDS: Record<string, string[]> = {
 	"history:load": ["id", "sessionId"],
 	"smarts:list": ["id"],
 	"smarts:search": ["id", "query"],
+	"session:identify": ["id", "clientType"],
+	"voice:start": ["id"],
+	"voice:stop": ["id"],
+	"voice:mode": ["id", "mode"],
 };
 
 export function parseClientMessage(raw: string): ClientMessage | null {
@@ -105,6 +125,9 @@ export function parseClientMessage(raw: string): ClientMessage | null {
 	if ("command" in parsed && typeof parsed.command !== "string") return null;
 	if ("query" in parsed && typeof parsed.query !== "string") return null;
 	if ("sessionId" in parsed && typeof parsed.sessionId !== "string") return null;
+	if ("clientType" in parsed && typeof parsed.clientType !== "string") return null;
+	if ("mode" in parsed && typeof parsed.mode !== "string") return null;
+	if ("voice" in parsed && parsed.voice !== undefined && typeof parsed.voice !== "string") return null;
 
 	return parsed as ClientMessage;
 }
