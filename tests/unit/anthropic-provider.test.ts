@@ -266,6 +266,7 @@ describe("parseAnthropicResponse", () => {
     expect(result).toEqual({
       type: "text",
       text: "Hello! How can I help you today?",
+      truncated: false,
     });
   });
 
@@ -283,6 +284,7 @@ describe("parseAnthropicResponse", () => {
     expect(result).toEqual({
       type: "text",
       text: "Part one. Part two.",
+      truncated: false,
     });
   });
 
@@ -362,5 +364,39 @@ describe("parseAnthropicResponse", () => {
     expect(() => parseAnthropicResponse(response)).toThrow(
       "Anthropic response contained no text blocks",
     );
+  });
+
+  test("sets truncated to false on normal end_turn", () => {
+    const response = {
+      content: [
+        { type: "text" as const, text: "Hello!" },
+      ],
+      stop_reason: "end_turn" as const,
+    };
+
+    const result = parseAnthropicResponse(response);
+
+    expect(result).toEqual({
+      type: "text",
+      text: "Hello!",
+      truncated: false,
+    });
+  });
+
+  test("sets truncated to true when stop_reason is max_tokens", () => {
+    const response = {
+      content: [
+        { type: "text" as const, text: "This response was cut sh" },
+      ],
+      stop_reason: "max_tokens" as const,
+    };
+
+    const result = parseAnthropicResponse(response);
+
+    expect(result).toEqual({
+      type: "text",
+      text: "This response was cut sh",
+      truncated: true,
+    });
   });
 });

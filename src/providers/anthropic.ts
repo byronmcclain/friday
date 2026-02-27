@@ -91,7 +91,7 @@ export function parseAnthropicResponse(response: AnthropicResponseLike): ChatRes
   }
   const text = textBlocks.map((block) => block.text as string).join("");
 
-  return { type: "text", text };
+  return { type: "text", text, truncated: response.stop_reason === "max_tokens" };
 }
 
 export class AnthropicProvider implements LLMProvider {
