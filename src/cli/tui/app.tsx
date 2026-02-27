@@ -307,12 +307,29 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			processingRef.current = true;
 
 			try {
-				const result = await runtime.process(input);
-				dispatch({ type: "set-thinking", value: false });
-				dispatch({
-					type: "add-message",
-					message: createMessage("assistant", result.output),
-				});
+				// Protocol inputs (starting with /) go through runtime.process()
+				// All other input streams through Cortex directly
+				const isProtocol = input.startsWith("/") && runtime.protocols.isProtocol(input);
+
+				if (isProtocol) {
+					const result = await runtime.process(input);
+					dispatch({ type: "set-thinking", value: false });
+					dispatch({
+						type: "add-message",
+						message: createMessage("assistant", result.output),
+					});
+				} else {
+					// Streaming path — dispatch chunks as they arrive
+					const stream = await runtime.cortex.chatStream(input);
+					dispatch({ type: "set-thinking", value: false });
+
+					for await (const chunk of stream.textStream) {
+						dispatch({ type: "chat:chunk", text: chunk });
+					}
+
+					// Wait for full text to ensure history is committed
+					await stream.fullText;
+				}
 
 				// Forge restart check
 				if (runtime.restartRequested) {

@@ -20,6 +20,7 @@ export interface AppState {
 
 export type AppAction =
 	| { type: "add-message"; message: Message }
+	| { type: "chat:chunk"; text: string }
 	| { type: "set-thinking"; value: boolean }
 	| { type: "set-phase"; phase: AppState["phase"] }
 	| { type: "set-welcome"; info: WelcomeInfo }
@@ -37,6 +38,21 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 	switch (action.type) {
 		case "add-message":
 			return { ...state, messages: [...state.messages, action.message] };
+		case "chat:chunk": {
+			const msgs = [...state.messages];
+			const last = msgs[msgs.length - 1];
+			if (last && last.role === "assistant") {
+				msgs[msgs.length - 1] = { ...last, content: last.content + action.text };
+			} else {
+				msgs.push({
+					id: crypto.randomUUID(),
+					role: "assistant",
+					content: action.text,
+					timestamp: new Date(),
+				});
+			}
+			return { ...state, messages: msgs };
+		}
 		case "set-thinking":
 			return { ...state, isThinking: action.value };
 		case "set-phase":
