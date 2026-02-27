@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Runtime**: Bun (not Node.js)
 - **Language**: TypeScript (strict mode)
-- **AI Providers**: Anthropic Claude (`@anthropic-ai/sdk`) and xAI Grok (`openai` SDK with xAI base URL)
+- **AI SDK**: Vercel AI SDK v6 (`ai`, `@ai-sdk/xai`, `@ai-sdk/anthropic`) — unified multi-provider with native streaming
 - **CLI Framework**: Commander.js
 - **Linter/Formatter**: Biome (not ESLint/Prettier)
 
@@ -55,8 +55,10 @@ src/
 │       ├── lib/           # ANSI parser, color utils, chafa logo processor
 │       └── channels/      # TuiChannel — notification bridge into TUI toasts
 ├── core/
-│   ├── cortex.ts          # Cortex — LLM brain, conversation state, tool registration
-│   ├── summarizer.ts      # ConversationSummarizer — generates session summaries via fast model
+│   ├── cortex.ts          # Cortex — LLM brain, streamText() with AI SDK, tool registration
+│   ├── history-manager.ts # HistoryManager — token-budget conversation history with compaction
+│   ├── stream-types.ts    # ChatStream interface — textStream, fullText, usage
+│   ├── summarizer.ts      # ConversationSummarizer — generates session summaries via generateText()
 │   ├── runtime.ts         # FridayRuntime — boot/shutdown orchestrator, wires all subsystems
 │   ├── events.ts          # SignalBus — typed event system (file:changed, test:failed, etc.)
 │   ├── clearance.ts       # ClearanceManager — permission gates (read-fs, exec-shell, etc.)
@@ -122,7 +124,11 @@ src/
 │   ├── protocol.ts        # Shared message types (ClientMessage, ServerMessage)
 │   ├── handler.ts         # WebSocketHandler — message routing to FridayRuntime
 │   └── ws-channel.ts      # WebSocket notification channel
-├── providers/             # LLM provider adapters (Anthropic, Grok)
+├── providers/             # AI SDK model factory (createModel), Zod schema converter
+│   ├── index.ts           # createModel(), PROVIDER_DEFAULTS, DEFAULT_PROVIDER
+│   ├── schemas.ts         # toZodSchema() — converts FridayTool parameters to Zod for AI SDK
+│   ├── types.ts           # Legacy LLMProvider interface (retained for test dual-path compat)
+│   └── debug-log.ts       # appendInferenceLog() — shared debug logging for providers
 ├── config/                # Runtime configuration loading — future
 └── utils/                 # Shared utilities — future
 web/                       # React web UI (Vite + Tailwind)
@@ -134,7 +140,7 @@ web/                       # React web UI (Vite + Tailwind)
 smarts/                    # Runtime-generated knowledge files (gitignored, user-specific)
 forge/                     # Friday-authored modules (gitignored, AI-generated)
 tests/
-├── helpers/               # Shared test stubs (stubProvider, grokStub)
+├── helpers/               # Shared test stubs (createMockModel, stubProvider)
 ├── unit/                  # Unit tests (bun:test)
 └── integration/           # Integration tests — future
 ```
@@ -142,7 +148,7 @@ tests/
 ### Key Design Patterns
 
 - **FridayRuntime** (`src/core/runtime.ts`) is the composition root. It boots all subsystems in order: SignalBus, ClearanceManager, AuditLogger, NotificationManager, ProtocolRegistry, DirectiveStore/Engine, Memory, SmartsStore, Sensorium, Genesis, Vox, Cortex, Recall Tool, Arc Rhythm, then discovers and loads Modules.
-- **Cortex** (`src/core/cortex.ts`) is Friday's LLM brain. It owns conversation history, delegates to providers, and exposes tool registration for modules. When a SmartsStore is provided, Cortex enriches the system prompt with pinned and FTS5-matched knowledge per message. Replaces the old FridayCore.
+- **Cortex** (`src/core/cortex.ts`) is Friday's LLM brain. Uses AI SDK `streamText()` with `stopWhen: stepCountIs(N)` for automatic tool loop execution. Exposes `chat()` (blocking) and `chatStream()` (streaming `ChatStream` with `textStream`, `fullText`, `usage`). `HistoryManager` handles token-budget conversation history with compaction. Tools registered via `registerTool()` are converted to AI SDK tools via `toZodSchema()`. When a SmartsStore is provided, Cortex enriches the system prompt with pinned and FTS5-matched knowledge per message. A legacy `injectedProvider` path is retained for test backward compatibility.
 - **SMARTS** (`src/smarts/`) is Friday's dynamic knowledge system. Markdown files with YAML frontmatter in `smarts/` are indexed into FTS5, queried per-message to enrich prompts, and new knowledge is extracted from conversations on shutdown via SmartsCurator. The `/smart` protocol provides manual control (list, show, search, reload).
 - **SignalBus** (`src/core/events.ts`) is the reactive nervous system. Typed signals (file:changed, test:failed, etc.) flow through here, triggering directives and module behavior.
 - **Protocols** bypass LLM reasoning entirely — `/command` input is routed directly to a protocol handler via the ProtocolRegistry, while everything else flows through Cortex.
@@ -167,9 +173,10 @@ tests/
 
 ## Testing
 
-- 957 tests across 88 files (as of 2026-02-27)
-- Runtime/Cortex tests use `injectedProvider` (stub `LLMProvider`) to avoid needing `ANTHROPIC_API_KEY`
-- Shared test stubs live in `tests/helpers/stubs.ts` — import `stubProvider`/`grokStub` instead of defining inline
+- 959 tests across 89 files (as of 2026-02-27)
+- New tests use `injectedModel: createMockModel()` (AI SDK `MockLanguageModelV3` from `ai/test`)
+- Legacy tests use `injectedProvider` (stub `LLMProvider`) for backward compat — being migrated
+- Shared test stubs live in `tests/helpers/stubs.ts` — prefer `createMockModel` for new tests, `stubProvider`/`grokStub` for legacy
 - SQLite tests must clean up WAL files: unlink `db`, `db-wal`, and `db-shm` in afterEach
 - `bun:sqlite` transactions: `db.transaction(() => { ... })()` — must invoke the returned function
 - `node:fs/promises` `appendFile` is an accepted exception where Bun has no native append API
@@ -235,6 +242,7 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 - Vox voice output: `docs/plans/2026-02-25-vox-voice-output-design.md`
 - Vox implementation plan: `docs/plans/2026-02-25-vox-implementation-plan.md`
 - Inference payload logging: `docs/plans/2026-02-27-inference-payload-logging-design.md`
+- Cortex AI SDK migration: `docs/plans/2026-02-27-cortex-ai-sdk-migration-plan.md`
 - MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler, Genesis=identity template, Vox=voice
 
 ## Worktrees

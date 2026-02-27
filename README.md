@@ -16,7 +16,7 @@ TUI-first. Module-driven. Built to think, remember, and adapt.
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tests](https://img.shields.io/badge/tests-843%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-959%20passing-brightgreen)]()
 [![Biome](https://img.shields.io/badge/lint-Biome-60a5fa?logo=biome)](https://biomejs.dev)
 
 <br />
@@ -26,7 +26,7 @@ TUI-first. Module-driven. Built to think, remember, and adapt.
 
 Friday is an **agent runtime**, not a chatbot wrapper. She loads capabilities as **Modules**, executes **Protocols** on command, follows **Directives** autonomously, learns through **SMARTS** dynamic knowledge, monitors her environment via **Sensorium**, and remembers everything through persistent **Memory** — all within **Clearance** boundaries and a full **Audit** trail.
 
-Built on [Bun](https://bun.sh) and TypeScript. Powered by Anthropic Claude and xAI Grok.
+Built on [Bun](https://bun.sh) and TypeScript. Powered by the [Vercel AI SDK](https://sdk.vercel.ai) with Anthropic Claude and xAI Grok.
 
 ---
 
@@ -53,7 +53,7 @@ Friday greets you and enters an interactive session. Type natural language to co
 
 ### 🧠 Cortex — The Brain
 
-Cortex is Friday's LLM reasoning engine — the central intelligence that processes every non-protocol message. It manages conversation history, delegates to LLM providers (Anthropic Claude or xAI Grok), and runs an **agentic tool loop** that executes tools in parallel until the LLM is satisfied with its response.
+Cortex is Friday's LLM reasoning engine — the central intelligence that processes every non-protocol message. Built on the Vercel AI SDK v6, it uses `streamText()` with automatic tool execution via `stopWhen: stepCountIs(N)`. It exposes both `chat()` (blocking) and `chatStream()` (native streaming) methods. `HistoryManager` handles token-budget-aware conversation history with automatic compaction.
 
 Every message Friday receives triggers a sophisticated pipeline: the system prompt is dynamically enriched with pinned SMARTS knowledge, FTS5-matched knowledge relevant to the current message, and a compact Sensorium environment context block — all before the LLM ever sees it. This means Friday's responses are always informed by what she's learned and what's happening on the machine.
 
@@ -1007,7 +1007,7 @@ docker run -e XAI_API_KEY=xai-... friday chat --provider grok
 |---|---|
 | Runtime | [Bun](https://bun.sh) |
 | Language | TypeScript (strict mode) |
-| AI Providers | Anthropic Claude (`@anthropic-ai/sdk`), xAI Grok (`openai` SDK) |
+| AI SDK | [Vercel AI SDK v6](https://sdk.vercel.ai) (`ai`, `@ai-sdk/xai`, `@ai-sdk/anthropic`) |
 | CLI Framework | [Commander.js](https://github.com/tj/commander.js) |
 | Terminal UI | [OpenTUI](https://github.com/anthropics/claude-code-openui) (`@opentui/react`) — React for CLI |
 | Web UI | React + [Vite](https://vite.dev) + [Tailwind CSS](https://tailwindcss.com) |
