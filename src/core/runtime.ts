@@ -1,6 +1,7 @@
+import type { LanguageModelV3 } from "@ai-sdk/provider";
 import type { FridayConfig, ProviderName } from "./types.ts";
 import { Cortex } from "./cortex.ts";
-import { PROVIDER_DEFAULTS, type LLMProvider } from "../providers/index.ts";
+import { createModel, PROVIDER_DEFAULTS, type LLMProvider } from "../providers/index.ts";
 import { SignalBus } from "./events.ts";
 import { ClearanceManager } from "./clearance.ts";
 import { AuditLogger } from "../audit/logger.ts";
@@ -40,6 +41,8 @@ import type { GrokVoice } from "./voice/types.ts";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
 	modulesDir?: string;
+	injectedModel?: LanguageModelV3;
+	/** @deprecated Use injectedModel — removed in Task 13 */
 	injectedProvider?: LLMProvider;
 	smartsDir?: string;
 	dataDir?: string;
@@ -260,6 +263,7 @@ export class FridayRuntime {
 				provider: providerName,
 				model: reasoningModel,
 				maxTokens: config.maxTokens,
+				injectedModel: config.injectedModel,
 				injectedProvider: config.injectedProvider,
 				smartsStore: this._smarts,
 				sensorium: this._sensorium,
@@ -306,10 +310,27 @@ export class FridayRuntime {
 				this._rhythmScheduler.start();
 			}
 
+			// Subsystem provider for curator/summarizer during migration.
+			// When using injectedModel (AI SDK path), create a fast model for subsystems.
+			// When using injectedProvider (legacy path), use llmProvider.
+			// After Tasks 8/9 migrate these to accept LanguageModelV3, this simplifies.
+			const subsystemProvider: LLMProvider | undefined =
+				config.injectedProvider ?? (config.injectedModel ? undefined : this._cortex.llmProvider);
+			const subsystemModel: LanguageModelV3 | undefined =
+				config.injectedModel ? createModel(providerName, this._fastModel) : undefined;
+
 			if (this._smarts) {
-				this._curator = new SmartsCurator(this._smarts, this._cortex.llmProvider, this._fastModel);
+				if (subsystemModel) {
+					this._curator = new SmartsCurator(this._smarts, subsystemModel);
+				} else if (subsystemProvider) {
+					this._curator = new SmartsCurator(this._smarts, subsystemProvider, this._fastModel);
+				}
 			}
-			this._summarizer = new ConversationSummarizer(this._cortex.llmProvider, this._fastModel);
+			if (subsystemModel) {
+				this._summarizer = new ConversationSummarizer(subsystemModel);
+			} else if (subsystemProvider) {
+				this._summarizer = new ConversationSummarizer(subsystemProvider, this._fastModel);
+			}
 
 			if (this._memory && !config.fresh) {
 				const recent = await this._memory.getConversationHistory(1);
