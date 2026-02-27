@@ -5,7 +5,7 @@ import { SQLiteMemory } from "../../src/core/memory.ts";
 import type { LLMProvider } from "../../src/providers/types.ts";
 import type { ConversationMessage } from "../../src/core/types.ts";
 import { getTextContent } from "../../src/core/types.ts";
-import { textResponse } from "../helpers/stubs.ts";
+import { textResponse, createMockModel } from "../helpers/stubs.ts";
 import { unlink, mkdir, rm } from "node:fs/promises";
 
 const TEST_DB = "/tmp/friday-test-curator.db";
@@ -545,5 +545,136 @@ That's what I found.`),
 
 		const entry = await store.getByName("high-confidence");
 		expect(entry!.confidence).toBe(0.7);
+	});
+
+	describe("AI SDK LanguageModelV3 path", () => {
+		test("extracts knowledge using generateText() with AI SDK model", async () => {
+			const model = createMockModel({
+				text: JSON.stringify([
+					{
+						action: "create",
+						name: "ai-sdk-knowledge",
+						domain: "typescript",
+						tags: ["ai-sdk", "migration"],
+						confidence: 0.7,
+						content: "# AI SDK\n\nUse generateText() for simple completions.",
+					},
+				]),
+			});
+			const curator = new SmartsCurator(store, model);
+			await curator.extractFromConversation(makeMessages(10, "AI SDK migration"));
+
+			expect(store.all()).toHaveLength(1);
+			expect(store.all()[0]!.name).toBe("ai-sdk-knowledge");
+			expect(store.all()[0]!.source).toBe("conversation");
+		});
+
+		test("skips short conversations with AI SDK model", async () => {
+			const model = createMockModel({ text: "should not be called" });
+			const curator = new SmartsCurator(store, model);
+			await curator.extractFromConversation([
+				{ role: "user", content: "Hi" },
+				{ role: "assistant", content: "Hello!" },
+			]);
+			expect(store.all()).toHaveLength(0);
+		});
+
+		test("handles malformed response from AI SDK model", async () => {
+			const model = createMockModel({ text: "this is not JSON" });
+			const curator = new SmartsCurator(store, model);
+			await curator.extractFromConversation(makeMessages(10));
+			expect(store.all()).toHaveLength(0);
+		});
+
+		test("handles empty array response from AI SDK model", async () => {
+			const model = createMockModel({ text: "[]" });
+			const curator = new SmartsCurator(store, model);
+			await curator.extractFromConversation(makeMessages(10));
+			expect(store.all()).toHaveLength(0);
+		});
+
+		test("filters volatile entries via AI SDK model path", async () => {
+			const model = createMockModel({
+				text: JSON.stringify([
+					{
+						action: "create",
+						name: "tool-count",
+						domain: "project-context",
+						tags: ["tools"],
+						confidence: 0.7,
+						content: "Friday has 29 tools available.",
+					},
+					{
+						action: "create",
+						name: "valid-insight",
+						domain: "typescript",
+						tags: ["ts"],
+						confidence: 0.7,
+						content: "# TS Tip\n\nUse satisfies for literal type preservation.",
+					},
+				]),
+			});
+			const curator = new SmartsCurator(store, model);
+			await curator.extractFromConversation(makeMessages(10));
+			expect(store.all()).toHaveLength(1);
+			expect(store.all()[0]!.name).toBe("valid-insight");
+		});
+
+		test("caps confidence at 0.7 via AI SDK model path", async () => {
+			const model = createMockModel({
+				text: JSON.stringify([
+					{
+						action: "create",
+						name: "high-conf-ai-sdk",
+						domain: "test",
+						tags: ["test"],
+						confidence: 0.95,
+						content: "# High Confidence\n\nShould be capped.",
+					},
+				]),
+			});
+			const curator = new SmartsCurator(store, model);
+			await curator.extractFromConversation(makeMessages(10));
+
+			const entry = await store.getByName("high-conf-ai-sdk");
+			expect(entry!.confidence).toBe(0.7);
+		});
+
+		test("uses modelId from LanguageModelV3 as internal model", () => {
+			const model = createMockModel({ text: "[]" });
+			const curator = new SmartsCurator(store, model);
+			expect(curator["model"]).toBe(model.modelId);
+		});
+
+		test("update action works via AI SDK model path", async () => {
+			// Seed an existing entry
+			await store.create({
+				name: "existing-entry",
+				domain: "test",
+				tags: ["test"],
+				confidence: 0.6,
+				source: "conversation",
+				content: "# Existing\n\nOriginal content.",
+			});
+
+			const model = createMockModel({
+				text: JSON.stringify([
+					{
+						action: "update",
+						name: "existing-entry",
+						domain: "test",
+						tags: ["test", "updated"],
+						confidence: 0.7,
+						content: "# Existing\n\nUpdated with new insights.",
+					},
+				]),
+			});
+			const curator = new SmartsCurator(store, model);
+			await curator.extractFromConversation(makeMessages(10));
+
+			expect(store.all()).toHaveLength(1);
+			const entry = await store.getByName("existing-entry");
+			expect(entry!.content).toContain("new insights");
+		});
 	});
 });
