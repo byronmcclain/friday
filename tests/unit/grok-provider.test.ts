@@ -293,6 +293,7 @@ describe("parseGrokResponse", () => {
     expect(result).toEqual({
       type: "text",
       text: "Hello! How can I help you today?",
+      truncated: false,
     });
   });
 
@@ -364,6 +365,42 @@ describe("parseGrokResponse", () => {
       expect(result.toolCalls[1]!.name).toBe("writeFile");
       expect(result.toolCalls[1]!.input).toEqual({ path: "/b.txt", content: "hello" });
     }
+  });
+
+  test("sets truncated to false on normal stop", () => {
+    const choice = {
+      finish_reason: "stop",
+      message: {
+        content: "Hello!",
+        tool_calls: undefined,
+      },
+    };
+
+    const result = parseGrokResponse(choice);
+
+    expect(result).toEqual({
+      type: "text",
+      text: "Hello!",
+      truncated: false,
+    });
+  });
+
+  test("sets truncated to true when finish_reason is length", () => {
+    const choice = {
+      finish_reason: "length",
+      message: {
+        content: "This response was cut sh",
+        tool_calls: undefined,
+      },
+    };
+
+    const result = parseGrokResponse(choice);
+
+    expect(result).toEqual({
+      type: "text",
+      text: "This response was cut sh",
+      truncated: true,
+    });
   });
 
   test("throws on empty/null content with non-tool finish_reason", () => {

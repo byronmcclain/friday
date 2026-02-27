@@ -128,7 +128,7 @@ export function parseGrokResponse(choice: GrokChoiceLike): ChatResponse {
     throw new Error("Grok returned an empty response");
   }
 
-  return { type: "text", text };
+  return { type: "text", text, truncated: choice.finish_reason === "length" };
 }
 
 export class GrokProvider implements LLMProvider {
