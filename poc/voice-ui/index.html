@@ -263,7 +263,120 @@
   </div>
 
   <script>
-    // Script will be added in Tasks 2 and 3
+    // --- Constants ---
+    const COLORS = {
+      deep: '#0B0E14',
+      amber: '#F5A623',
+      amberLight: '#FFCC66',
+      copper: '#E8852A',
+      text: '#E8E0D4',
+      textDim: '#7A7262',
+      error: '#F87171',
+    };
+    const PARTICLE_COUNT = 150;
+    const SPHERE_RADIUS = 0.35; // fraction of canvas size
+
+    // --- Particle class ---
+    class Particle {
+      constructor(index) {
+        const golden = Math.PI * (3 - Math.sqrt(5));
+        const y = 1 - (index / (PARTICLE_COUNT - 1)) * 2;
+        const radiusAtY = Math.sqrt(1 - y * y);
+        const theta = golden * index;
+
+        this.homeX = Math.cos(theta) * radiusAtY;
+        this.homeY = y;
+        this.homeZ = Math.sin(theta) * radiusAtY;
+
+        this.x = this.homeX;
+        this.y = this.homeY;
+        this.z = this.homeZ;
+
+        this.vx = 0;
+        this.vy = 0;
+        this.vz = 0;
+
+        this.baseSize = 1.5 + Math.random() * 1.5;
+        this.opacity = 0.5 + Math.random() * 0.5;
+      }
+
+      project(cx, cy, radius) {
+        const perspective = 2;
+        const scale = perspective / (perspective + this.z);
+        const px = cx + this.x * radius * scale;
+        const py = cy - this.y * radius * scale;
+        const depth = (this.z + 1) / 2; // 0=back, 1=front
+        return { px, py, depth, scale };
+      }
+    }
+
+    // --- Canvas setup ---
+    const canvas = document.getElementById('orb');
+    const ctx = canvas.getContext('2d');
+    let centerX, centerY, orbRadius;
+
+    function resize() {
+      const container = canvas.parentElement;
+      const rect = container.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+      centerX = rect.width / 2;
+      centerY = rect.height / 2;
+      orbRadius = Math.min(rect.width, rect.height) * SPHERE_RADIUS;
+      ctx.fillStyle = COLORS.deep;
+      ctx.fillRect(0, 0, rect.width, rect.height);
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+
+    // --- Initialize particles ---
+    const particles = [];
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      particles.push(new Particle(i));
+    }
+
+    // --- Render loop ---
+    const canvasRect = canvas.parentElement.getBoundingClientRect();
+
+    function render() {
+      const w = canvasRect.width;
+      const h = canvasRect.height;
+
+      // Trail effect
+      ctx.fillStyle = 'rgba(11, 14, 20, 0.15)';
+      ctx.fillRect(0, 0, w, h);
+
+      // Sort back to front
+      particles.sort((a, b) => a.z - b.z);
+
+      ctx.globalCompositeOperation = 'lighter';
+
+      for (const p of particles) {
+        const { px, py, depth, scale } = p.project(centerX, centerY, orbRadius);
+        const size = p.baseSize * scale * (orbRadius / 80);
+        const alpha = p.opacity * (0.3 + depth * 0.7);
+
+        if (size < 0.2) continue;
+
+        const grad = ctx.createRadialGradient(px, py, 0, px, py, size * 2);
+        grad.addColorStop(0, `rgba(245, 166, 35, ${alpha})`);
+        grad.addColorStop(1, 'rgba(245, 166, 35, 0)');
+
+        ctx.beginPath();
+        ctx.arc(px, py, size * 2, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+
+      ctx.globalCompositeOperation = 'source-over';
+
+      requestAnimationFrame(render);
+    }
+
+    requestAnimationFrame(render);
   </script>
 </body>
 </html>
