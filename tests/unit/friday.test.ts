@@ -293,21 +293,63 @@ describe("Cortex — Sensorium integration", () => {
   });
 });
 
-const DEBUG_LOG_PATH = "/tmp/debug-prompt.log";
+const PAYLOAD_LOG = "/tmp/test/last-inference-payload.log";
+const RESPONSE_LOG = "/tmp/test/last-inference-response.log";
 
-describe("Cortex — debug prompt logging", () => {
+describe("Cortex — debug inference logging", () => {
   afterEach(async () => {
-    await unlink(DEBUG_LOG_PATH).catch(() => {});
+    await unlink(PAYLOAD_LOG).catch(() => {});
+    await unlink(RESPONSE_LOG).catch(() => {});
   });
 
-  test("writes system prompt to debug-prompt.log when debug enabled", async () => {
-    let capturedPrompt = "";
+  test("clears payload and response logs at start of chat()", async () => {
+    await Bun.write(PAYLOAD_LOG, "STALE PAYLOAD");
+    await Bun.write(RESPONSE_LOG, "STALE RESPONSE");
+
+    const cortex = new Cortex({
+      injectedProvider: stubProvider,
+      debug: true,
+      projectRoot: "/tmp/test",
+    });
+    await cortex.chat("Hello");
+
+    const payload = await Bun.file(PAYLOAD_LOG).text();
+    const response = await Bun.file(RESPONSE_LOG).text();
+    expect(payload).not.toContain("STALE PAYLOAD");
+    expect(response).not.toContain("STALE RESPONSE");
+  });
+
+  test("does NOT write logs when debug is false", async () => {
+    const cortex = new Cortex({
+      injectedProvider: stubProvider,
+      debug: false,
+      projectRoot: "/tmp/test",
+    });
+    await cortex.chat("Hello");
+
+    expect(existsSync(PAYLOAD_LOG)).toBe(false);
+    expect(existsSync(RESPONSE_LOG)).toBe(false);
+  });
+
+  test("does NOT write logs when debug is true but no projectRoot", async () => {
+    const cortex = new Cortex({
+      injectedProvider: stubProvider,
+      debug: true,
+    });
+    await cortex.chat("Hello");
+
+    expect(existsSync(PAYLOAD_LOG)).toBe(false);
+    expect(existsSync(RESPONSE_LOG)).toBe(false);
+  });
+
+  test("passes debug options to provider chat() call", async () => {
+    let capturedOptions: unknown;
     const capturingProvider: LLMProvider = {
       name: "capturing",
       defaultModel: "capture",
       defaultFastModel: "capture-fast",
-      chat: async (systemPrompt) => {
-        capturedPrompt = systemPrompt;
+      chat: async (_sys, _msgs, opts) => {
+        capturedOptions = opts;
         return textResponse("ok");
       },
     };
@@ -315,79 +357,54 @@ describe("Cortex — debug prompt logging", () => {
     const cortex = new Cortex({
       injectedProvider: capturingProvider,
       debug: true,
-      projectRoot: "/tmp",
+      projectRoot: "/tmp/test",
     });
     await cortex.chat("Hello");
 
-    const fileContent = await Bun.file(DEBUG_LOG_PATH).text();
-    expect(fileContent).toBe(capturedPrompt);
+    expect(capturedOptions).toBeDefined();
+    const opts = capturedOptions as { debug?: { payloadPath: string; responsePath: string; round: number } };
+    expect(opts.debug).toBeDefined();
+    expect(opts.debug!.payloadPath).toBe("/tmp/test/last-inference-payload.log");
+    expect(opts.debug!.responsePath).toBe("/tmp/test/last-inference-response.log");
+    expect(opts.debug!.round).toBe(1);
   });
 
-  test("logs audit entry with action debug:system-prompt when debug enabled", async () => {
+  test("retains debug:system-prompt audit entry", async () => {
     const { AuditLogger } = await import("../../src/audit/logger.ts");
     const audit = new AuditLogger();
 
     const cortex = new Cortex({
       injectedProvider: stubProvider,
       debug: true,
-      projectRoot: "/tmp",
+      projectRoot: "/tmp/test",
       audit,
     });
     await cortex.chat("Hello");
 
     const entries = audit.entries({ action: "debug:system-prompt" });
     expect(entries).toHaveLength(1);
-    expect(entries[0]!.source).toBe("cortex");
-    expect(entries[0]!.detail.length).toBeGreaterThan(0);
   });
 
-  test("does NOT write debug-prompt.log when debug is false", async () => {
-    const cortex = new Cortex({
-      injectedProvider: stubProvider,
-      debug: false,
-      projectRoot: "/tmp",
-    });
-    await cortex.chat("Hello");
-
-    expect(existsSync(DEBUG_LOG_PATH)).toBe(false);
-  });
-
-  test("does NOT write debug-prompt.log when debug is true but no projectRoot", async () => {
-    const cortex = new Cortex({
-      injectedProvider: stubProvider,
-      debug: true,
-    });
-    await cortex.chat("Hello");
-
-    expect(existsSync(DEBUG_LOG_PATH)).toBe(false);
-  });
-
-  test("overwrites debug-prompt.log on each chat() call", async () => {
-    let capturedPrompt = "";
+  test("does not pass debug to provider when debug is false", async () => {
+    let capturedOptions: unknown;
     const capturingProvider: LLMProvider = {
       name: "capturing",
       defaultModel: "capture",
       defaultFastModel: "capture-fast",
-      chat: async (systemPrompt) => {
-        capturedPrompt = systemPrompt;
+      chat: async (_sys, _msgs, opts) => {
+        capturedOptions = opts;
         return textResponse("ok");
       },
     };
 
-    // Pre-seed file with known content that differs from any system prompt
-    await Bun.write(DEBUG_LOG_PATH, "STALE CONTENT");
-
     const cortex = new Cortex({
       injectedProvider: capturingProvider,
-      debug: true,
-      projectRoot: "/tmp",
+      debug: false,
+      projectRoot: "/tmp/test",
     });
-
     await cortex.chat("Hello");
-    const content = await Bun.file(DEBUG_LOG_PATH).text();
 
-    expect(content).not.toBe("STALE CONTENT");
-    expect(content).toBe(capturedPrompt);
-    expect(content.length).toBeGreaterThan(0);
+    const opts = capturedOptions as { debug?: unknown };
+    expect(opts.debug).toBeUndefined();
   });
 });

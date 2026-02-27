@@ -48,7 +48,8 @@ export class Cortex {
   private genesisPrompt?: string;
   private vox?: Vox;
   private debug: boolean;
-  private debugLogPath?: string;
+  private debugPayloadPath?: string;
+  private debugResponsePath?: string;
 
   constructor(config: CortexConfig = {}) {
     const providerName = config.provider ?? DEFAULT_PROVIDER;
@@ -68,7 +69,8 @@ export class Cortex {
     this.vox = config.vox;
     this.debug = config.debug ?? false;
     if (this.debug && config.projectRoot) {
-      this.debugLogPath = `${config.projectRoot}/debug-prompt.log`;
+      this.debugPayloadPath = `${config.projectRoot}/last-inference-payload.log`;
+      this.debugResponsePath = `${config.projectRoot}/last-inference-response.log`;
     }
   }
 
@@ -114,14 +116,15 @@ export class Cortex {
           detail: systemPrompt,
           success: true,
         });
-        if (this.debugLogPath) {
+        if (this.debugPayloadPath && this.debugResponsePath) {
           try {
-            await Bun.write(this.debugLogPath, systemPrompt);
+            await Bun.write(this.debugPayloadPath, "");
+            await Bun.write(this.debugResponsePath, "");
           } catch {
             this.audit?.log({
-              action: "debug:write-failed",
+              action: "debug:inference-write-failed",
               source: "cortex",
-              detail: `Failed to write ${this.debugLogPath}`,
+              detail: "Failed to clear inference log files",
               success: false,
             });
           }
@@ -135,10 +138,20 @@ export class Cortex {
       };
 
       for (let i = 0; i < this.maxToolIterations; i++) {
+        const roundOptions = {
+          ...options,
+          ...(this.debug && this.debugPayloadPath && this.debugResponsePath ? {
+            debug: {
+              payloadPath: this.debugPayloadPath,
+              responsePath: this.debugResponsePath,
+              round: i + 1,
+            },
+          } : {}),
+        };
         const response = await this.provider.chat(
           systemPrompt,
           this.conversationHistory,
-          options,
+          roundOptions,
         );
 
         if (response.type === "text") {
