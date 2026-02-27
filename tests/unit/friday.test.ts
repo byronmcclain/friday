@@ -7,7 +7,7 @@ import { SmartsStore } from "../../src/smarts/store.ts";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 import { mkdir, writeFile, rm, unlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { stubProvider, grokStub, textResponse } from "../helpers/stubs.ts";
+import { stubProvider, grokStub, textResponse, createMockModel } from "../helpers/stubs.ts";
 
 describe("Cortex", () => {
   test("system prompt is defined and non-empty", () => {
@@ -20,27 +20,27 @@ describe("Cortex", () => {
   });
 
   test("defaults to grok provider", () => {
-    const cortex = new Cortex({ injectedProvider: grokStub });
+    const cortex = new Cortex({ injectedModel: createMockModel(), provider: "grok" });
     expect(cortex.providerName).toBe("grok");
   });
 
   test("defaults to grok-4-1-fast-reasoning-latest model", () => {
-    const cortex = new Cortex({ injectedProvider: grokStub });
+    const cortex = new Cortex({ injectedModel: createMockModel(), provider: "grok" });
     expect(cortex.modelName).toBe(PROVIDER_DEFAULTS.grok.model);
   });
 
   test("accepts custom model", () => {
-    const cortex = new Cortex({ injectedProvider: stubProvider, model: "claude-haiku-4-5-20251001" });
+    const cortex = new Cortex({ injectedModel: createMockModel(), model: "claude-haiku-4-5-20251001" });
     expect(cortex.modelName).toBe("claude-haiku-4-5-20251001");
   });
 
   test("exposes available tools (empty by default)", () => {
-    const cortex = new Cortex({ injectedProvider: stubProvider });
+    const cortex = new Cortex({ injectedModel: createMockModel() });
     expect(cortex.availableTools).toEqual([]);
   });
 
   test("registers tools", () => {
-    const cortex = new Cortex({ injectedProvider: stubProvider });
+    const cortex = new Cortex({ injectedModel: createMockModel() });
     cortex.registerTool({
       name: "test-tool",
       description: "A test tool",
@@ -53,7 +53,7 @@ describe("Cortex", () => {
   });
 
   test("setHistory seeds conversation history", async () => {
-    const cortex = new Cortex({ injectedProvider: stubProvider });
+    const cortex = new Cortex({ injectedModel: createMockModel() });
     cortex.setHistory([
       { role: "user", content: "Previous question" },
       { role: "assistant", content: "Previous answer" },

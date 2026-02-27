@@ -4,7 +4,7 @@ import { Vox } from "../../src/core/voice/vox.ts";
 import { SignalBus } from "../../src/core/events.ts";
 import { NotificationManager } from "../../src/core/notifications.ts";
 import { VOX_DEFAULTS } from "../../src/core/voice/types.ts";
-import { stubProvider } from "../helpers/stubs.ts";
+import { createMockModel } from "../helpers/stubs.ts";
 
 describe("Cortex + Vox integration", () => {
 	let signals: SignalBus;
@@ -26,7 +26,7 @@ describe("Cortex + Vox integration", () => {
 	test("Cortex fires vox.speak after chat response", async () => {
 		vox.setMode("on");
 		const cortex = new Cortex({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			vox,
 		});
 
@@ -39,7 +39,7 @@ describe("Cortex + Vox integration", () => {
 
 	test("Cortex does not fire vox.speak when mode is off", async () => {
 		const cortex = new Cortex({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			vox,
 		});
 
@@ -50,7 +50,7 @@ describe("Cortex + Vox integration", () => {
 
 	test("Cortex works normally without vox", async () => {
 		const cortex = new Cortex({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 		});
 
 		const result = await cortex.chat("Hello");
@@ -65,7 +65,7 @@ describe("Cortex + Vox integration", () => {
 		};
 
 		const cortex = new Cortex({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			vox,
 		});
 
