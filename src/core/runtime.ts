@@ -310,14 +310,12 @@ export class FridayRuntime {
 				this._rhythmScheduler.start();
 			}
 
-			// Subsystem provider for curator/summarizer during migration.
-			// When using injectedModel (AI SDK path), create a fast model for subsystems.
-			// When using injectedProvider (legacy path), use llmProvider.
-			// After Tasks 8/9 migrate these to accept LanguageModelV3, this simplifies.
-			const subsystemProvider: LLMProvider | undefined =
-				config.injectedProvider ?? (config.injectedModel ? undefined : this._cortex.llmProvider);
+			// Subsystem model/provider for curator/summarizer.
+			// Production path and injectedModel both use AI SDK createModel().
+			// Legacy injectedProvider path retained for test backward compat.
+			const subsystemProvider: LLMProvider | undefined = config.injectedProvider;
 			const subsystemModel: LanguageModelV3 | undefined =
-				config.injectedModel ? createModel(providerName, this._fastModel) : undefined;
+				config.injectedProvider ? undefined : createModel(providerName, this._fastModel);
 
 			if (this._smarts) {
 				if (subsystemModel) {
