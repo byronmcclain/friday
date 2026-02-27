@@ -4,7 +4,6 @@ import type { FridayConfig, ConversationMessage, ContentBlock } from "./types.ts
 import { GENESIS_TEMPLATE } from "./prompts.ts";
 import {
 	createModel,
-	createProvider,
 	DEFAULT_PROVIDER,
 	PROVIDER_DEFAULTS,
 	type LLMProvider,

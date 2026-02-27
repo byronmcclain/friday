@@ -3,9 +3,8 @@ import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { xai } from "@ai-sdk/xai";
 import { anthropic } from "@ai-sdk/anthropic";
 
-// Re-export legacy types during migration (remove in Task 13)
+// Legacy types — kept for dual-path test compatibility
 export type { LLMProvider, ChatOptions, ChatResponse, ToolCallRequest, ToolDefinition } from "./types.ts";
-export { toJsonSchema } from "./tool-schema.ts";
 
 export const DEFAULT_PROVIDER: ProviderName = "grok";
 
@@ -25,6 +24,3 @@ export function createModel(provider: ProviderName, modelId: string): LanguageMo
 			throw new Error(`Unknown provider: ${provider}`);
 	}
 }
-
-// Legacy — keep during migration (remove in Task 13)
-export { createProvider } from "./legacy.ts";
