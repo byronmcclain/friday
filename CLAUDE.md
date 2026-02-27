@@ -32,6 +32,9 @@ bun run start genesis show    # Print current identity prompt
 bun run start genesis edit    # Open GENESIS.md in $EDITOR
 bun run start genesis check   # Validate file exists and permissions
 bun run start genesis path    # Print resolved file path
+friday --debug chat           # Chat with debug prompt logging (writes debug-prompt.log)
+friday --debug serve          # Serve with debug prompt logging
+friday --debug                # Default (chat) with debug prompt logging
 ```
 
 ## Architecture
@@ -160,10 +163,11 @@ tests/
 - **Genesis** (`src/core/genesis.ts`) is Friday's identity prompt, loaded from `~/.friday/GENESIS.md` at boot. The file is protected: `chmod 600`, filesystem tools and Forge reject writes to it, and it lives outside the repo. The BOSS edits it via `friday genesis edit`. `GENESIS_TEMPLATE` in `src/core/prompts.ts` is the seed template used by `friday genesis init`. Override path with `FRIDAY_GENESIS_PATH` env var.
 - **Prompts** live in `src/core/prompts.ts` as exported constants. `GENESIS_TEMPLATE` is the seed template for Friday's identity — it gets written to `~/.friday/GENESIS.md` on first run. The system prompt includes current date/time injection and recall_memory tool usage guidance.
 - **Vox** (`src/core/voice/`) is Friday's voice output — her mouth. Uses the xAI Grok Voice Agent API via persistent WebSocket to speak responses aloud. Three modes: Off (default), On, Whisper. Dynamic TTS prompt system classifies content (tables, code, lists) and adjusts instructions per utterance. Persistent WebSocket with 60s idle eviction. Fire-and-forget speech after Cortex chat responses. VoiceChannel bridges notifications into speech. `/voice` protocol for human control (aliases: `/vox`, `/speak`). Default voice: Eve (override with `FRIDAY_VOICE` env var). Platform-detected audio: `afplay` (macOS), `paplay` (Linux), PowerShell (Windows).
+- **Debug Prompt Logging** — `--debug` global CLI flag enables system prompt logging on every `Cortex.chat()` call. Logs the fully assembled system prompt (Genesis + SMARTS + Sensorium) to the AuditLogger (`action: "debug:system-prompt"`) and overwrites `debug-prompt.log` in the project root via `Bun.write()`. The file write is wrapped in try/catch so debug failures never crash the primary chat function. A `debug:enabled` audit entry is logged at boot. Config flows: CLI global option → `optsWithGlobals()` → `launchTui()` → `RuntimeConfig.debug` → `CortexConfig.debug` → Cortex private field. The default command handler explicitly forwards `--debug` through re-parse args.
 
 ## Testing
 
-- 939 tests across 87 files (as of 2026-02-26)
+- 946 tests across 87 files (as of 2026-02-26)
 - Runtime/Cortex tests use `injectedProvider` (stub `LLMProvider`) to avoid needing `ANTHROPIC_API_KEY`
 - Shared test stubs live in `tests/helpers/stubs.ts` — import `stubProvider`/`grokStub` instead of defining inline
 - SQLite tests must clean up WAL files: unlink `db`, `db-wal`, and `db-shm` in afterEach
@@ -230,6 +234,7 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 - Genesis identity prompt design: `docs/plans/2026-02-25-genesis-identity-prompt-design.md`
 - Vox voice output: `docs/plans/2026-02-25-vox-voice-output-design.md`
 - Vox implementation plan: `docs/plans/2026-02-25-vox-implementation-plan.md`
+- Debug prompt logging: `docs/plans/2026-02-26-debug-prompt-logging-design.md`
 - MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler, Genesis=identity template, Vox=voice
 
 ## Worktrees
