@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>F.R.I.D.A.Y. Voice UI</title>
+  <style>
+    :root {
+      --friday-deep: #0B0E14;
+      --friday-bg: #111620;
+      --friday-surface: #1A1F2E;
+      --friday-amber: #F5A623;
+      --friday-amber-light: #FFCC66;
+      --friday-copper: #E8852A;
+      --friday-text: #E8E0D4;
+      --friday-text-dim: #7A7262;
+      --friday-error: #F87171;
+    }
+
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: radial-gradient(ellipse at center, #0B0E14 0%, #080A0F 100%);
+      color: var(--friday-text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Vignette overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.6) 100%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .title {
+      letter-spacing: 0.3em;
+      color: var(--friday-amber);
+      font-size: 1.4rem;
+      font-weight: 600;
+      user-select: none;
+      z-index: 2;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      color: var(--friday-text-dim);
+      font-size: 0.85rem;
+      z-index: 2;
+      margin-bottom: 16px;
+    }
+
+    .canvas-container {
+      width: min(50vh, 50vw);
+      height: min(50vh, 50vw);
+      position: relative;
+      z-index: 2;
+    }
+
+    .canvas-container canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .status-text {
+      text-align: center;
+      color: var(--friday-text-dim);
+      font-size: 0.9rem;
+      min-height: 1.4em;
+      margin-top: 16px;
+      opacity: 0;
+      transition: opacity 300ms ease;
+      z-index: 2;
+    }
+
+    .status-text.visible {
+      opacity: 1;
+    }
+
+    /* Ellipsis animation */
+    .ellipsis span {
+      opacity: 0;
+      animation: ellipsisFade 1.4s infinite;
+    }
+
+    .ellipsis span:nth-child(1) {
+      animation-delay: 0s;
+    }
+
+    .ellipsis span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .ellipsis span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes ellipsisFade {
+      0%, 80%, 100% { opacity: 0; }
+      40% { opacity: 1; }
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-top: 32px;
+      z-index: 2;
+    }
+
+    .pill-btn {
+      background: transparent;
+      border: 1px solid var(--friday-amber);
+      color: var(--friday-amber);
+      padding: 8px 20px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 200ms ease, color 200ms ease;
+      user-select: none;
+    }
+
+    .pill-btn:hover {
+      background: var(--friday-amber);
+      color: var(--friday-deep);
+    }
+
+    .pill-btn.end {
+      border-color: var(--friday-error);
+      color: var(--friday-error);
+    }
+
+    .pill-btn.end:hover {
+      background: var(--friday-error);
+      color: var(--friday-deep);
+    }
+
+    .dev-controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 10;
+      background: var(--friday-surface);
+      padding: 8px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(245, 166, 35, 0.15);
+    }
+
+    .state-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid var(--friday-text-dim);
+      background: transparent;
+      color: var(--friday-text-dim);
+      font-size: 0.55rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: border-color 200ms ease, color 200ms ease;
+    }
+
+    .state-btn:hover {
+      border-color: var(--friday-amber);
+      color: var(--friday-amber);
+    }
+
+    .state-btn.active {
+      border-color: var(--friday-amber);
+      background: var(--friday-amber);
+      color: var(--friday-deep);
+    }
+
+    .dev-separator {
+      width: 1px;
+      height: 20px;
+      background: var(--friday-text-dim);
+      opacity: 0.3;
+    }
+
+    .resume-btn {
+      background: transparent;
+      border: 1px solid var(--friday-text-dim);
+      color: var(--friday-text-dim);
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: border-color 200ms ease, color 200ms ease;
+    }
+
+    .resume-btn:hover {
+      border-color: var(--friday-amber);
+      color: var(--friday-amber);
+    }
+
+    .speed-control {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .speed-control input[type="range"] {
+      width: 80px;
+      accent-color: var(--friday-amber);
+    }
+
+    .speed-label {
+      color: var(--friday-text-dim);
+      font-size: 0.7rem;
+      min-width: 30px;
+    }
+  </style>
+</head>
+<body>
+  <div class="title">F.R.I.D.A.Y.</div>
+  <div class="subtitle">Eve &middot; On</div>
+
+  <div class="canvas-container">
+    <canvas id="orb"></canvas>
+  </div>
+
+  <div id="status" class="status-text">
+    Listening<span class="ellipsis"><span>.</span><span>.</span><span>.</span></span>
+  </div>
+
+  <div class="controls">
+    <button class="pill-btn" id="btn-whisper">Whisper</button>
+    <button class="pill-btn" id="btn-mute">Mute</button>
+    <button class="pill-btn end" id="btn-end">End Session</button>
+  </div>
+
+  <div class="dev-controls">
+    <button class="state-btn active" data-state="idle">IDLE</button>
+    <button class="state-btn" data-state="listening">LIST</button>
+    <button class="state-btn" data-state="thinking">THNK</button>
+    <button class="state-btn" data-state="speaking">SPKR</button>
+    <div class="dev-separator"></div>
+    <button class="resume-btn" id="btn-resume">Resume</button>
+    <div class="dev-separator"></div>
+    <div class="speed-control">
+      <input type="range" id="speed-slider" min="0.5" max="3" step="0.1" value="1">
+      <span class="speed-label" id="speed-label">1.0x</span>
+    </div>
+  </div>
+
+  <script>
+    // Script will be added in Tasks 2 and 3
+  </script>
+</body>
+</html>
