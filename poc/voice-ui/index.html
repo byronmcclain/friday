@@ -482,6 +482,98 @@
       }
     }
 
+    // --- State color resolver ---
+    function getStateColor() {
+      switch (currentState) {
+        case STATES.IDLE: return { r: 245, g: 166, b: 35 };       // amber
+        case STATES.LISTENING: return { r: 245, g: 166, b: 35 };   // amber
+        case STATES.THINKING: return { r: 232, g: 133, b: 42 };    // copper
+        case STATES.SPEAKING: return { r: 255, g: 204, b: 102 };   // amber light
+        case STATES.ERROR: return { r: 248, g: 113, b: 113 };      // error red
+        default: return { r: 245, g: 166, b: 35 };
+      }
+    }
+
+    // --- Ring glow effect ---
+    function drawRing(time) {
+      const ringRadius = orbRadius * 1.15;
+      let alpha, lineWidth;
+
+      switch (currentState) {
+        case STATES.IDLE:
+          alpha = 0.15 + Math.sin(time * 0.5) * 0.05;
+          lineWidth = 1.5;
+          break;
+        case STATES.LISTENING:
+          alpha = 0.3 + Math.sin(time * Math.PI) * 0.2;
+          lineWidth = 2;
+          break;
+        case STATES.THINKING:
+          alpha = 0.5;
+          lineWidth = 2.5;
+          break;
+        case STATES.SPEAKING:
+          alpha = 0.6 + Math.sin(time * 3) * 0.2;
+          lineWidth = 3;
+          break;
+        case STATES.ERROR:
+          alpha = 0.5 * (1 - stateTransition);
+          lineWidth = 3;
+          break;
+        default:
+          alpha = 0.15;
+          lineWidth = 1.5;
+      }
+
+      let colorR, colorG, colorB;
+      if (muted) {
+        colorR = 74; colorG = 74; colorB = 74;
+        alpha *= 0.3;
+      } else {
+        const c = getStateColor();
+        colorR = c.r; colorG = c.g; colorB = c.b;
+      }
+
+      if (whisperMode) {
+        alpha *= 0.5;
+      }
+
+      // Outer glow
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(${colorR}, ${colorG}, ${colorB}, ${alpha * 0.3})`;
+      ctx.lineWidth = lineWidth * 6;
+      ctx.stroke();
+
+      // Inner ring (sharp)
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(${colorR}, ${colorG}, ${colorB}, ${alpha})`;
+      ctx.lineWidth = lineWidth;
+      ctx.stroke();
+
+      // THINKING special: spinning arc segment
+      if (currentState === STATES.THINKING) {
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, ringRadius, time * 3, time * 3 + Math.PI * 0.6);
+        ctx.strokeStyle = `rgba(${colorR}, ${colorG}, ${colorB}, 0.8)`;
+        ctx.lineWidth = lineWidth * 1.5;
+        ctx.stroke();
+      }
+
+      // SPEAKING special: radiating pulse ring
+      if (currentState === STATES.SPEAKING) {
+        const pulsePhase = (time * 2) % 1;
+        const pulseRadius = ringRadius + pulsePhase * orbRadius * 0.3;
+        const pulseAlpha = alpha * (1 - pulsePhase);
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, pulseRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(${colorR}, ${colorG}, ${colorB}, ${pulseAlpha})`;
+        ctx.lineWidth = lineWidth * (1 - pulsePhase);
+        ctx.stroke();
+      }
+    }
+
     // --- Render loop ---
     let lastTime = performance.now();
 
@@ -502,6 +594,9 @@
       // Sort back to front
       particles.sort((a, b) => a.z - b.z);
 
+      // Get state color once per frame
+      const stateColor = getStateColor();
+
       ctx.globalCompositeOperation = 'lighter';
 
       for (const p of particles) {
@@ -512,8 +607,8 @@
         if (size < 0.2) continue;
 
         const grad = ctx.createRadialGradient(px, py, 0, px, py, size * 2);
-        grad.addColorStop(0, `rgba(245, 166, 35, ${alpha})`);
-        grad.addColorStop(1, 'rgba(245, 166, 35, 0)');
+        grad.addColorStop(0, `rgba(${stateColor.r}, ${stateColor.g}, ${stateColor.b}, ${alpha})`);
+        grad.addColorStop(1, `rgba(${stateColor.r}, ${stateColor.g}, ${stateColor.b}, 0)`);
 
         ctx.beginPath();
         ctx.arc(px, py, size * 2, 0, Math.PI * 2);
@@ -522,6 +617,10 @@
       }
 
       ctx.globalCompositeOperation = 'source-over';
+
+      // Draw ring glow after particles
+      const time = performance.now() * 0.001;
+      drawRing(time);
 
       requestAnimationFrame(render);
     }
