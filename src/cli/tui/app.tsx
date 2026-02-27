@@ -96,6 +96,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			fresh: options.fresh,
 			genesisPath: resolveGenesisPath(),
 			channels: [],
+			debug: options.debug,
 		}),
 		[options, projectRoot],
 	);
