@@ -627,14 +627,144 @@
 
     requestAnimationFrame(render);
 
-    // --- Dev control buttons ---
+    // --- Canned responses ---
+    const RESPONSES = [
+      "I found 3 unread emails from today.",
+      "Your Docker containers are all healthy.",
+      "The build passed. 957 tests, zero failures.",
+      "Checking your calendar... you're free until 3pm.",
+      "I've summarized the PR \u2014 4 files changed, 2 comments.",
+    ];
+    let responseIndex = 0;
+
+    // --- Auto-demo state ---
+    let autoDemo = true;
+    let demoStep = 0;
+    let demoTimer = null;
+    let typewriterInterval = null;
+
+    const statusEl = document.getElementById('status');
+
+    // --- Status text controller ---
+    function setStatus(text, typewriter) {
+      // Clear any running typewriter
+      if (typewriterInterval) {
+        clearInterval(typewriterInterval);
+        typewriterInterval = null;
+      }
+
+      // Clear status element's children via DOM methods
+      while (statusEl.firstChild) {
+        statusEl.removeChild(statusEl.firstChild);
+      }
+
+      if (typewriter && text.length > 0) {
+        statusEl.classList.add('visible');
+        let charIndex = 0;
+        typewriterInterval = setInterval(() => {
+          if (charIndex < text.length) {
+            statusEl.appendChild(document.createTextNode(text[charIndex]));
+            charIndex++;
+          } else {
+            clearInterval(typewriterInterval);
+            typewriterInterval = null;
+          }
+        }, 30 / speedMultiplier);
+      } else if (text === 'Listening...') {
+        statusEl.appendChild(document.createTextNode('Listening'));
+        const ellipsisWrap = document.createElement('span');
+        ellipsisWrap.className = 'ellipsis';
+        for (let i = 0; i < 3; i++) {
+          const dot = document.createElement('span');
+          dot.appendChild(document.createTextNode('.'));
+          ellipsisWrap.appendChild(dot);
+        }
+        statusEl.appendChild(ellipsisWrap);
+        statusEl.classList.add('visible');
+      } else {
+        statusEl.textContent = text;
+        statusEl.classList.toggle('visible', !!text);
+      }
+    }
+
+    // --- Auto-demo schedule ---
+    const DEMO_SCHEDULE = [
+      { state: STATES.IDLE, duration: 3000, status: 'Ready.', typewriter: false },
+      { state: STATES.LISTENING, duration: 3000, status: 'Listening...', typewriter: false },
+      { state: STATES.THINKING, duration: 2000, status: 'Processing...', typewriter: false },
+      { state: STATES.SPEAKING, duration: 4000, status: null, typewriter: true },
+      { state: STATES.IDLE, duration: 2000, status: '', typewriter: false },
+    ];
+
+    function runDemoStep() {
+      if (!autoDemo) return;
+
+      const step = DEMO_SCHEDULE[demoStep % DEMO_SCHEDULE.length];
+      setState(step.state);
+
+      if (step.state === STATES.SPEAKING) {
+        const response = RESPONSES[responseIndex % RESPONSES.length];
+        responseIndex++;
+        setStatus(response, true);
+      } else {
+        setStatus(step.status, step.typewriter);
+      }
+
+      // Update dev control active class to match current state
+      document.querySelectorAll('.state-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.state === step.state)
+      );
+
+      demoStep++;
+      demoTimer = setTimeout(runDemoStep, step.duration / speedMultiplier);
+    }
+
+    // Start the auto-demo
+    runDemoStep();
+
+    // --- Dev control buttons (enhanced) ---
+    const STATUS_FOR_STATE = {
+      [STATES.IDLE]: 'Ready.',
+      [STATES.LISTENING]: 'Listening...',
+      [STATES.THINKING]: 'Processing...',
+      [STATES.SPEAKING]: '',
+      [STATES.ERROR]: 'Error.',
+    };
+
     document.querySelectorAll('.state-btn').forEach(btn => {
       btn.addEventListener('click', () => {
+        autoDemo = false;
+        if (demoTimer) {
+          clearTimeout(demoTimer);
+          demoTimer = null;
+        }
+
         setState(btn.dataset.state);
+        setStatus(STATUS_FOR_STATE[btn.dataset.state] || '', false);
+
         document.querySelectorAll('.state-btn').forEach(b =>
           b.classList.toggle('active', b === btn)
         );
       });
+    });
+
+    // --- Resume button ---
+    document.getElementById('btn-resume').addEventListener('click', () => {
+      autoDemo = true;
+      demoStep = 0;
+      if (demoTimer) {
+        clearTimeout(demoTimer);
+        demoTimer = null;
+      }
+      runDemoStep();
+    });
+
+    // --- Speed slider ---
+    const speedSlider = document.getElementById('speed-slider');
+    const speedLabel = document.getElementById('speed-label');
+    speedSlider.addEventListener('input', () => {
+      speedMultiplier = parseFloat(speedSlider.value);
+      speedLabel.textContent = speedMultiplier.toFixed(1) + 'x';
     });
   </script>
 </body>
