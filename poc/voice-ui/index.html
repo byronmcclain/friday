@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>F.R.I.D.A.Y. Voice UI</title>
+  <title>F.R.I.D.A.Y. — Voice Mode</title>
   <style>
     :root {
       --friday-deep: #0B0E14;
@@ -78,7 +78,7 @@
 
     .status-text {
       text-align: center;
-      color: var(--friday-text-dim);
+      color: var(--friday-text);
       font-size: 0.9rem;
       min-height: 1.4em;
       margin-top: 16px;
@@ -253,9 +253,7 @@
     <canvas id="orb"></canvas>
   </div>
 
-  <div id="status" class="status-text">
-    Listening<span class="ellipsis"><span>.</span><span>.</span><span>.</span></span>
-  </div>
+  <div id="status" class="status-text"></div>
 
   <div class="controls">
     <button class="pill-btn" id="btn-whisper">Whisper</button>
@@ -278,6 +276,15 @@
   </div>
 
   <script>
+    /**
+     * F.R.I.D.A.Y. Voice Conversation UI — Proof of Concept
+     *
+     * Self-contained visual mockup for hands-free voice mode.
+     * No dependencies, no build step. Open directly in browser.
+     *
+     * Design: docs/plans/2026-02-27-voice-conversation-ui-poc-design.md
+     */
+
     // --- Constants ---
     const COLORS = {
       deep: '#0B0E14',
@@ -338,7 +345,7 @@
       const dpr = window.devicePixelRatio || 1;
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       centerX = rect.width / 2;
       centerY = rect.height / 2;
       orbRadius = Math.min(rect.width, rect.height) * SPHERE_RADIUS;
