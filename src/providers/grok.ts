@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import type { ConversationMessage, ContentBlock, ToolUseBlock } from "../core/types.ts";
 import type { ChatOptions, ChatResponse, ToolDefinition, LLMProvider } from "./types.ts";
 import { toJsonSchema } from "./tool-schema.ts";
+import { appendInferenceLog } from "./debug-log.ts";
 
 /** OpenAI-compatible message types used by the Grok API */
 interface GrokMessage {
@@ -169,7 +170,16 @@ export class GrokProvider implements LLMProvider {
         : {}),
     };
 
+    if (options.debug) {
+      await appendInferenceLog(options.debug.payloadPath, options.debug.round, params);
+    }
+
     const response = await this.client.chat.completions.create(params);
+
+    if (options.debug) {
+      await appendInferenceLog(options.debug.responsePath, options.debug.round, response);
+    }
+
     const choice = response.choices[0];
     if (!choice) {
       throw new Error("Grok returned no choices");

@@ -5,6 +5,11 @@ export interface ChatOptions {
   model: string;
   maxTokens: number;
   tools?: ToolDefinition[];
+  debug?: {
+    payloadPath: string;
+    responsePath: string;
+    round: number;
+  };
 }
 
 /** Tool call requested by the LLM */

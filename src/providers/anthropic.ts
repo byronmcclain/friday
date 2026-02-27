@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { ConversationMessage, ContentBlock } from "../core/types.ts";
 import type { ChatOptions, ChatResponse, ToolDefinition, LLMProvider } from "./types.ts";
 import { toJsonSchema } from "./tool-schema.ts";
+import { appendInferenceLog } from "./debug-log.ts";
 
 /** Convert Friday ToolDefinition[] to Anthropic API tool format */
 export function toAnthropicTools(
@@ -130,7 +131,16 @@ export class AnthropicProvider implements LLMProvider {
       params.tools = toAnthropicTools(options.tools);
     }
 
+    if (options.debug) {
+      await appendInferenceLog(options.debug.payloadPath, options.debug.round, params);
+    }
+
     const response = await this.client.messages.create(params);
+
+    if (options.debug) {
+      await appendInferenceLog(options.debug.responsePath, options.debug.round, response);
+    }
+
     return parseAnthropicResponse(
       response as unknown as AnthropicResponseLike,
     );
