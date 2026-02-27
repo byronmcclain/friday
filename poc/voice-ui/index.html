@@ -138,6 +138,21 @@
       color: var(--friday-deep);
     }
 
+    .pill-btn.active {
+      background: var(--friday-amber);
+      color: var(--friday-deep);
+    }
+
+    .pill-btn.muted {
+      border-color: var(--friday-error);
+      color: var(--friday-error);
+    }
+
+    .pill-btn.muted:hover {
+      background: var(--friday-error);
+      color: var(--friday-deep);
+    }
+
     .pill-btn.end {
       border-color: var(--friday-error);
       color: var(--friday-error);
@@ -733,6 +748,7 @@
 
     document.querySelectorAll('.state-btn').forEach(btn => {
       btn.addEventListener('click', () => {
+        if (sessionEnded) return;
         autoDemo = false;
         if (demoTimer) {
           clearTimeout(demoTimer);
@@ -750,6 +766,7 @@
 
     // --- Resume button ---
     document.getElementById('btn-resume').addEventListener('click', () => {
+      if (sessionEnded) return;
       autoDemo = true;
       demoStep = 0;
       if (demoTimer) {
@@ -765,6 +782,49 @@
     speedSlider.addEventListener('input', () => {
       speedMultiplier = parseFloat(speedSlider.value);
       speedLabel.textContent = speedMultiplier.toFixed(1) + 'x';
+    });
+
+    // --- Control buttons ---
+    const subtitleEl = document.querySelector('.subtitle');
+    const btnWhisper = document.getElementById('btn-whisper');
+    const btnMute = document.getElementById('btn-mute');
+    const btnEnd = document.getElementById('btn-end');
+
+    // Whisper toggle
+    btnWhisper.addEventListener('click', () => {
+      if (sessionEnded) return;
+      whisperMode = !whisperMode;
+      btnWhisper.classList.toggle('active', whisperMode);
+      subtitleEl.textContent = whisperMode ? 'Eve \u00B7 Whisper' : 'Eve \u00B7 On';
+    });
+
+    // Mute toggle
+    btnMute.addEventListener('click', () => {
+      if (sessionEnded) return;
+      muted = !muted;
+      btnMute.classList.toggle('muted', muted);
+      btnMute.textContent = muted ? 'Unmute' : 'Mute';
+      if (!autoDemo) {
+        setStatus(muted ? 'Muted' : 'Ready.', false);
+      }
+    });
+
+    // End Session
+    btnEnd.addEventListener('click', () => {
+      if (sessionEnded) return;
+      sessionEnded = true;
+      autoDemo = false;
+      if (demoTimer) {
+        clearTimeout(demoTimer);
+        demoTimer = null;
+      }
+      setState(STATES.ERROR);
+      setStatus('Session ended.', false);
+      setTimeout(() => {
+        for (const p of particles) {
+          p.opacity = 0;
+        }
+      }, 1500);
     });
   </script>
 </body>
