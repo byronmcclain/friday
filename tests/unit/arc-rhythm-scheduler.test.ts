@@ -223,7 +223,7 @@ describe("RhythmScheduler", () => {
 				...stubProvider,
 				chat: async () => {
 					await new Promise((r) => setTimeout(r, 200));
-					return { type: "text" as const, text: "done" };
+					return { type: "text" as const, text: "done", truncated: false };
 				},
 			},
 		});

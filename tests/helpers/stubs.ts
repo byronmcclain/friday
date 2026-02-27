@@ -3,7 +3,7 @@ import { PROVIDER_DEFAULTS } from "../../src/providers/index.ts";
 
 /** Helper to create a text ChatResponse */
 export function textResponse(text: string): ChatResponse {
-	return { type: "text", text };
+	return { type: "text", text, truncated: false };
 }
 
 export const stubProvider: LLMProvider = {

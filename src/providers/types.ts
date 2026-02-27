@@ -16,7 +16,7 @@ export interface ToolCallRequest {
 
 /** Single chat turn result — either final text or tool-call requests */
 export type ChatResponse =
-  | { type: "text"; text: string }
+  | { type: "text"; text: string; truncated: boolean }
   | { type: "tool_use"; toolCalls: ToolCallRequest[] };
 
 /** Provider-agnostic tool definition */
