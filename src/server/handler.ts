@@ -1,24 +1,24 @@
-import { FridayRuntime, type RuntimeConfig } from "../core/runtime.ts";
+import type { FridayRuntime } from "../core/runtime.ts";
 import {
 	parseClientMessage,
 	type ClientMessage,
 	type ServerMessage,
 } from "./protocol.ts";
+import { ClientRegistry } from "./client-registry.ts";
 import { WebSocketNotificationChannel } from "./ws-channel.ts";
 
 export type SendFn = (msg: ServerMessage) => void;
 
 export class WebSocketHandler {
 	private runtime: FridayRuntime;
-	private bootConfigDefaults: Partial<RuntimeConfig>;
+	private registry: ClientRegistry;
+	private clientId: string;
 	private defaultSend?: SendFn;
 
-	constructor(
-		runtime: FridayRuntime,
-		bootConfigDefaults: Partial<RuntimeConfig> = {},
-	) {
+	constructor(runtime: FridayRuntime, registry: ClientRegistry, clientId: string) {
 		this.runtime = runtime;
-		this.bootConfigDefaults = bootConfigDefaults;
+		this.registry = registry;
+		this.clientId = clientId;
 	}
 
 	async handle(raw: string, send: SendFn): Promise<void> {
@@ -34,11 +34,16 @@ export class WebSocketHandler {
 
 		try {
 			switch (msg.type) {
+				case "session:identify":
+					this.handleIdentify(msg, send);
+					return;
 				case "session:boot":
-					await this.handleBoot(msg, send);
+					// Runtime is already booted (singleton). Respond with ready.
+					this.handleLegacyBoot(msg, send);
 					return;
 				case "session:shutdown":
-					await this.handleShutdown(msg, send);
+					// Don't actually shut down the singleton. Just acknowledge.
+					send({ type: "session:closed", requestId: msg.id });
 					return;
 				default:
 					await this.handleRuntimeMessage(msg, send);
@@ -53,6 +58,10 @@ export class WebSocketHandler {
 				message,
 			});
 		}
+	}
+
+	handleAudio(_audioData: Buffer): void {
+		// Stub — Phase 4 implements VoiceBridge forwarding
 	}
 
 	pushSensoriumUpdate(send?: SendFn): void {
@@ -86,33 +95,56 @@ export class WebSocketHandler {
 		}
 	}
 
-	private async handleBoot(
-		msg: Extract<ClientMessage, { type: "session:boot" }>,
+	private handleIdentify(
+		msg: Extract<ClientMessage, { type: "session:identify" }>,
 		send: SendFn,
-	): Promise<void> {
-		if (this.runtime.isBooted) {
-			send({
-				type: "error",
-				requestId: msg.id,
-				code: "ALREADY_BOOTED",
-				message: "Runtime already booted",
-			});
-			return;
+	): void {
+		const capabilities = new Set<string>(["text"]);
+		if (msg.clientType === "voice") {
+			capabilities.add("audio-in");
+			capabilities.add("audio-out");
 		}
-		const config: RuntimeConfig = {
-			...this.bootConfigDefaults,
-			provider: msg.provider ?? this.bootConfigDefaults.provider,
-			model: msg.model,
-			fastModel: msg.fastModel,
-			fresh: msg.fresh,
-		};
-		await this.runtime.boot(config);
+
+		this.registry.register({
+			id: this.clientId,
+			clientType: msg.clientType,
+			send,
+			capabilities,
+		});
+
 		this.defaultSend = send;
+
+		// Wire notification channel for this client
 		if (this.runtime.notifications) {
 			this.runtime.notifications.addChannel(
 				new WebSocketNotificationChannel(send),
 			);
 		}
+
+		send({
+			type: "session:ready",
+			requestId: msg.id,
+			provider: this.runtime.cortex.providerName,
+			model: this.runtime.cortex.modelName,
+			capabilities: [...capabilities],
+		});
+	}
+
+	private handleLegacyBoot(
+		msg: Extract<ClientMessage, { type: "session:boot" }>,
+		send: SendFn,
+	): void {
+		// Singleton is already booted. Register client implicitly and respond.
+		if (!this.registry.getById(this.clientId)) {
+			this.registry.register({
+				id: this.clientId,
+				clientType: "chat",
+				send,
+				capabilities: new Set(["text"]),
+			});
+			this.defaultSend = send;
+		}
+
 		send({
 			type: "session:booted",
 			requestId: msg.id,
@@ -120,24 +152,6 @@ export class WebSocketHandler {
 			model: this.runtime.cortex.modelName,
 			fastModel: this.runtime.fastModel,
 		});
-	}
-
-	private async handleShutdown(
-		msg: Extract<ClientMessage, { type: "session:shutdown" }>,
-		send: SendFn,
-	): Promise<void> {
-		if (!this.runtime.isBooted) {
-			send({
-				type: "error",
-				requestId: msg.id,
-				code: "NOT_BOOTED",
-				message: "Runtime not booted",
-			});
-			return;
-		}
-		await this.runtime.shutdown();
-		this.defaultSend = undefined;
-		send({ type: "session:closed", requestId: msg.id });
 	}
 
 	private async handleRuntimeMessage(
@@ -149,14 +163,13 @@ export class WebSocketHandler {
 				type: "error",
 				requestId: msg.id,
 				code: "NOT_BOOTED",
-				message: "Runtime not booted. Send session:boot first.",
+				message: "Runtime not booted. Send session:identify first.",
 			});
 			return;
 		}
 
 		switch (msg.type) {
 			case "chat": {
-				// Protocol inputs bypass streaming — route through runtime.process()
 				if (this.runtime.protocols.isProtocol(msg.content)) {
 					const result = await this.runtime.process(msg.content);
 					send({
@@ -165,12 +178,34 @@ export class WebSocketHandler {
 						content: result.output,
 						source: result.source,
 					});
+
+					// Broadcast to other clients
+					this.registry.broadcast(
+						{
+							type: "conversation:message",
+							role: "user",
+							content: msg.content,
+							source: "chat",
+						},
+						(c) => c.id !== this.clientId,
+					);
 					break;
 				}
 
-				// Stream Cortex response as chunks
 				try {
 					const stream = await this.runtime.cortex.chatStream(msg.content);
+
+					// Broadcast user message to other clients
+					this.registry.broadcast(
+						{
+							type: "conversation:message",
+							role: "user",
+							content: msg.content,
+							source: "chat",
+						},
+						(c) => c.id !== this.clientId,
+					);
+
 					for await (const chunk of stream.textStream) {
 						send({
 							type: "chat:chunk",
@@ -185,6 +220,17 @@ export class WebSocketHandler {
 						content: fullText,
 						source: "cortex",
 					});
+
+					// Broadcast assistant response to other clients
+					this.registry.broadcast(
+						{
+							type: "conversation:message",
+							role: "assistant",
+							content: fullText,
+							source: "chat",
+						},
+						(c) => c.id !== this.clientId,
+					);
 				} catch (streamErr) {
 					const message =
 						streamErr instanceof Error
@@ -209,50 +255,44 @@ export class WebSocketHandler {
 				});
 				break;
 			}
+			case "voice:start": {
+				// Phase 4 implements this
+				send({
+					type: "voice:error",
+					code: "NOT_IMPLEMENTED",
+					message: "Voice not yet implemented",
+				});
+				break;
+			}
+			case "voice:stop": {
+				send({ type: "voice:stopped", requestId: msg.id });
+				break;
+			}
+			case "voice:mode": {
+				// Phase 4 implements this
+				break;
+			}
 			case "history:list": {
 				if (!this.runtime.memory) {
-					send({
-						type: "error",
-						requestId: msg.id,
-						code: "NO_MEMORY",
-						message: "Memory not configured",
-					});
+					send({ type: "error", requestId: msg.id, code: "NO_MEMORY", message: "Memory not configured" });
 					return;
 				}
-				const sessions = await this.runtime.memory.getConversationHistory(
-					msg.count ?? 20,
-				);
-				send({
-					type: "history:result",
-					requestId: msg.id,
-					data: sessions,
-				});
+				const sessions = await this.runtime.memory.getConversationHistory(msg.count ?? 20);
+				send({ type: "history:result", requestId: msg.id, data: sessions });
 				break;
 			}
 			case "history:load": {
 				if (!this.runtime.memory) {
-					send({
-						type: "error",
-						requestId: msg.id,
-						code: "NO_MEMORY",
-						message: "Memory not configured",
-					});
+					send({ type: "error", requestId: msg.id, code: "NO_MEMORY", message: "Memory not configured" });
 					return;
 				}
-				const session = await this.runtime.memory.getConversationById(
-					msg.sessionId,
-				);
+				const session = await this.runtime.memory.getConversationById(msg.sessionId);
 				send({ type: "history:result", requestId: msg.id, data: session });
 				break;
 			}
 			case "smarts:list": {
 				if (!this.runtime.smarts) {
-					send({
-						type: "error",
-						requestId: msg.id,
-						code: "NO_SMARTS",
-						message: "SMARTS not configured",
-					});
+					send({ type: "error", requestId: msg.id, code: "NO_SMARTS", message: "SMARTS not configured" });
 					return;
 				}
 				const entries = this.runtime.smarts.all();
@@ -261,12 +301,7 @@ export class WebSocketHandler {
 			}
 			case "smarts:search": {
 				if (!this.runtime.smarts) {
-					send({
-						type: "error",
-						requestId: msg.id,
-						code: "NO_SMARTS",
-						message: "SMARTS not configured",
-					});
+					send({ type: "error", requestId: msg.id, code: "NO_SMARTS", message: "SMARTS not configured" });
 					return;
 				}
 				const results = await this.runtime.smarts.findRelevant(msg.query);

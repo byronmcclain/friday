@@ -27,7 +27,7 @@ export function serveCommand(program: Command): void {
 			}
 
 			const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-			const server = createFridayServer({
+			const result = await createFridayServer({
 				port,
 				staticDir: resolve(projectRoot, "web/dist"),
 				runtimeConfig: {
@@ -42,15 +42,18 @@ export function serveCommand(program: Command): void {
 
 			console.log(
 				boxen(
-					`${chalk.hex("#F0A030").bold("F.R.I.D.A.Y. Web UI")}\n${chalk.hex("#8B6914")(`http://localhost:${server.port}`)}`,
+					`${chalk.hex("#F0A030").bold("F.R.I.D.A.Y. Web UI")}\n${chalk.hex("#8B6914")(`http://localhost:${result.server.port}`)}`,
 					{ padding: 1, borderColor: "#C07020", borderStyle: "round" },
 				),
 			);
 
 			const shutdown = async () => {
 				console.log(chalk.hex("#8B6914")("\nShutting down server..."));
-				server.stop(true);
-				// Give in-flight WebSocket handlers a moment to drain
+				// Shutdown the singleton runtime
+				if (result.runtime.isBooted) {
+					await result.runtime.shutdown();
+				}
+				result.server.stop(true);
 				await new Promise((r) => setTimeout(r, 1000));
 				process.exit(0);
 			};

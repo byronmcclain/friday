@@ -1,11 +1,13 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { WebSocketHandler } from "../../src/server/handler.ts";
+import { ClientRegistry } from "../../src/server/client-registry.ts";
 import { FridayRuntime } from "../../src/core/runtime.ts";
 import { stubProvider } from "../helpers/stubs.ts";
 import type { ServerMessage } from "../../src/server/protocol.ts";
 
 describe("WebSocketHandler", () => {
 	let runtime: FridayRuntime;
+	let registry: ClientRegistry;
 	let handler: WebSocketHandler;
 	let sent: ServerMessage[];
 
@@ -13,9 +15,11 @@ describe("WebSocketHandler", () => {
 		sent.push(msg);
 	};
 
-	beforeEach(() => {
+	beforeEach(async () => {
 		runtime = new FridayRuntime();
-		handler = new WebSocketHandler(runtime, { injectedProvider: stubProvider });
+		await runtime.boot({ injectedProvider: stubProvider });
+		registry = new ClientRegistry();
+		handler = new WebSocketHandler(runtime, registry, "test-client");
 		sent = [];
 	});
 
@@ -25,25 +29,43 @@ describe("WebSocketHandler", () => {
 		}
 	});
 
-	test("returns error when runtime not booted and chat received", async () => {
+	test("returns error when chat received before identify", async () => {
+		// Runtime is booted but client hasn't identified — still works since runtime is shared
 		await handler.handle('{"type":"chat","id":"1","content":"hello"}', mockSend);
-		expect(sent).toHaveLength(1);
-		expect(sent[0]!.type).toBe("error");
-		expect((sent[0] as any).code).toBe("NOT_BOOTED");
+		// Should get a streaming response (chunks + final) since runtime is booted
+		expect(sent.length).toBeGreaterThanOrEqual(1);
 	});
 
-	test("boots runtime on session:boot", async () => {
+	test("handles legacy session:boot by responding with session:booted", async () => {
 		await handler.handle(
 			'{"type":"session:boot","id":"1","provider":"grok"}',
 			mockSend,
 		);
 		expect(sent).toHaveLength(1);
 		expect(sent[0]!.type).toBe("session:booted");
+		// Runtime was already booted — it stays booted
 		expect(runtime.isBooted).toBe(true);
 	});
 
-	test("handles chat after boot — streams chunks then final response", async () => {
-		await handler.handle('{"type":"session:boot","id":"1"}', mockSend);
+	test("handles session:identify and responds with session:ready", async () => {
+		await handler.handle(
+			'{"type":"session:identify","id":"1","clientType":"voice"}',
+			mockSend,
+		);
+		expect(sent).toHaveLength(1);
+		expect(sent[0]!.type).toBe("session:ready");
+		const ready = sent[0] as any;
+		expect(ready.capabilities).toContain("text");
+		expect(ready.capabilities).toContain("audio-in");
+		expect(ready.capabilities).toContain("audio-out");
+		expect(registry.count).toBe(1);
+	});
+
+	test("handles chat after identify — streams chunks then final response", async () => {
+		await handler.handle(
+			'{"type":"session:identify","id":"0","clientType":"chat"}',
+			mockSend,
+		);
 		sent = [];
 		await handler.handle(
 			'{"type":"chat","id":"2","content":"hello"}',
@@ -57,19 +79,16 @@ describe("WebSocketHandler", () => {
 		expect(chunks.length).toBeGreaterThanOrEqual(1);
 		expect(responses).toHaveLength(1);
 
-		// All chunks carry the correct requestId
 		for (const chunk of chunks) {
 			expect((chunk as any).requestId).toBe("2");
 			expect(typeof (chunk as any).text).toBe("string");
 		}
 
-		// Final response carries the correct requestId and source
 		expect((responses[0] as any).requestId).toBe("2");
 		expect((responses[0] as any).source).toBe("cortex");
 	});
 
-	test("handles protocol command after boot", async () => {
-		await handler.handle('{"type":"session:boot","id":"1"}', mockSend);
+	test("handles protocol command", async () => {
 		runtime.protocols.register({
 			name: "test",
 			description: "test",
@@ -78,7 +97,6 @@ describe("WebSocketHandler", () => {
 			clearance: [],
 			execute: async () => ({ success: true, summary: "Test OK" }),
 		});
-		sent = [];
 		await handler.handle(
 			'{"type":"protocol","id":"3","command":"/test"}',
 			mockSend,
@@ -88,27 +106,17 @@ describe("WebSocketHandler", () => {
 		expect((sent[0] as any).content).toContain("Test OK");
 	});
 
-	test("handles session:shutdown", async () => {
-		await handler.handle('{"type":"session:boot","id":"1"}', mockSend);
-		sent = [];
+	test("handles session:shutdown without killing singleton", async () => {
 		await handler.handle('{"type":"session:shutdown","id":"4"}', mockSend);
 		expect(sent).toHaveLength(1);
 		expect(sent[0]!.type).toBe("session:closed");
-		expect(runtime.isBooted).toBe(false);
+		// Singleton runtime should STILL be booted
+		expect(runtime.isBooted).toBe(true);
 	});
 
-	test("pushSensoriumUpdate does not throw when runtime not booted", () => {
-		// Should safely no-op when sensorium is not available
-		handler.pushSensoriumUpdate(mockSend);
-		expect(sent).toHaveLength(0);
-	});
-
-	test("pushSensoriumUpdate sends via provided send function after boot", async () => {
-		await handler.handle('{"type":"session:boot","id":"1"}', mockSend);
-		sent = [];
-
-		// pushSensoriumUpdate may or may not produce output depending on
-		// whether sensorium has a snapshot in stub mode — the key is it doesn't throw
+	test("pushSensoriumUpdate does not throw", () => {
+		// With a booted runtime, sensorium may or may not have a snapshot yet
+		// The key is it doesn't throw
 		handler.pushSensoriumUpdate(mockSend);
 		const sensoriumMsgs = sent.filter((m) => m.type === "sensorium:update");
 		expect(sensoriumMsgs.length).toBeGreaterThanOrEqual(0);

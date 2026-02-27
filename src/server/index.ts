@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { FridayRuntime, type RuntimeConfig } from "../core/runtime.ts";
 import { WebSocketHandler, type SendFn } from "./handler.ts";
+import { ClientRegistry } from "./client-registry.ts";
 import type { ServerMessage } from "./protocol.ts";
 import type { ServerWebSocket } from "bun";
 
@@ -11,15 +12,14 @@ export interface FridayServerConfig {
 }
 
 interface WSData {
+	clientId: string;
 	handler: WebSocketHandler;
-	runtime: FridayRuntime;
 	pushInterval?: ReturnType<typeof setInterval>;
 }
 
 const MAX_CONNECTIONS = 10;
 
-export function createFridayServer(config: FridayServerConfig) {
-	let activeConnections = 0;
+export async function createFridayServer(config: FridayServerConfig) {
 	const staticDir = config.staticDir ?? resolve("web/dist");
 	const allowedOrigins = new Set([
 		`http://localhost:${config.port}`,
@@ -27,6 +27,14 @@ export function createFridayServer(config: FridayServerConfig) {
 		`http://127.0.0.1:${config.port}`,
 		"http://127.0.0.1:5173",
 	]);
+
+	// Boot singleton runtime BEFORE starting the server
+	const runtime = new FridayRuntime();
+	await runtime.boot({
+		...config.runtimeConfig,
+	});
+
+	const registry = new ClientRegistry();
 
 	const server = Bun.serve<WSData>({
 		port: config.port,
@@ -37,21 +45,17 @@ export function createFridayServer(config: FridayServerConfig) {
 			if (url.pathname === "/ws") {
 				const origin = req.headers.get("origin");
 				if (origin && !allowedOrigins.has(origin)) {
-					return new Response("Forbidden: invalid origin", {
-						status: 403,
-					});
+					return new Response("Forbidden: invalid origin", { status: 403 });
 				}
 
-				if (activeConnections >= MAX_CONNECTIONS) {
-					return new Response("Service Unavailable: connection limit reached", {
-						status: 503,
-					});
+				if (registry.count >= MAX_CONNECTIONS) {
+					return new Response("Service Unavailable: connection limit reached", { status: 503 });
 				}
 
-				const runtime = new FridayRuntime();
-				const handler = new WebSocketHandler(runtime, config.runtimeConfig);
+				const clientId = crypto.randomUUID();
+				const handler = new WebSocketHandler(runtime, registry, clientId);
 				const upgraded = server.upgrade(req, {
-					data: { handler, runtime },
+					data: { clientId, handler },
 				});
 				if (upgraded) return undefined;
 				return new Response("WebSocket upgrade failed", { status: 400 });
@@ -68,13 +72,12 @@ export function createFridayServer(config: FridayServerConfig) {
 				return new Response(file);
 			}
 
-			// SPA fallback: serve index.html for all non-file routes
+			// SPA fallback
 			const index = Bun.file(resolve(staticDir, "index.html"));
 			if (await index.exists()) {
 				return new Response(index);
 			}
 
-			// Dev mode placeholder when web/dist doesn't exist
 			return new Response(
 				"<html><body><h1>Friday Web UI</h1><p>Run <code>cd web && bun run build</code> first.</p></body></html>",
 				{ headers: { "Content-Type": "text/html" } },
@@ -82,11 +85,16 @@ export function createFridayServer(config: FridayServerConfig) {
 		},
 		websocket: {
 			open(_ws: ServerWebSocket<WSData>) {
-				activeConnections++;
+				// Client registered when they send session:identify
 			},
 			async message(ws: ServerWebSocket<WSData>, message: string | Buffer) {
-				const raw =
-					typeof message === "string" ? message : message.toString();
+				if (message instanceof Buffer) {
+					// Binary frame = audio data from voice client
+					ws.data.handler.handleAudio(message);
+					return;
+				}
+
+				const raw = typeof message === "string" ? message : message.toString();
 				const send: SendFn = (msg: ServerMessage) => {
 					try {
 						if (ws.readyState === 1) {
@@ -96,11 +104,12 @@ export function createFridayServer(config: FridayServerConfig) {
 				};
 				await ws.data.handler.handle(raw, send);
 
-				// After handling, check if runtime just booted and set up Sensorium push
+				// Set up Sensorium push after identify
 				if (
-					ws.data.runtime.isBooted &&
-					ws.data.runtime.sensorium &&
-					!ws.data.pushInterval
+					runtime.isBooted &&
+					runtime.sensorium &&
+					!ws.data.pushInterval &&
+					registry.getById(ws.data.clientId)
 				) {
 					ws.data.pushInterval = setInterval(() => {
 						try {
@@ -112,24 +121,20 @@ export function createFridayServer(config: FridayServerConfig) {
 								);
 							}
 						} catch {
-							// Connection may have closed between check and send
+							// Connection may have closed
 						}
 					}, 5000);
 				}
 			},
 			close(ws: ServerWebSocket<WSData>) {
-				activeConnections--;
-				// Clean up Sensorium push interval
 				if (ws.data.pushInterval) {
 					clearInterval(ws.data.pushInterval);
 				}
-				// Auto-shutdown runtime if still booted
-				if (ws.data.runtime.isBooted) {
-					ws.data.runtime.shutdown().catch(() => {});
-				}
+				registry.unregister(ws.data.clientId);
+				// Do NOT shutdown runtime — it's shared!
 			},
 		},
 	});
 
-	return server;
+	return { server, runtime, registry };
 }
