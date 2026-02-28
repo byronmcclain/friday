@@ -82,27 +82,16 @@ export function MenuBar({ activeMode, onModeChange }: MenuBarProps) {
 
 			{/* Content layer */}
 			<div className="relative flex items-center w-full px-3 z-10">
-				{/* Brand */}
-				<div className="flex items-center gap-2 mr-1">
-					<span
-						className="friday-diamond"
-						style={{
-							color: "var(--color-friday-amber)",
-							fontSize: "12px",
-						}}
-					>
-						&#x25C6;
-					</span>
-					<span
-						className="text-[10px] font-semibold"
-						style={{
-							color: "var(--color-friday-amber)",
-							letterSpacing: "0.2em",
-						}}
-					>
-						FRIDAY
-					</span>
-				</div>
+				{/* Diamond icon — brand presence without redundant text */}
+				<span
+					className="friday-diamond mr-2.5"
+					style={{
+						color: "var(--color-friday-amber)",
+						fontSize: "12px",
+					}}
+				>
+					&#x25C6;
+				</span>
 
 				<Divider />
 

@@ -84,6 +84,19 @@ export class FridaySocketServer {
         });
         break;
       }
+      case "session:list-protocols": {
+        const protocols = this.runtime.protocols.list().map((p) => ({
+          name: p.name,
+          description: p.description,
+          aliases: p.aliases,
+        }));
+        send({
+          type: "session:protocols",
+          requestId: msg.id,
+          protocols,
+        });
+        break;
+      }
       case "chat": {
         if (this.runtime.protocols.isProtocol(msg.content)) {
           const result = await this.runtime.process(msg.content);

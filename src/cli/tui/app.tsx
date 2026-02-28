@@ -164,6 +164,18 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 						// Identification failed — use CLI options as fallback
 					}
 
+					// Fetch available protocols for typeahead
+					try {
+						const protocols = await socketBridge.listProtocols();
+						commandsRef.current = protocols.map((p) => ({
+							name: p.name,
+							description: p.description,
+							aliases: p.aliases ?? [],
+						}));
+					} catch {
+						// Protocol list unavailable — typeahead will be empty
+					}
+
 					dispatch({
 						type: "set-welcome",
 						info: { provider: runtimeProvider, model: runtimeModel },

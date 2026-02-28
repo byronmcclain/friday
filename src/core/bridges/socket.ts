@@ -150,6 +150,30 @@ export class SocketBridge implements RuntimeBridge {
     });
   }
 
+  /** Ask the server for its available protocol commands. */
+  async listProtocols(): Promise<{ name: string; description: string; aliases?: string[] }[]> {
+    const requestId = crypto.randomUUID();
+
+    return new Promise((resolve, reject) => {
+      this.pendingCallbacks.set(requestId, {
+        onComplete: (msg) => {
+          this.pendingCallbacks.delete(requestId);
+          if (msg.type === "session:protocols") {
+            resolve(msg.protocols);
+          } else {
+            resolve([]);
+          }
+        },
+        onError: (err) => {
+          this.pendingCallbacks.delete(requestId);
+          reject(err);
+        },
+      });
+
+      this.send({ type: "session:list-protocols", id: requestId });
+    });
+  }
+
   isBooted(): boolean {
     return this.connected;
   }
@@ -185,6 +209,7 @@ export class SocketBridge implements RuntimeBridge {
       case "chat:response":
       case "protocol:response":
       case "session:ready":
+      case "session:protocols":
       case "session:booted":
       case "session:closed":
         callbacks.onComplete(msg);
