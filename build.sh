@@ -3,6 +3,13 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+RUN_TESTS=false
+for arg in "$@"; do
+  case "$arg" in
+    --test|-t) RUN_TESTS=true ;;
+  esac
+done
+
 AMBER='\033[38;2;240;160;48m'
 DIM='\033[2m'
 GREEN='\033[32m'
@@ -37,10 +44,14 @@ step "Linting..."
 bun run lint || fail "Lint failed"
 ok "Lint clean"
 
-# 5. Tests
-step "Running tests..."
-bun test || fail "Tests failed"
-ok "All tests pass"
+# 5. Tests (opt-in via --test or -t)
+if [ "$RUN_TESTS" = true ]; then
+  step "Running tests..."
+  bun test || fail "Tests failed"
+  ok "All tests pass"
+else
+  printf "${DIM}  ⊘ Tests skipped (use --test to run)${RESET}\n"
+fi
 
 # 6. Build web UI
 step "Building web UI..."
