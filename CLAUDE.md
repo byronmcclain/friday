@@ -15,6 +15,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
+bun link               # Register `friday` executable globally (reads bin from package.json)
 bun run start          # Run Friday
 bun run dev            # Run with --watch (auto-restart on changes)
 bun test               # Run all tests
@@ -162,36 +163,42 @@ tests/
 └── integration/           # Integration tests — future
 ```
 
-### Key Design Patterns
+### Subsystem Map
 
-- **FridayRuntime** (`src/core/runtime.ts`) is the composition root. It boots all subsystems in order: SignalBus, ClearanceManager, AuditLogger, NotificationManager, ProtocolRegistry, DirectiveStore/Engine, Memory, SmartsStore, Sensorium, Genesis, Vox, Cortex, Recall Tool, Arc Rhythm, then discovers and loads Modules.
-- **Cortex** (`src/core/cortex.ts`) is Friday's LLM brain. Uses AI SDK `streamText()` with `stopWhen: stepCountIs(N)` for automatic tool loop execution. Exposes `chat()` (blocking, with error rollback) and `chatStream()` (streaming `ChatStream` with `textStream`, `fullText`, `usage`). `HistoryManager` handles token-budget conversation history with compaction. Tools registered via `registerTool()` are converted to AI SDK tools via `toZodSchema()`. When a SmartsStore is provided, Cortex enriches the system prompt with pinned and FTS5-matched knowledge per message.
-- **SMARTS** (`src/smarts/`) is Friday's dynamic knowledge system. Markdown files with YAML frontmatter in `smarts/` are indexed into FTS5, queried per-message to enrich prompts, and new knowledge is extracted from conversations on shutdown via SmartsCurator. The `/smart` protocol provides manual control (list, show, search, reload).
-- **SignalBus** (`src/core/events.ts`) is the reactive nervous system. Typed signals (file:changed, test:failed, etc.) flow through here, triggering directives and module behavior.
-- **Protocols** bypass LLM reasoning entirely — `/command` input is routed directly to a protocol handler via the ProtocolRegistry, while everything else flows through Cortex.
-- **Directives** are autonomous rules: signal triggers fire actions (tools, protocols, prompts) after clearance checks. The DirectiveEngine wires the SignalBus to the DirectiveStore.
-- **Modules** bundle tools, protocols, knowledge, triggers, and clearance into discoverable units. They're auto-loaded from directories and validated against the manifest contract.
-- **Commands** are registered via Commander.js in `src/cli/index.ts`. Each command lives in its own file under `src/cli/commands/`.
-- **Types** are split by domain: core config in `src/core/types.ts`, tool/module contracts in `src/modules/types.ts`, directive structures in `src/directives/types.ts`.
-- **Sensorium** (`src/sensorium/`) is Friday's environmental awareness. Pure sensor functions gather machine stats (`node:os`), Docker containers (`Bun.$`), and dev environment (git, ports, runtimes). The Sensorium class runs a dual-cadence polling loop (30s fast / 5min slow), evaluates alert thresholds with hysteresis, and injects a compact context block into the system prompt via `getContextBlock()`. The `/env` protocol provides CLI access; `getEnvironmentStatus` tool provides LLM access.
-- **Dual-Model Architecture** — FridayRuntime resolves two models per provider: a reasoning model (for Cortex conversations) and a fast model (for SmartsCurator knowledge extraction and ConversationSummarizer). Resolution priority: CLI flag > env var > `PROVIDER_DEFAULTS`. `FridayConfig.fastModel` carries the fast model through the config chain.
-- **The Forge** (`src/modules/forge/`) is Friday's self-improvement system. She can author new modules in `forge/` and patch existing forge modules, subject to human approval. The Forge validates modules (import, manifest, typecheck, lint) before triggering an in-process restart. Failed forge modules don't crash boot — errors are reported back so Friday can iterate. The filesystem module and Forge itself are core-protected.
-- **TUI** (`src/cli/tui/`) is Friday's interactive terminal interface, built with OpenTUI (React for CLI). The `chat` command delegates to `launchTui()` which renders a React component tree: Header (shimmer animation), ChatArea (messages + thinking indicator), InputBar (command typeahead). State is managed via a reducer with phases: `splash → fading → booting → active → shutting-down`. TuiChannel bridges NotificationManager into TUI toasts. The splash screen uses chafa to convert the logo image to ANSI art with a fade animation. Mouse-enabled text selection with auto-copy to clipboard.
-- **History** (`src/history/protocol.ts`) provides the `/history` protocol (aliases: `/hist`) for browsing, viewing, and clearing past conversation sessions stored in SQLite.
-- **Recall (Deja Vu)** (`src/core/recall-tool.ts`) is Friday's conversational memory search. The `recall_memory` tool provides two modes: `search` (FTS5 keyword search across conversation summaries, returns session IDs + dates + snippets) and `recall` (retrieves full message transcript for a session). Conversations are auto-indexed on save via `memory.indexConversation()` with pruning of deleted sessions. Wired into Cortex as a registered tool at boot.
-- **Arc Rhythm** (`src/arc-rhythm/`) is Friday's autonomous scheduling subsystem — her heartbeat. RhythmStore persists rhythms and execution history to SQLite (shared database with Memory). RhythmScheduler ticks every 60s, finds due rhythms, and dispatches them through RhythmExecutor which routes prompt/tool/protocol actions through Cortex, the tool registry, or the ProtocolRegistry respectively. Auto-pause disables rhythms after 5 consecutive failures. Emits signals (`custom:arc-rhythm-executed`, `custom:arc-rhythm-failed`, `custom:arc-rhythm-paused`). The `/arc` protocol provides human CLI access; `manage_rhythm` tool provides LLM access. Built-in zero-dependency cron parser supports 5-field expressions, ranges, lists, steps, named days/months, and shorthands (@hourly, @daily, @weekly, @monthly).
-- **Operational Modules** — Beyond the filesystem module, Friday has 6 additional modules: **git** (status, diff, log, branch, stash, push, pull), **docker** (ps, logs, inspect, stats, exec), **code-exec** (sandboxed script execution), **web-fetch** (HTTP with SSRF protection), **notify** (multi-channel dispatch), and **gmail** (search, read, send, reply, modify, labels via Gmail API with OAuth 2.0). All use shared validation from `src/modules/validation.ts` for path traversal, SSRF, and flag injection protection.
-- **Gmail** (`src/modules/gmail/`) provides Friday's email identity via the Gmail API. `GmailAuth` handles OAuth 2.0 with encrypted token storage via `SecretStore` (AES-256-GCM, OS keychain). `GmailClient` wraps the googleapis SDK. Six tools for Cortex (`gmail.search`, `gmail.read`, `gmail.send`, `gmail.reply`, `gmail.modify`, `gmail.list_labels`), one `/gmail` protocol for humans (aliases: `/mail`, `/email`). Send/reply tools require `"email-send"` clearance. The `SecretStore` (`src/core/secrets.ts`) is a reusable core component.
-- **SMARTS Staleness Prevention** — SMARTS entries carry a `sessionId` field. On boot, `SmartsStore.pruneStale()` removes entries whose session hasn't been seen within a TTL window. The SmartsCurator filters volatile extractions (greetings, meta-commentary) and stamps `sessionId` on create/update for TTL renewal.
-- **Genesis** (`src/core/genesis.ts`) is Friday's identity prompt, loaded from `~/.friday/GENESIS.md` at boot. The file is protected: `chmod 600`, filesystem tools and Forge reject writes to it, and it lives outside the repo. The BOSS edits it via `friday genesis edit`. `GENESIS_TEMPLATE` in `src/core/prompts.ts` is the seed template used by `friday genesis init`. Override path with `FRIDAY_GENESIS_PATH` env var.
-- **Prompts** live in `src/core/prompts.ts` as exported constants. `GENESIS_TEMPLATE` is the seed template for Friday's identity — it gets written to `~/.friday/GENESIS.md` on first run. The system prompt includes current date/time injection and recall_memory tool usage guidance.
-- **Vox** (`src/core/voice/`) is Friday's voice output — her mouth. Uses the xAI Grok Voice Agent API via persistent WebSocket to speak responses aloud. Three modes: Off (default), On, Whisper. Dynamic TTS prompt system classifies content (tables, code, lists) and adjusts instructions per utterance. Persistent WebSocket with 60s idle eviction. Fire-and-forget speech after Cortex chat responses. VoiceChannel bridges notifications into speech. `/voice` protocol for human control (aliases: `/vox`, `/speak`). Default voice: Eve (override with `FRIDAY_VOICE` env var). Platform-detected audio: `afplay` (macOS), `paplay` (Linux), PowerShell (Windows).
-- **Debug Inference Logging** — `--debug` global CLI flag enables inference payload and response logging on every `provider.chat()` call. At the start of each `Cortex.chat()`, two files are cleared: `last-inference-payload.log` and `last-inference-response.log` in the project root. Each tool loop round appends a timestamped separator and the provider-specific wire-format JSON (the exact params sent to the API and the raw response received). This captures what the LLM actually sees and returns — essential for debugging hallucinations. The system prompt is also logged to the AuditLogger (`action: "debug:system-prompt"`). A `debug:enabled` audit entry is logged at boot. File I/O uses `appendFile` from `node:fs/promises` for round appending and `Bun.write()` for clearing — all wrapped in try/catch so debug failures never crash the primary chat function. `ChatOptions.debug` carries `payloadPath`, `responsePath`, and `round` number from Cortex to providers. Config flows: CLI global option → `optsWithGlobals()` → `launchTui()` → `RuntimeConfig.debug` → `CortexConfig.debug` → Cortex private fields. The default command handler explicitly forwards `--debug` through re-parse args.
-- **Singleton Mode** — Friday supports a singleton runtime pattern: run `friday serve` in one terminal, then `friday chat` in another. The chat command auto-detects a running server via `~/.friday/friday.pid` and `~/.friday/friday.sock` and connects via `SocketBridge` instead of booting a local runtime. `RuntimeBridge` (`src/core/bridges/types.ts`) is the abstraction — `LocalBridge` wraps an in-process runtime, `SocketBridge` wraps Unix socket IPC to the server. The server writes PID/socket files at startup and cleans them on shutdown.
-- **Client Registry** (`src/server/client-registry.ts`) tracks connected WebSocket clients with metadata (client type: chat, voice, tui). Enables the server to push targeted messages to specific client types.
-- **VoiceBridge** (`src/core/voice/bridge.ts`) is the realtime conversational voice interface — distinct from Vox's fire-and-forget TTS. Connects to the Grok Realtime API via WebSocket (`wss://api.x.ai/v1/realtime`), with a state machine (idle → listening → thinking → speaking → error). Handles session updates, audio deltas, and transcript deltas with callbacks.
-- **TUI Log Panel** (`src/cli/tui/components/log-panel.tsx`) provides an in-TUI debug log viewer. `LogStore` (`log-store.ts`) manages log entries, and `LogEntry` types (`log-types.ts`) define the structured log format.
-- **Terminal-in-Browser** (`src/server/ttyd.ts`) spawns a ttyd process on port 7681 when the web server starts (if ttyd is installed), enabling a terminal interface embedded in the web UI via the `TerminalEmbed` component.
+| Subsystem | Location | Key Constraint |
+|---|---|---|
+| **FridayRuntime** | `src/core/runtime.ts` | Composition root. Boot order is strict dependency chain (see below). |
+| **Cortex** | `src/core/cortex.ts` | LLM brain. `chat()` blocks (with error rollback), `chatStream()` streams. `stopWhen: stepCountIs(N)` for tool loop. Enriches system prompt per message with SMARTS + Sensorium. |
+| **HistoryManager** | `src/core/history-manager.ts` | Token-budget conversation history. Auto-compacts, keeps min 4 messages. |
+| **SignalBus** | `src/core/events.ts` | Typed events. Error-isolated handlers. `custom:${string}` for custom signals. |
+| **Protocols** | `src/protocols/registry.ts` | `/command` routing. **Bypass LLM entirely** — direct handler dispatch. |
+| **Directives** | `src/directives/` | Autonomous signal→action rules. Clearance-gated. Dynamic subscriptions via `store.onStoreChange()`. |
+| **Modules** | `src/modules/` | Auto-loaded tool/protocol bundles. Shared validation in `validation.ts`. 8 modules: filesystem, git, docker, code-exec, web-fetch, notify, forge, gmail. |
+| **SMARTS** | `src/smarts/` | FTS5-indexed knowledge. Pinned + FTS5-matched injected per message. Staleness pruning on boot via `sessionId`. |
+| **Sensorium** | `src/sensorium/` | Dual-cadence polling (30s/5min). Hysteresis alerts. CPU needs delta between two tick samples. |
+| **Genesis** | `src/core/genesis.ts` | Identity prompt at `~/.friday/GENESIS.md`. Protected path (`chmod 600`). Seed template: `GENESIS_TEMPLATE` in `prompts.ts`. |
+| **Vox** | `src/core/voice/vox.ts` | Fire-and-forget TTS. 60s idle WebSocket eviction. 3 modes: off/on/whisper. |
+| **VoiceBridge** | `src/core/voice/bridge.ts` | Realtime conversational voice via Grok Realtime API. Separate from Vox's TTS. |
+| **Recall (Deja Vu)** | `src/core/recall-tool.ts` | `search` (FTS5 summaries) → `recall` (full transcript). Registered in Cortex at boot. |
+| **Arc Rhythm** | `src/arc-rhythm/` | 60s scheduler tick. Auto-pause after 5 failures. Shares Memory's SQLite via `memory.database`. |
+| **The Forge** | `src/modules/forge/` | Self-improvement. Failed modules don't crash boot. Filesystem module + Forge are core-protected. |
+| **Bridges** | `src/core/bridges/` | Singleton mode IPC. `LocalBridge` (in-process) / `SocketBridge` (Unix socket to server). |
+| **Server** | `src/server/` | HTTP + WebSocket + Unix socket. ClientRegistry tracks clients. ttyd for terminal-in-browser. |
+
+**Boot order:** SignalBus → ClearanceManager → AuditLogger → NotificationManager → ProtocolRegistry → DirectiveStore/Engine → Memory → SmartsStore → Sensorium → Genesis → Vox → Cortex → Recall Tool → Arc Rhythm → Modules → `session:start`
+
+### Patterns & Gotchas
+
+- **Dual-model architecture**: reasoning model (Cortex) + fast model (SmartsCurator, Summarizer). Resolution: CLI flag > env var > `PROVIDER_DEFAULTS`. `FridayConfig.fastModel` carries through config chain.
+- **Tool registration**: `registerTool()` → `toZodSchema()` converts FridayTool params to AI SDK tools
+- **Module pattern**: `satisfies FridayModule` preferred over `: FridayModule` for literal type preservation. Mutable arrays for triggers/clearance (no `as const`).
+- **`AuditEntry`** requires `action`, `source`, `detail`, `success` — NOT `target` or `message`
+- **Types split by domain**: core config in `src/core/types.ts`, tool/module contracts in `src/modules/types.ts`, directive structures in `src/directives/types.ts`
+- **Commands** registered via Commander.js in `src/cli/index.ts`, one file per command under `src/cli/commands/`
+- **Gmail**: send/reply tools require `"email-send"` clearance. OAuth tokens encrypted via `SecretStore` (AES-256-GCM).
+- **Debug logging**: `--debug` writes `last-inference-payload.log` + `last-inference-response.log` — cleared per `Cortex.chat()`, round-appended. Config chain: CLI → `RuntimeConfig.debug` → `CortexConfig.debug`.
+- **Singleton mode**: `friday serve` writes PID + socket files; `friday chat` auto-detects and connects via `SocketBridge`
+- **Protected paths**: `isProtectedPath()` in `src/modules/filesystem/containment.ts` — blocks writes to Genesis and core modules
 
 ## Testing
 
@@ -249,32 +256,9 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 
 ## Design Documents
 
-- Architecture design: `docs/plans/2026-02-21-friday-agent-runtime-design.md`
-- SMARTS design: `docs/plans/2026-02-21-smarts-dynamic-knowledge-design.md`
-- CLI markdown rendering: `docs/plans/2026-02-21-cli-markdown-rendering-design.md`
-- Sensorium design: `docs/plans/2026-02-21-sensorium-environment-awareness-design.md`
-- Web UI design: `docs/plans/2026-02-21-friday-web-ui-design.md`
-- Agentic tool loop: `docs/plans/2026-02-21-agentic-tool-loop-design.md`
-- OpenTUI TUI design: `docs/plans/2026-02-22-opentui-tui-design.md`
-- Hero header splash: `docs/plans/2026-02-22-hero-header-design.md`
-- Forge design: `docs/plans/2026-02-22-the-forge-self-improvement-design.md`
-- SMARTS staleness prevention: `docs/plans/2026-02-22-smarts-staleness-prevention-design.md`
-- TUI text selection & copy: `docs/plans/2026-02-22-tui-text-selection-copy-design.md`
-- Conversational memory recall (Deja Vu): `docs/plans/2026-02-23-conversational-memory-recall-design.md`
-- Arc Rhythm scheduling: `docs/plans/2026-02-24-arc-rhythm-scheduling-design.md`
-- Gmail module design: `docs/plans/2026-02-25-gmail-module-design.md`
-- Genesis identity prompt design: `docs/plans/2026-02-25-genesis-identity-prompt-design.md`
-- TUI log panel: `docs/plans/2026-02-24-tui-log-panel-design.md`
-- Vox voice output: `docs/plans/2026-02-25-vox-voice-output-design.md`
-- Debug prompt logging: `docs/plans/2026-02-26-debug-prompt-logging-design.md`
-- Genesis prompt optimization: `docs/plans/2026-02-26-genesis-prompt-optimization-design.md`
-- Max tokens truncation: `docs/plans/2026-02-26-max-tokens-truncation-design.md`
-- Inference payload logging: `docs/plans/2026-02-27-inference-payload-logging-design.md`
-- Cortex AI SDK migration: `docs/plans/2026-02-27-cortex-ai-sdk-migration-design.md`
-- Voice conversation UI PoC: `docs/plans/2026-02-27-voice-conversation-ui-poc-design.md`
-- Voice UI React components: `docs/plans/2026-02-27-voice-ui-react-components-design.md`
-- Voice web integration: `docs/plans/2026-02-27-voice-web-integration-design.md`
-- MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler, Genesis=identity template, Vox=voice
+All design docs live in `docs/plans/` with naming convention `YYYY-MM-DD-<topic>-design.md` (25 documents as of 2026-02-28). Key ones: `friday-agent-runtime-design`, `cortex-ai-sdk-migration-design`, `vox-voice-output-design`, `voice-web-integration-design`.
+
+**MCU concept mapping:** Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler, Genesis=identity template, Vox=voice
 
 ## Worktrees
 
