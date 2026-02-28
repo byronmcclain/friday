@@ -26,7 +26,7 @@ TUI-first. Module-driven. Built to think, remember, and adapt.
 
 Friday is an **agent runtime**, not a chatbot wrapper. She loads capabilities as **Modules**, executes **Protocols** on command, follows **Directives** autonomously, learns through **SMARTS** dynamic knowledge, monitors her environment via **Sensorium**, and remembers everything through persistent **Memory** — all within **Clearance** boundaries and a full **Audit** trail.
 
-Built on [Bun](https://bun.sh) and TypeScript. Powered by the [Vercel AI SDK](https://sdk.vercel.ai) with Anthropic Claude and xAI Grok.
+Built on [Bun](https://bun.sh) and TypeScript. Powered by the [Vercel AI SDK](https://sdk.vercel.ai) with xAI Grok.
 
 ---
 
@@ -39,7 +39,7 @@ bun install
 
 # Configure your API key
 cp .env.example .env
-# Edit .env — add ANTHROPIC_API_KEY or XAI_API_KEY
+# Edit .env — add XAI_API_KEY
 
 # Start the server
 bun run serve &
@@ -60,7 +60,7 @@ Cortex is Friday's LLM reasoning engine — the central intelligence that proces
 
 Every message Friday receives triggers a sophisticated pipeline: the system prompt is dynamically enriched with pinned SMARTS knowledge, FTS5-matched knowledge relevant to the current message, and a compact Sensorium environment context block — all before the LLM ever sees it. This means Friday's responses are always informed by what she's learned and what's happening on the machine.
 
-Friday uses a **dual-model architecture**: a reasoning model (e.g., Claude Sonnet, Grok) handles conversations, while a fast model (e.g., Claude Haiku) handles utility tasks like summarization and knowledge extraction.
+Friday uses a **dual-model architecture**: a reasoning model (Grok) handles conversations, while a fast model handles utility tasks like summarization and knowledge extraction.
 
 ```mermaid
 sequenceDiagram
@@ -697,7 +697,7 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 
 | MCU Concept | Framework Name | What It Does |
 |---|---|---|
-| Friday's brain | **Cortex** | LLM reasoning, conversation memory, provider routing |
+| Friday's brain | **Cortex** | LLM reasoning, conversation memory, tool orchestration |
 | "Activate Protocol X" | **Protocol** | Named slash command executed without LLM reasoning |
 | Standing orders | **Directive** | Autonomous rule triggered by signals or schedules |
 | Suit module | **Module** | Bundled capability (tools + protocols + knowledge) |
@@ -847,8 +847,8 @@ friday serve &                 # Or run in background after `bun link`
 bun run start chat             # Connect to running server via TUI
 friday chat                    # Or after `bun link`
 
-# Provider/model are configured on the server, not the chat client
-# Use --provider and --model flags on `friday serve` (or env vars)
+# Model overrides are configured on the server, not the chat client
+# Use --model and --fast-model flags on `friday serve` (or env vars)
 
 # Manage Friday's identity prompt
 bun run start genesis init     # Seed GENESIS.md from template
@@ -899,16 +899,16 @@ friday --debug serve           # Debug mode — logs inference payloads and resp
 | `/voice status` | Show voice system status |
 | `exit`, `quit`, `bye` | Ends the session |
 
-### Provider Defaults
+### Model Defaults
 
-Friday uses a **dual-model architecture**: a reasoning model for conversations and a fast model for utility tasks (summarization, knowledge extraction).
+Friday uses a **dual-model architecture**: a reasoning model for conversations and a fast model for utility tasks (summarization, knowledge extraction). Both models are powered by xAI Grok.
 
-| Provider | Reasoning Model | Fast Model |
-|---|---|---|
-| `anthropic` | `claude-sonnet-4-20250514` | `claude-haiku-4-5-20251001` |
-| `grok` | `grok-4-1-fast-reasoning-latest` | `grok-4-1-fast-non-reasoning` |
+| Role | Default Model |
+|---|---|
+| Reasoning | `grok-4-1-fast-reasoning-latest` |
+| Fast | `grok-4-1-fast-non-reasoning` |
 
-Resolution priority: CLI flag > env var > provider default.
+Resolution priority: CLI flag (`--model` / `--fast-model`) > env var (`FRIDAY_REASONING_MODEL` / `FRIDAY_FAST_MODEL`) > `GROK_DEFAULTS`.
 
 ---
 
@@ -968,17 +968,14 @@ cp .env.example .env
 ```
 
 ```env
-# Required for default Grok provider
+# Required — xAI API key for Grok
 XAI_API_KEY=xai-...
 
-# Required for Anthropic provider (--provider anthropic)
-ANTHROPIC_API_KEY=sk-ant-...
-
 # Optional: Override reasoning model (CLI: --model)
-FRIDAY_REASONING_MODEL=claude-sonnet-4-20250514
+FRIDAY_REASONING_MODEL=grok-4-1-fast-reasoning-latest
 
 # Optional: Override fast model for utility tasks (CLI: --fast-model)
-FRIDAY_FAST_MODEL=claude-haiku-4-5-20251001
+FRIDAY_FAST_MODEL=grok-4-1-fast-non-reasoning
 
 # Optional: Gmail module (OAuth 2.0)
 GOOGLE_CLIENT_ID=...
@@ -1109,7 +1106,7 @@ src/
 │   ├── socket.ts          # Unix socket server for singleton IPC (~/.friday/friday.sock)
 │   ├── ttyd.ts            # Terminal-in-browser support (spawns ttyd on port 7681)
 │   └── ws-channel.ts      # WebSocket notification channel
-├── providers/             # LLM provider adapters (createModel, Zod schema converter, debug-log)
+├── providers/             # Grok model factory (createModel, Zod schema converter, debug-log)
 └── utils/
     └── timeout.ts         # Shared timeout utilities
 web/                       # React web UI (Vite + Tailwind) — voice-focused architecture
@@ -1136,9 +1133,6 @@ docker build -t friday .
 
 # Run (starts the server — default entrypoint)
 docker run -p 3000:3000 -e XAI_API_KEY=xai-... friday
-
-# With Anthropic provider
-docker run -p 3000:3000 -e ANTHROPIC_API_KEY=sk-ant-... friday serve --provider anthropic
 ```
 
 ---
@@ -1149,7 +1143,7 @@ docker run -p 3000:3000 -e ANTHROPIC_API_KEY=sk-ant-... friday serve --provider 
 |---|---|
 | Runtime | [Bun](https://bun.sh) |
 | Language | TypeScript (strict mode) |
-| AI SDK | [Vercel AI SDK v6](https://sdk.vercel.ai) (`ai`, `@ai-sdk/xai`, `@ai-sdk/anthropic`) |
+| AI SDK | [Vercel AI SDK v6](https://sdk.vercel.ai) (`ai`, `@ai-sdk/xai`) — Grok provider |
 | CLI Framework | [Commander.js](https://github.com/tj/commander.js) |
 | Terminal UI | [OpenTUI](https://github.com/anthropics/claude-code-openui) (`@opentui/react`) — React for CLI |
 | Web UI | React + [Vite](https://vite.dev) + [Tailwind CSS](https://tailwindcss.com) |

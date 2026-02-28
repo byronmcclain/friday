@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Runtime**: Bun (not Node.js)
 - **Language**: TypeScript (strict mode)
-- **AI SDK**: Vercel AI SDK v6 (`ai`, `@ai-sdk/xai`, `@ai-sdk/anthropic`) — unified multi-provider with native streaming
+- **AI SDK**: Vercel AI SDK v6 (`ai`, `@ai-sdk/xai`) — Grok provider with native streaming
 - **CLI Framework**: Commander.js
 - **Linter/Formatter**: Biome (not ESLint/Prettier)
 
@@ -69,7 +69,7 @@ src/
 │   ├── recall-tool.ts     # recall_memory tool — FTS5 search across past conversations (Deja Vu)
 │   ├── genesis.ts         # Genesis — identity prompt loader (load/seed/check from ~/.friday/GENESIS.md)
 │   ├── notifications.ts   # NotificationManager — multi-channel alerts (terminal, log, slack, webhook)
-│   ├── types.ts           # Core types (FridayConfig, ConversationMessage, ProviderName)
+│   ├── types.ts           # Core types (FridayConfig, ConversationMessage)
 │   ├── prompts.ts         # GENESIS_TEMPLATE — seed template for Friday's identity prompt
 │   ├── secrets.ts         # SecretStore — AES-256-GCM encrypted storage (OS keychain + fallback)
 │   ├── bridges/           # Runtime bridge abstractions for singleton mode
@@ -138,7 +138,7 @@ src/
 │   ├── ttyd.ts            # Terminal-in-browser support (spawns ttyd on port 7681)
 │   └── ws-channel.ts      # WebSocket notification channel
 ├── providers/             # AI SDK model factory (createModel), Zod schema converter
-│   ├── index.ts           # createModel(), PROVIDER_DEFAULTS, DEFAULT_PROVIDER
+│   ├── index.ts           # createModel(), GROK_DEFAULTS
 │   ├── schemas.ts         # toZodSchema() — converts FridayTool parameters to Zod for AI SDK
 │   └── debug-log.ts       # appendInferenceLog() — shared debug logging for providers
 ├── config/                # Runtime configuration loading — future
@@ -189,7 +189,7 @@ tests/
 
 ### Patterns & Gotchas
 
-- **Dual-model architecture**: reasoning model (Cortex) + fast model (SmartsCurator, Summarizer). Resolution: CLI flag > env var > `PROVIDER_DEFAULTS`. `FridayConfig.fastModel` carries through config chain.
+- **Dual-model architecture**: reasoning model (Cortex) + fast model (SmartsCurator, Summarizer). Resolution: CLI flag > env var > `GROK_DEFAULTS`. `FridayConfig.fastModel` carries through config chain.
 - **Tool registration**: `registerTool()` → `toZodSchema()` converts FridayTool params to AI SDK tools
 - **Module pattern**: `satisfies FridayModule` preferred over `: FridayModule` for literal type preservation. Mutable arrays for triggers/clearance (no `as const`).
 - **`AuditEntry`** requires `action`, `source`, `detail`, `success` — NOT `target` or `message`
@@ -237,9 +237,8 @@ Default to Bun APIs instead of Node.js equivalents or third-party packages:
 
 ## Environment
 
-Requires `XAI_API_KEY` in `.env` for the default Grok provider. Bun loads `.env` automatically.
-Optional: `ANTHROPIC_API_KEY` for Anthropic provider (`--provider anthropic`).
-Optional: `FRIDAY_REASONING_MODEL` and `FRIDAY_FAST_MODEL` to override default models (resolution: CLI flag > env var > provider default).
+Requires `XAI_API_KEY` in `.env` for the Grok provider. Bun loads `.env` automatically.
+Optional: `FRIDAY_REASONING_MODEL` and `FRIDAY_FAST_MODEL` to override default models (resolution: CLI flag > env var > `GROK_DEFAULTS`).
 Optional: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` for Gmail module (OAuth 2.0).
 Optional: `FRIDAY_SECRET_KEY` — fallback master key for SecretStore when OS keychain is unavailable.
 Optional: `FRIDAY_GENESIS_PATH` to override default `~/.friday/GENESIS.md` location.
@@ -252,7 +251,7 @@ Optional: `FRIDAY_EMAIL_WEBHOOK_URL` for email webhook notification channel.
 
 ```bash
 docker build -t friday .
-docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
+docker run -e XAI_API_KEY=xai-... friday chat
 ```
 
 ## Design Documents
