@@ -89,8 +89,8 @@ describe("SQLiteMemory — Conversation History", () => {
     await memory.saveConversation({
       id: "sess-1",
       startedAt: new Date("2026-01-01"),
-      provider: "anthropic",
-      model: "claude-sonnet-4-20250514",
+      provider: "grok",
+      model: "grok-3",
       messages: [
         { role: "user", content: "Hello" },
         { role: "assistant", content: "Hey boss!" },
@@ -106,8 +106,8 @@ describe("SQLiteMemory — Conversation History", () => {
     await memory.saveConversation({
       id: "sess-1",
       startedAt: new Date("2026-01-01"),
-      provider: "anthropic",
-      model: "claude-sonnet-4-20250514",
+      provider: "grok",
+      model: "grok-3",
       messages: [],
     });
     await memory.saveConversation({
@@ -127,8 +127,8 @@ describe("SQLiteMemory — Conversation History", () => {
       await memory.saveConversation({
         id: `sess-${i}`,
         startedAt: new Date(2026, 0, i + 1),
-        provider: "anthropic",
-        model: "claude-sonnet-4-20250514",
+        provider: "grok",
+        model: "grok-3",
         messages: [],
       });
     }

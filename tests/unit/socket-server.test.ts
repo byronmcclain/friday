@@ -28,7 +28,7 @@ afterEach(async () => {
 
 describe("FridaySocketServer", () => {
 	test("creates socket file on start", async () => {
-		const mockRuntime = { isBooted: true, cortex: { providerName: "test", modelName: "test" } } as any;
+		const mockRuntime = { isBooted: true, cortex: { modelName: "test" } } as any;
 		const hub = createMockHub();
 		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
 		await server.start();
@@ -42,7 +42,7 @@ describe("FridaySocketServer", () => {
 	});
 
 	test("cleans up on stop", async () => {
-		const mockRuntime = { isBooted: true, cortex: { providerName: "test", modelName: "test" } } as any;
+		const mockRuntime = { isBooted: true, cortex: { modelName: "test" } } as any;
 		const hub = createMockHub();
 		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
 		await server.start();
@@ -55,7 +55,7 @@ describe("FridaySocketServer", () => {
 	test("session:shutdown does not double-unregister (close handler handles it)", async () => {
 		const mockRuntime = {
 			isBooted: true,
-			cortex: { providerName: "test", modelName: "test" },
+			cortex: { modelName: "test" },
 			protocols: { isProtocol: () => false },
 		} as any;
 		const hub = createMockHub();
@@ -84,7 +84,7 @@ describe("FridaySocketServer", () => {
 	test("registers client with hub on session:identify", async () => {
 		const mockRuntime = {
 			isBooted: true,
-			cortex: { providerName: "test", modelName: "test" },
+			cortex: { modelName: "test" },
 			protocols: { isProtocol: () => false },
 		} as any;
 		const hub = createMockHub();

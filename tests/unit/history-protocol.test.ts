@@ -34,8 +34,8 @@ describe("/history protocol", () => {
     await memory.saveConversation({
       id: "sess-def",
       startedAt: new Date("2026-01-16T14:00:00Z"),
-      provider: "anthropic",
-      model: "claude-sonnet-4-20250514",
+      provider: "grok",
+      model: "grok-3",
       messages: [
         { role: "user", content: "What is TypeScript?" },
         { role: "assistant", content: "TypeScript is..." },

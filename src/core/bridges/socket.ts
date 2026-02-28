@@ -127,8 +127,8 @@ export class SocketBridge implements RuntimeBridge {
     });
   }
 
-  /** Ask the server for its actual provider and model names. */
-  async identify(): Promise<{ provider: string; model: string }> {
+  /** Ask the server for its actual model name. */
+  async identify(): Promise<{ model: string }> {
     const requestId = crypto.randomUUID();
 
     return new Promise((resolve, reject) => {
@@ -136,9 +136,9 @@ export class SocketBridge implements RuntimeBridge {
         onComplete: (msg) => {
           this.pendingCallbacks.delete(requestId);
           if (msg.type === "session:ready") {
-            resolve({ provider: msg.provider, model: msg.model });
+            resolve({ model: msg.model });
           } else {
-            resolve({ provider: "unknown", model: "unknown" });
+            resolve({ model: "unknown" });
           }
         },
         onError: (err) => {
