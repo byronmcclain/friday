@@ -1,32 +1,15 @@
-import { WebSocketProvider } from "./contexts/WebSocketContext.tsx";
-import { SessionProvider } from "./contexts/SessionContext.tsx";
-import { ChatProvider } from "./contexts/ChatContext.tsx";
-import { Layout } from "./components/layout/Layout.tsx";
-import { ChatPanel } from "./components/chat/ChatPanel.tsx";
 import { VoiceMode } from "./components/voice/index.ts";
-import { AutoBoot } from "./components/AutoBoot.tsx";
+import { TerminalEmbed } from "./components/terminal/TerminalEmbed.tsx";
 
-const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-const wsPort = window.location.port || (window.location.protocol === "https:" ? "443" : "80");
-const WS_URL = `${wsProtocol}//${window.location.hostname}:${wsPort}/ws`;
+const mode = new URLSearchParams(window.location.search).get("mode");
 
-const isVoiceMode = new URLSearchParams(window.location.search).get("mode") === "voice";
+// ttyd URL — same host, port 7681, base path /terminal/
+const TTYD_URL = `${window.location.protocol}//${window.location.hostname}:7681/terminal/`;
 
 export function App() {
-	if (isVoiceMode) {
+	if (mode === "voice") {
 		return <VoiceMode />;
 	}
 
-	return (
-		<WebSocketProvider url={WS_URL}>
-			<SessionProvider>
-				<ChatProvider>
-					<AutoBoot />
-					<Layout>
-						<ChatPanel />
-					</Layout>
-				</ChatProvider>
-			</SessionProvider>
-		</WebSocketProvider>
-	);
+	return <TerminalEmbed src={TTYD_URL} />;
 }

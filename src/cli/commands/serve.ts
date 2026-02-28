@@ -3,7 +3,10 @@ import chalk from "chalk";
 import boxen from "boxen";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { mkdir } from "node:fs/promises";
 import { createFridayServer } from "../../server/index.ts";
+import { FridaySocketServer } from "../../server/socket.ts";
+import { spawnTtyd } from "../../server/ttyd.ts";
 import type { ProviderName } from "../../core/types.ts";
 import { DEFAULT_PROVIDER } from "../../providers/index.ts";
 
@@ -40,16 +43,31 @@ export function serveCommand(program: Command): void {
 				},
 			});
 
+			// Start Unix socket server for IPC
+			await mkdir(`${process.env.HOME}/.friday`, { recursive: true });
+			const socketServer = new FridaySocketServer(result.runtime);
+			await socketServer.start();
+
+			// Spawn ttyd for terminal-in-browser
+			const ttydProc = await spawnTtyd({
+				port: 7681,
+				basePath: "/terminal",
+				command: ["friday", "chat"],
+			});
+
 			console.log(
 				boxen(
-					`${chalk.hex("#F0A030").bold("F.R.I.D.A.Y. Web UI")}\n${chalk.hex("#8B6914")(`http://localhost:${result.server.port}`)}`,
+					`${chalk.hex("#F0A030").bold("F.R.I.D.A.Y. Web UI")}\n${chalk.hex("#8B6914")(`http://localhost:${result.server.port}`)}\n${chalk.hex("#8B6914")("IPC socket: ~/.friday/friday.sock")}${ttydProc ? `\n${chalk.hex("#8B6914")("Terminal: http://localhost:7681/terminal/")}` : ""}`,
 					{ padding: 1, borderColor: "#C07020", borderStyle: "round" },
 				),
 			);
 
 			const shutdown = async () => {
 				console.log(chalk.hex("#8B6914")("\nShutting down server..."));
-				// Shutdown the singleton runtime
+				if (ttydProc) {
+					ttydProc.kill();
+				}
+				await socketServer.stop();
 				if (result.runtime.isBooted) {
 					await result.runtime.shutdown();
 				}
