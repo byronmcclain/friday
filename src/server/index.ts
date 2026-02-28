@@ -27,10 +27,13 @@ export async function createFridayServer(config: FridayServerConfig) {
 		"http://127.0.0.1:5173",
 	]);
 
-	// Boot singleton runtime BEFORE starting the server
+	// Boot singleton runtime BEFORE starting the server.
+	// Always boot fresh — SessionHub owns session lifecycle (start/save/clear),
+	// so loading previous history at boot would leak stale conversations to clients.
 	const runtime = new FridayRuntime();
 	await runtime.boot({
 		...config.runtimeConfig,
+		fresh: true,
 	});
 
 	const hub = new SessionHub({

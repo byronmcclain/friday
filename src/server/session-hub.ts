@@ -37,7 +37,7 @@ export class SessionHub {
 		const wasEmpty = this.registry.count === 0;
 		this.registry.register(client);
 
-		if (wasEmpty) {
+		if (wasEmpty && !this._saving) {
 			this.startSession();
 		}
 
@@ -67,6 +67,10 @@ export class SessionHub {
 	private startSession(): void {
 		this.sessionId = crypto.randomUUID();
 		this.sessionStartedAt = new Date();
+		// Ensure Cortex starts clean — prevents stale history from a previous
+		// session leaking into the new one (e.g. if clearHistory wasn't called
+		// due to a crash or SIGINT during endSession).
+		this.runtime.cortex.clearHistory();
 	}
 
 	private async endSession(): Promise<void> {

@@ -46,20 +46,45 @@ describe("SessionHub", () => {
 		expect(hub.clientCount).toBe(1);
 	});
 
-	test("hydrates new client with existing history", () => {
-		const history = [
-			{ role: "user", content: "hello" },
-			{ role: "assistant", content: "hi there" },
+	test("startSession clears stale history on first client connect", () => {
+		const staleHistory = [
+			{ role: "user", content: "old message" },
+			{ role: "assistant", content: "old response" },
 		];
-		const hub = new SessionHub({ runtime: createMockRuntime(history) });
+		const runtime = createMockRuntime(staleHistory);
+		const hub = new SessionHub({ runtime });
 
 		const { client, messages } = createMockClient("c1");
 		hub.registerClient(client);
 
+		// Stale history should be cleared — first client gets no replays
 		const replays = messages.filter(
-			(m) =>
-				m.type === "conversation:message" &&
-				(m as any).source === "replay",
+			(m) => m.type === "conversation:message" && (m as any).source === "replay",
+		);
+		expect(replays).toHaveLength(0);
+		expect(staleHistory).toHaveLength(0);
+	});
+
+	test("hydrates second client with session history", () => {
+		const history: { role: string; content: string }[] = [];
+		const hub = new SessionHub({ runtime: createMockRuntime(history) });
+
+		// First client connects (starts session, clears history)
+		const c1 = createMockClient("c1");
+		hub.registerClient(c1.client);
+
+		// Simulate chat activity during session
+		history.push(
+			{ role: "user", content: "hello" },
+			{ role: "assistant", content: "hi there" },
+		);
+
+		// Second client connects — gets hydrated with current session history
+		const c2 = createMockClient("c2");
+		hub.registerClient(c2.client);
+
+		const replays = c2.messages.filter(
+			(m) => m.type === "conversation:message" && (m as any).source === "replay",
 		);
 		expect(replays).toHaveLength(2);
 		expect((replays[0] as any).role).toBe("user");
@@ -97,10 +122,8 @@ describe("SessionHub", () => {
 
 	test("saves conversation on last client disconnect", async () => {
 		let saved = false;
-		const runtime = createMockRuntime([
-			{ role: "user", content: "hello" },
-			{ role: "assistant", content: "hi" },
-		]);
+		const history: { role: string; content: string }[] = [];
+		const runtime = createMockRuntime(history);
 		runtime.memory.saveConversation = async () => {
 			saved = true;
 		};
@@ -109,6 +132,13 @@ describe("SessionHub", () => {
 
 		const { client } = createMockClient("c1");
 		hub.registerClient(client);
+
+		// Simulate chat activity
+		history.push(
+			{ role: "user", content: "hello" },
+			{ role: "assistant", content: "hi" },
+		);
+
 		await hub.unregisterClient("c1");
 
 		expect(saved).toBe(true);
@@ -117,9 +147,8 @@ describe("SessionHub", () => {
 
 	test("does NOT save when non-last client disconnects", async () => {
 		let saved = false;
-		const runtime = createMockRuntime([
-			{ role: "user", content: "hello" },
-		]);
+		const history: { role: string; content: string }[] = [];
+		const runtime = createMockRuntime(history);
 		runtime.memory.saveConversation = async () => {
 			saved = true;
 		};
@@ -131,6 +160,9 @@ describe("SessionHub", () => {
 		hub.registerClient(c1.client);
 		hub.registerClient(c2.client);
 
+		// Simulate chat activity
+		history.push({ role: "user", content: "hello" });
+
 		await hub.unregisterClient("c1");
 
 		expect(saved).toBe(false);
@@ -138,26 +170,27 @@ describe("SessionHub", () => {
 	});
 
 	test("clears cortex history after save on last disconnect", async () => {
-		const history = [
-			{ role: "user", content: "hello" },
-			{ role: "assistant", content: "hi" },
-		];
+		const history: { role: string; content: string }[] = [];
 		const runtime = createMockRuntime(history);
 
 		const hub = new SessionHub({ runtime });
 
 		const { client } = createMockClient("c1");
 		hub.registerClient(client);
+
+		// Simulate chat activity
+		history.push(
+			{ role: "user", content: "hello" },
+			{ role: "assistant", content: "hi" },
+		);
+
 		await hub.unregisterClient("c1");
 
 		expect(history).toHaveLength(0);
 	});
 
 	test("reconnect guard: skips clear if client reconnects during save", async () => {
-		const history = [
-			{ role: "user", content: "hello" },
-			{ role: "assistant", content: "hi" },
-		];
+		const history: { role: string; content: string }[] = [];
 		let saveResolve: (() => void) | null = null;
 		const runtime = createMockRuntime(history);
 		runtime.memory.saveConversation = () =>
@@ -169,6 +202,12 @@ describe("SessionHub", () => {
 
 		const c1 = createMockClient("c1");
 		hub.registerClient(c1.client);
+
+		// Simulate chat activity
+		history.push(
+			{ role: "user", content: "hello" },
+			{ role: "assistant", content: "hi" },
+		);
 
 		// Start unregister (triggers async save)
 		const unregisterPromise = hub.unregisterClient("c1");
@@ -188,7 +227,7 @@ describe("SessionHub", () => {
 
 	test("saveIfActive saves without clearing", async () => {
 		let saved = false;
-		const history = [{ role: "user", content: "hello" }];
+		const history: { role: string; content: string }[] = [];
 		const runtime = createMockRuntime(history);
 		runtime.memory.saveConversation = async () => {
 			saved = true;
@@ -197,6 +236,9 @@ describe("SessionHub", () => {
 		const hub = new SessionHub({ runtime });
 		const { client } = createMockClient("c1");
 		hub.registerClient(client);
+
+		// Simulate chat activity
+		history.push({ role: "user", content: "hello" });
 
 		await hub.saveIfActive();
 
