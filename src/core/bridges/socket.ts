@@ -12,6 +12,7 @@ export class SocketBridge implements RuntimeBridge {
     onError: (err: Error) => void;
   }>();
   private buffer = "";
+  onConversationMessage?: (msg: { role: string; content: string; source: string }) => void;
 
   constructor(socketPath: string) {
     this.socketPath = socketPath;
@@ -196,6 +197,12 @@ export class SocketBridge implements RuntimeBridge {
   }
 
   private handleServerMessage(msg: ServerMessage): void {
+    // Handle push messages (no requestId)
+    if (msg.type === "conversation:message") {
+      this.onConversationMessage?.(msg);
+      return;
+    }
+
     const requestId = "requestId" in msg ? (msg as any).requestId : undefined;
     if (!requestId) return;
 
