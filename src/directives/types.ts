@@ -10,10 +10,6 @@ export interface FridayDirective {
   action: DirectiveAction;
   clearance: ClearanceName[];
   executionCount: number;
-  notify?: {
-    channels: string[];
-    level: "info" | "warning" | "alert";
-  };
 }
 
 export type DirectiveTrigger =

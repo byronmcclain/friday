@@ -78,7 +78,16 @@ function parseYamlFields(yaml: string): Record<string, string> {
     const kvMatch = line.match(/^(\w[\w-]*)\s*:\s*(.*)$/);
     if (kvMatch) {
       currentKey = kvMatch[1]!;
-      fields[currentKey] = unescapeYaml(kvMatch[2]!.trim().replace(/^(['"])(.*)\1$/, "$2"));
+      const rawValue = kvMatch[2]!.trim();
+      const doubleQuoted = rawValue.match(/^"(.*)"$/);
+      const singleQuoted = rawValue.match(/^'(.*)'$/);
+      if (doubleQuoted) {
+        fields[currentKey] = unescapeYaml(doubleQuoted[1]!);
+      } else if (singleQuoted) {
+        fields[currentKey] = singleQuoted[1]!;
+      } else {
+        fields[currentKey] = rawValue;
+      }
     } else if (currentKey && line.match(/^\s+-\s+/)) {
       fields[currentKey] = `${fields[currentKey] || ""}\x1F${line.replace(/^\s+-\s+/, "").trim()}`;
     }
@@ -88,7 +97,11 @@ function parseYamlFields(yaml: string): Record<string, string> {
 }
 
 function stripQuotes(s: string): string {
-  return unescapeYaml(s.replace(/^(['"])(.*)\1$/, "$2"));
+  const doubleQuoted = s.match(/^"(.*)"$/);
+  if (doubleQuoted) return unescapeYaml(doubleQuoted[1]!);
+  const singleQuoted = s.match(/^'(.*)'$/);
+  if (singleQuoted) return singleQuoted[1]!;
+  return s;
 }
 
 function parseYamlArray(value: string): string[] {

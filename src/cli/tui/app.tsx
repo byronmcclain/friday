@@ -71,6 +71,8 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 	const logStoreRef = useRef(new LogStore());
 	const [logEntries, setLogEntries] = useState<LogEntry[]>([]);
 	const isShuttingDownRef = useRef(false);
+	const phaseRef = useRef(state.phase);
+	phaseRef.current = state.phase;
 
 	const pushLog = useCallback((level: LogEntry["level"], source: string, message: string, detail?: string) => {
 		const entry: LogEntry = {
@@ -198,7 +200,10 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 				try {
 					await runtime.boot(bootConfig());
 
-					if (cancelled) return;
+					if (cancelled) {
+						void runtime.shutdown();
+						return;
+					}
 
 					// Wrap in LocalBridge for unified interface
 					bridgeRef.current = new LocalBridge(runtime);
@@ -335,7 +340,6 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			restoreTerminal();
 			process.exit(0);
 		}, 500);
-		isShuttingDownRef.current = false;
 	}, []);
 
 	// Auto-copy selected text on mouse release
@@ -364,7 +368,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 		async (input: string) => {
 			const bridge = bridgeRef.current;
 			const runtime = runtimeRef.current;
-			if (!bridge || state.phase !== "active" || processingRef.current)
+			if (!bridge || phaseRef.current !== "active" || processingRef.current)
 				return;
 
 			// Exit words trigger shutdown
@@ -495,7 +499,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 				processingRef.current = false;
 			}
 		},
-		[state.phase, bootConfig, handleShutdown],
+		[bootConfig, handleShutdown],
 	);
 
 	// Gate chat behind splash completion
@@ -611,6 +615,7 @@ export async function launchTui(options: {
 			process.exit(0);
 		};
 		process.on("SIGTERM", emergencyCleanup);
+		process.on("SIGINT", emergencyCleanup);
 
 		// Add toast overlay to the renderer
 		const toaster = new ToasterRenderable(renderer, {

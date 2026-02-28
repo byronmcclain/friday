@@ -256,7 +256,7 @@ describe("fs.delete", () => {
     writeFileSync(filePath, "bye");
     const result = await fsDelete.execute({ path: "doomed.txt" }, ctx);
     expect(result.success).toBe(true);
-    expect(result.output).toContain("Deleted file");
+    expect(result.output).toContain("Deleted:");
     const exists = await Bun.file(filePath).exists();
     expect(exists).toBe(false);
   });
@@ -274,7 +274,7 @@ describe("fs.delete", () => {
     writeFileSync(resolve(dirPath, "inner.txt"), "x");
     const result = await fsDelete.execute({ path: "nuke-me", recursive: true }, ctx);
     expect(result.success).toBe(true);
-    expect(result.output).toContain("Deleted directory");
+    expect(result.output).toContain("Deleted:");
   });
 
   test("fails for nonexistent path", async () => {

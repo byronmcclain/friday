@@ -4,6 +4,7 @@ import { assertContained } from "./containment.ts";
 
 const DEFAULT_LIMIT = 200;
 const MAX_LIMIT = 2000;
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export const fsRead: FridayTool = {
   name: "fs.read",
@@ -52,6 +53,13 @@ export const fsRead: FridayTool = {
       const exists = await file.exists();
       if (!exists) {
         return { success: false, output: `File not found: ${resolved}` };
+      }
+
+      if (file.size > MAX_FILE_SIZE) {
+        return {
+          success: false,
+          output: `File too large: ${resolved} is ${(file.size / (1024 * 1024)).toFixed(1)}MB (max ${MAX_FILE_SIZE / (1024 * 1024)}MB). Use bash.exec with head/tail for large files.`,
+        };
       }
 
       const text = await file.text();

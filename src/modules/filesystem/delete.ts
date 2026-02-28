@@ -1,4 +1,4 @@
-import { rm, stat } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
 import { assertContained, isProtectedPath } from "./containment.ts";
@@ -44,37 +44,36 @@ export const fsDelete: FridayTool = {
         detail: `Blocked deletion of protected path: ${resolved}`,
         success: false,
       });
-      return { success: false, output: "Access denied: GENESIS.md is BOSS-only" };
+      return { success: false, output: "Access denied: path is protected" };
     }
 
     try {
-      const info = await stat(resolved);
-      const isDir = info.isDirectory();
+      await rm(resolved, { recursive, force: false });
 
-      if (isDir && !recursive) {
+      await context.audit.log({
+        action: "tool:fs.delete",
+        source: "fs.delete",
+        detail: `Deleted: ${resolved}`,
+        success: true,
+      });
+
+      return {
+        success: true,
+        output: `Deleted: ${resolved}`,
+        artifacts: { path: resolved },
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+
+      // If rm failed on a directory without recursive, provide a helpful hint
+      // Error varies by platform: EISDIR, EPERM, ENOTEMPTY, EFAULT (Bun), or "is a directory"
+      if (!recursive && (msg.includes("is a directory") || msg.includes("EISDIR") || msg.includes("EPERM") || msg.includes("ENOTEMPTY") || msg.includes("EFAULT"))) {
         return {
           success: false,
           output: `${resolved} is a directory. Set recursive=true to delete.`,
         };
       }
 
-      await rm(resolved, { recursive, force: false });
-      const what = isDir ? "directory" : "file";
-
-      await context.audit.log({
-        action: "tool:fs.delete",
-        source: "fs.delete",
-        detail: `Deleted ${what}: ${resolved}`,
-        success: true,
-      });
-
-      return {
-        success: true,
-        output: `Deleted ${what}: ${resolved}`,
-        artifacts: { path: resolved, type: what },
-      };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
       return {
         success: false,
         output: `Failed to delete ${resolved}: ${msg}`,

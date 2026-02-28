@@ -44,7 +44,7 @@ function useThrottled(value: string, ms: number, active: boolean): string {
  * OpenTUI's <markdown> component doesn't process embedded HTML,
  * so tags like <br> render as literal text.
  */
-function sanitizeHtml(text: string): string {
+function fixLineBreaks(text: string): string {
 	return text.replace(/<br\s*\/?>/gi, "\n");
 }
 
@@ -121,7 +121,7 @@ export function Message({ message, streaming }: MessageProps) {
 			>
 				<markdown
 					key={streaming ? "stream" : "final"}
-					content={sanitizeHtml(streaming ? displayContent : content)}
+					content={fixLineBreaks(streaming ? displayContent : content)}
 					syntaxStyle={FRIDAY_SYNTAX_STYLE}
 				/>
 			</box>

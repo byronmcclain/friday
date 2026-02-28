@@ -111,8 +111,8 @@ export async function enforceGenesisPermissions(path: string): Promise<void> {
 	const dir = dirname(path);
 	try {
 		await chmod(dir, 0o700);
-	} catch {
-		/* directory may not exist yet */
+	} catch (err) {
+		console.warn(`[Genesis] Could not enforce permissions on directory ${dir}:`, err instanceof Error ? err.message : err);
 	}
 	try {
 		await chmod(path, 0o600);

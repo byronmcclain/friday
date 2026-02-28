@@ -24,10 +24,6 @@ export class ClientRegistry {
     return this.clients.get(id);
   }
 
-  getByType(type: string): RegisteredClient[] {
-    return [...this.clients.values()].filter((c) => c.clientType === type);
-  }
-
   broadcast(msg: ServerMessage, filter?: (c: RegisteredClient) => boolean): void {
     for (const client of this.clients.values()) {
       if (!filter || filter(client)) {

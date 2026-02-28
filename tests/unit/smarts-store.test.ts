@@ -232,14 +232,12 @@ This was added by hand.`;
     await rm(emptyDir, { recursive: true });
   });
 
-  test("update on nonexistent entry is a silent no-op", async () => {
+  test("update on nonexistent entry throws", async () => {
     await store.initialize(
       { smartsDir: TEST_SMARTS_DIR, maxPerMessage: 5, tokenBudget: 24000, minConfidence: 0.5 },
       memory,
     );
-    const countBefore = store.all().length;
-    await store.update("nonexistent", "new content");
-    expect(store.all().length).toBe(countBefore);
+    expect(store.update("nonexistent", "new content")).rejects.toThrow("not found");
   });
 
   test("rejects duplicate entries that sanitize to the same filename", async () => {

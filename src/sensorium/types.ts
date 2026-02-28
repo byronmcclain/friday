@@ -72,7 +72,6 @@ export interface AlertThresholds {
 	cpuHigh: number;
 	memoryHigh: number;
 	memoryCritical: number;
-	diskLow: number;
 	watchContainers: string[];
 }
 
@@ -95,7 +94,6 @@ export const SENSORIUM_DEFAULTS: SensorConfig = {
 		cpuHigh: 85,
 		memoryHigh: 80,
 		memoryCritical: 95,
-		diskLow: 10,
 		watchContainers: [],
 	},
 };

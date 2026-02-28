@@ -1,4 +1,5 @@
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertSafeArg } from "../validation.ts";
 
 export const dockerPs: FridayTool = {
 	name: "docker.ps",
@@ -32,7 +33,11 @@ export const dockerPs: FridayTool = {
 
 			const cmdParts = ["docker", "ps"];
 			if (all) cmdParts.push("-a");
-			if (filter) cmdParts.push("--filter", filter);
+			if (filter) {
+				const filterCheck = assertSafeArg(filter, "filter");
+				if (filterCheck) return filterCheck;
+				cmdParts.push("--filter", filter);
+			}
 			cmdParts.push("--format", "table {{.ID}}\t{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}");
 
 			const result = await Bun.$`${cmdParts}`.quiet().nothrow();

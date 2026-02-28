@@ -1,5 +1,5 @@
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
-import { assertAllowedProtocol } from "../validation.ts";
+import { assertAllowedProtocol, assertNotPrivateIP } from "../validation.ts";
 
 const WEBHOOK_TIMEOUT_MS = 10_000;
 
@@ -84,6 +84,8 @@ export const notifySend: FridayTool = {
 					}
 					const slackProtocolCheck = assertAllowedProtocol(webhookUrl);
 					if (slackProtocolCheck) return slackProtocolCheck;
+					const slackIpCheck = assertNotPrivateIP(webhookUrl);
+					if (slackIpCheck) return slackIpCheck;
 
 					const emoji: Record<string, string> = {
 						info: ":information_source:",
@@ -110,6 +112,8 @@ export const notifySend: FridayTool = {
 					}
 					const webhookProtocolCheck = assertAllowedProtocol(webhookUrl);
 					if (webhookProtocolCheck) return webhookProtocolCheck;
+					const webhookIpCheck = assertNotPrivateIP(webhookUrl);
+					if (webhookIpCheck) return webhookIpCheck;
 
 					const payload = {
 						level,
@@ -134,6 +138,8 @@ export const notifySend: FridayTool = {
 					}
 					const emailProtocolCheck = assertAllowedProtocol(emailWebhookUrl);
 					if (emailProtocolCheck) return emailProtocolCheck;
+					const emailIpCheck = assertNotPrivateIP(emailWebhookUrl);
+					if (emailIpCheck) return emailIpCheck;
 
 					const payload = {
 						subject: `[Friday ${level.toUpperCase()}] ${title}`,

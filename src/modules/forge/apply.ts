@@ -122,7 +122,7 @@ export const forgeApply: FridayTool = {
 					};
 				}
 
-				if (isProtectedPath(filePath)) {
+				if (isProtectedPath(resolvedFilePath)) {
 					await context.audit.log({
 						action: "genesis:write-denied",
 						source: "forge",

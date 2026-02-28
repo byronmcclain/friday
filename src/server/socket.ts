@@ -132,6 +132,15 @@ export class FridaySocketServer {
         send({ type: "session:closed", requestId: msg.id });
         break;
       }
+      default: {
+        send({
+          type: "error",
+          requestId: msg.id,
+          code: "UNKNOWN_MESSAGE_TYPE",
+          message: `Unhandled message type: ${msg.type}`,
+        });
+        break;
+      }
     }
   }
 }

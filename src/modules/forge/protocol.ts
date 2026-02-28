@@ -40,7 +40,7 @@ export function createForgeProtocol(forgeDir: string): FridayProtocol {
 				default:
 					return {
 						success: false,
-						summary: `Unknown subcommand: "${subcommand}". Available: list, status <name>, history <name>, rollback <name>, protect <name>, unprotect <name>, manifest`,
+						summary: `Unknown subcommand: "${subcommand}". Available: list, status <name>, history <name>, rollback <name> (not yet implemented), protect <name>, unprotect <name>, manifest`,
 					};
 			}
 		},

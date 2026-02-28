@@ -58,11 +58,12 @@ export function assertNotPrivateIP(url: string): ToolResult | null {
 	// IPv4 private/reserved ranges
 	const ipMatch = host.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
 	if (ipMatch) {
-		const [, a, b] = ipMatch.map(Number);
+		const a = Number(ipMatch[1]);
+		const b = Number(ipMatch[2]);
 		if (
 			a === 127 ||
 			a === 10 ||
-			(a === 172 && b! >= 16 && b! <= 31) ||
+			(a === 172 && b >= 16 && b <= 31) ||
 			(a === 192 && b === 168) ||
 			(a === 169 && b === 254) ||
 			a === 0
@@ -96,5 +97,8 @@ export function assertInteger(value: unknown, label: string): { value: number } 
 	if (!Number.isFinite(num) || num < 0) {
 		return { success: false, output: `Invalid ${label}: must be a non-negative integer` };
 	}
-	return { value: Math.floor(num) };
+	if (!Number.isInteger(num)) {
+		return { success: false, output: `Invalid ${label}: must be an integer, got ${num}` };
+	}
+	return { value: num };
 }

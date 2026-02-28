@@ -83,13 +83,25 @@ export class GmailAuth {
 
 	async startLocalCallback(): Promise<string> {
 		return new Promise((resolve, reject) => {
+			let settled = false;
+			const timer = setTimeout(() => {
+				if (settled) return;
+				settled = true;
+				server.stop();
+				reject(new Error("OAuth callback timed out after 5 minutes"));
+			}, 300_000);
+
 			const server = Bun.serve({
 				port: 3847,
 				fetch(req) {
 					const url = new URL(req.url);
 					const code = url.searchParams.get("code");
 					if (code) {
-						resolve(code);
+						if (!settled) {
+							settled = true;
+							clearTimeout(timer);
+							resolve(code);
+						}
 						setTimeout(() => server.stop(), 100);
 						return new Response(
 							"<html><body><h1>Authorization successful!</h1><p>You can close this tab.</p></body></html>",
@@ -97,21 +109,19 @@ export class GmailAuth {
 						);
 					}
 					const error = url.searchParams.get("error");
-					reject(
-						new Error(error ?? "No authorization code received"),
-					);
+					if (!settled) {
+						settled = true;
+						clearTimeout(timer);
+						reject(
+							new Error(error ?? "No authorization code received"),
+						);
+					}
 					setTimeout(() => server.stop(), 100);
 					return new Response("Authorization failed", {
 						status: 400,
 					});
 				},
 			});
-
-			// Timeout after 5 minutes
-			setTimeout(() => {
-				server.stop();
-				reject(new Error("OAuth callback timed out after 5 minutes"));
-			}, 300_000);
 		});
 	}
 

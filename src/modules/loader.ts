@@ -50,7 +50,8 @@ export async function discoverModules(modulesDir: string): Promise<FridayModule[
         console.warn(`Failed to load module at ${indexPath}:`, err);
       }
     }
-  } catch {
+  } catch (err) {
+    console.warn("[Loader]", err);
     return [];
   }
 

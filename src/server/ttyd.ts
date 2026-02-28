@@ -38,7 +38,7 @@ export async function spawnTtyd(config: TtydConfig): Promise<Subprocess | null> 
     ...config.command,
   ];
 
-  const proc = spawn(["ttyd", ...args], {
+  const proc = spawn([ttydPath, ...args], {
     stdio: ["ignore", "inherit", "inherit"],
   });
 

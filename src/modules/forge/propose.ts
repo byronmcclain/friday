@@ -9,6 +9,7 @@ function generateModuleTemplate(
 	return [
 		{
 			path: "index.ts",
+			// Import path assumes forge/ directory is at the project root
 			content: `import type { FridayModule } from "../../src/modules/types.ts";
 
 const ${toolName}Module: FridayModule = {

@@ -186,12 +186,18 @@ export class SmartsStore {
     return full;
   }
 
-  async update(name: string, content: string): Promise<void> {
+  async update(name: string, content: string, opts?: { tags?: string[]; confidence?: number }): Promise<void> {
     const key = this.sanitizeName(name);
     const existing = this.entries.get(key);
-    if (!existing) return;
+    if (!existing) throw new Error(`SMARTS entry '${name}' not found`);
 
-    const updated: SmartEntry = { ...existing, content, sessionId: this._currentSession };
+    const updated: SmartEntry = {
+      ...existing,
+      content,
+      sessionId: this._currentSession,
+      ...(opts?.tags !== undefined ? { tags: opts.tags } : {}),
+      ...(opts?.confidence !== undefined ? { confidence: opts.confidence } : {}),
+    };
     const serialized = serializeSmartFile(updated);
     await Bun.write(existing.filePath, serialized);
 
@@ -208,7 +214,6 @@ export class SmartsStore {
   }
 
   async reindex(): Promise<void> {
-    await this.memory.purgeNamespace(SMARTS_NAMESPACE);
     const newEntries = new Map<string, SmartEntry>();
     const newEmbeddingIds = new Map<string, string>();
     const oldEntries = this.entries;
@@ -216,6 +221,7 @@ export class SmartsStore {
     this.entries = newEntries;
     this.embeddingIds = newEmbeddingIds;
     try {
+      await this.memory.purgeNamespace(SMARTS_NAMESPACE);
       await this.scanAndIndex(resolve(this.config.smartsDir));
     } catch (err) {
       this.entries = oldEntries;

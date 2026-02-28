@@ -610,7 +610,7 @@ describe("FridayRuntime — debug mode", () => {
 
 		const entries = runtime.audit.entries({ action: "debug:enabled" });
 		expect(entries).toHaveLength(1);
-		expect(entries[0]!.detail).toContain("debug-prompt.log");
+		expect(entries[0]!.detail).toContain("last-inference-payload.log");
 
 		await runtime.shutdown();
 	});

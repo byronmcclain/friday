@@ -52,7 +52,10 @@ export const bashExec: FridayTool = {
       return { success: false, output: `Access denied: cwd escapes working directory` };
     }
 
-    // Best-effort check: reject commands that reference protected paths
+    // Best-effort heuristic: reject commands that reference protected paths.
+    // NOTE: This string-match check is easily bypassed (e.g. via variables, symlinks,
+    // or path encoding). The real security boundary is the `exec-shell` clearance gate
+    // which requires explicit user permission before any shell command runs.
     for (const pp of getProtectedPaths()) {
       if (command.includes(pp)) {
         await context.audit.log({

@@ -30,9 +30,10 @@ export function CommandTypeahead({
 	const nextValueRef = useRef("");
 	const shadowRef = useRef(shadow);
 	shadowRef.current = shadow;
+	const [suggestionsBlocked, setSuggestionsBlocked] = useState(false);
 
 	const suggestions =
-		shadow.startsWith("/") && !shadow.includes(" ")
+		!suggestionsBlocked && shadow.startsWith("/") && !shadow.includes(" ")
 			? filterCommands(commands, shadow.slice(1)).slice(
 					0,
 					MAX_SUGGESTIONS,
@@ -44,6 +45,7 @@ export function CommandTypeahead({
 	const handleInput = useCallback((value: string) => {
 		setShadow(value);
 		setSelectedIndex(0);
+		setSuggestionsBlocked(false);
 	}, []);
 
 	// Programmatically replace input content by remounting with new initialValue
@@ -114,6 +116,7 @@ export function CommandTypeahead({
 		if (key.name === "escape" && hasSuggestions) {
 			key.preventDefault();
 			setSelectedIndex(0);
+			setSuggestionsBlocked(true);
 			return;
 		}
 	});

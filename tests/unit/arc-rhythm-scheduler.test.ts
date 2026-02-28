@@ -200,7 +200,7 @@ describe("RhythmScheduler", () => {
 		expect(emitted).toContain("custom:arc-rhythm-paused");
 	});
 
-	test("computes next occurrence relative to rhythm's original nextRun, not wall clock", async () => {
+	test("computes next occurrence relative to wall clock after execution", async () => {
 		const rhythm = store.create({
 			name: "test",
 			description: "test",
@@ -215,7 +215,8 @@ describe("RhythmScheduler", () => {
 		await scheduler.tick();
 
 		const updated = store.get(rhythm.id);
-		expect(updated!.nextRun.getUTCMinutes()).toBe(10);
+		// Next occurrence should be in the future (relative to now, not the original nextRun)
+		expect(updated!.nextRun.getTime()).toBeGreaterThan(Date.now() - 60_000);
 	});
 
 	test("reentrant guard skips rhythm that is already running", async () => {

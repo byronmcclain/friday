@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
 import { assertSafeArg } from "../validation.ts";
+import { assertContained } from "../filesystem/containment.ts";
 
 export const gitCommit: FridayTool = {
 	name: "git.commit",
@@ -52,10 +53,8 @@ export const gitCommit: FridayTool = {
 				const argCheck = assertSafeArg(file, "file");
 				if (argCheck) return argCheck;
 				const resolved = resolve(context.workingDirectory, file);
-				if (
-					!resolved.startsWith(`${context.workingDirectory}/`) &&
-					resolved !== context.workingDirectory
-				) {
+				const containment = await assertContained(resolved, context.workingDirectory);
+				if (!containment.ok) {
 					return {
 						success: false,
 						output: `Access denied: file "${file}" resolves outside working directory`,

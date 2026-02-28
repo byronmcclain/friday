@@ -14,7 +14,6 @@ describe("Sensorium types", () => {
 		expect(SENSORIUM_DEFAULTS.thresholds.cpuHigh).toBe(85);
 		expect(SENSORIUM_DEFAULTS.thresholds.memoryHigh).toBe(80);
 		expect(SENSORIUM_DEFAULTS.thresholds.memoryCritical).toBe(95);
-		expect(SENSORIUM_DEFAULTS.thresholds.diskLow).toBe(10);
 		expect(SENSORIUM_DEFAULTS.thresholds.watchContainers).toEqual([]);
 	});
 

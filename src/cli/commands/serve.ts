@@ -4,6 +4,7 @@ import boxen from "boxen";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { mkdir } from "node:fs/promises";
+import { homedir } from "node:os";
 import { createFridayServer } from "../../server/index.ts";
 import { FridaySocketServer } from "../../server/socket.ts";
 import { spawnTtyd } from "../../server/ttyd.ts";
@@ -44,7 +45,7 @@ export function serveCommand(program: Command): void {
 			});
 
 			// Start Unix socket server for IPC
-			await mkdir(`${process.env.HOME}/.friday`, { recursive: true });
+			await mkdir(`${homedir()}/.friday`, { recursive: true });
 			const socketServer = new FridaySocketServer(result.runtime);
 			await socketServer.start();
 

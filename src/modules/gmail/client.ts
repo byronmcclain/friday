@@ -224,6 +224,9 @@ export class GmailClient {
 			id: threadId,
 		});
 		const messages = thread.data.messages ?? [];
+		if (messages.length === 0) {
+			throw new Error(`Thread "${threadId}" has no messages — cannot reply to an empty thread`);
+		}
 		const lastMessage = messages[messages.length - 1];
 		const headers = lastMessage?.payload?.headers ?? [];
 		const messageId = extractHeader(headers, "Message-ID");

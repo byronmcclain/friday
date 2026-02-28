@@ -1,6 +1,6 @@
 import type { SignalBus } from "../events.ts";
 import type { ClearanceManager } from "../clearance.ts";
-import type { VoiceMode, GrokVoice, VoxConfig, VoxOptions } from "./types.ts";
+import { type VoiceMode, type GrokVoice, type VoxConfig, type VoxOptions, VOX_WS_URL } from "./types.ts";
 import { buildTtsPrompt } from "./prompt.ts";
 import { pcmToWav, playAudio, cleanupTempFile, detectPlayer } from "./audio.ts";
 
@@ -10,8 +10,6 @@ import { pcmToWav, playAudio, cleanupTempFile, detectPlayer } from "./audio.ts";
 // audio input streaming). When the web UI adds conversational voice, extend this
 // connection to handle audio input + output, enabling real-time voice dialogue.
 // The persistent connection with idle eviction pattern is designed with this in mind.
-
-const WS_URL = "wss://api.x.ai/v1/realtime";
 
 interface VoxStatus {
 	mode: VoiceMode;
@@ -212,7 +210,7 @@ export class Vox {
 		if (!apiKey) throw new Error("XAI_API_KEY not set");
 
 		return new Promise<void>((resolve, reject) => {
-			const ws = new WebSocket(WS_URL, {
+			const ws = new WebSocket(VOX_WS_URL, {
 				headers: {
 					Authorization: `Bearer ${apiKey}`,
 					"Content-Type": "application/json",
@@ -301,14 +299,22 @@ export class Vox {
 				const resolve = this._speakResolve;
 				this._speakResolve = null;
 
-				// Play audio async, don't block
+				// Play audio async — assign kill handle synchronously so cancel() works immediately
 				if (chunks.length > 0) {
 					const pcm = Buffer.concat(chunks);
 					const wav = pcmToWav(pcm, this._config.sampleRate);
 					const volume = this._mode === "whisper" ? this._config.whisperVolume : 1.0;
 
+					// Proxy kill handle set before async playAudio resolves
+					let realProc: { kill(): void } | null = null;
+					const killHandle: { kill(): void } = {
+						kill: () => { realProc?.kill(); },
+					};
+					this._activeProc = killHandle;
+
 					void playAudio(wav, volume)
 						.then(({ proc, tmpFile }) => {
+							realProc = proc;
 							this._activeProc = proc;
 							this._activeTmpFile = tmpFile;
 							return proc.exited;
@@ -324,6 +330,7 @@ export class Vox {
 							});
 						})
 						.catch((err) => {
+							this._activeProc = null;
 							const msg = err instanceof Error ? err.message : String(err);
 							void this._signals.emit("custom:vox-error", "vox", { error: msg });
 						});

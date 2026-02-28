@@ -84,8 +84,8 @@ export const gitBranch: FridayTool = {
 						"git",
 						"-C",
 						context.workingDirectory,
-						"checkout",
-						"-b",
+						"switch",
+						"-c",
 						name,
 					];
 					if (from) cmdParts.push(from);
@@ -160,7 +160,7 @@ export const gitBranch: FridayTool = {
 					}
 
 					const result =
-						await Bun.$`git -C ${context.workingDirectory} checkout ${name}`
+						await Bun.$`git -C ${context.workingDirectory} switch ${name}`
 							.quiet()
 							.nothrow();
 

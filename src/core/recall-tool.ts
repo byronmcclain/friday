@@ -118,7 +118,8 @@ async function handleRecall(
 		}
 		const line = `${msg.role}: ${text}\n`;
 		if (totalLength + line.length > MAX_OUTPUT_LENGTH) {
-			output += `\n... (${session.messages.length - messages.indexOf(msg)} more messages truncated)`;
+			const remaining = Math.min(session.messages.length - messages.indexOf(msg) - 1, MAX_RECALL_MESSAGES);
+			output += `\n... (${remaining} more messages truncated)`;
 			break;
 		}
 		output += line;

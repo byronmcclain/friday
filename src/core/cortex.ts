@@ -18,6 +18,7 @@ import type { Vox } from "./voice/vox.ts";
 import { HistoryManager } from "./history-manager.ts";
 import type { ChatStream } from "./stream-types.ts";
 import { toZodSchema } from "../providers/schemas.ts";
+import { appendInferenceLog } from "../providers/debug-log.ts";
 
 export interface CortexConfig extends Partial<FridayConfig> {
 	injectedModel?: LanguageModelV3;
@@ -111,6 +112,7 @@ export class Cortex {
 	}
 
 	async chatStream(userMessage: string): Promise<ChatStream> {
+		await this.historyManager.compact();
 		const systemPrompt = await this.buildSystemPrompt(userMessage);
 		this.historyManager.push({ role: "user", content: userMessage });
 
@@ -150,23 +152,36 @@ export class Cortex {
 			maxOutputTokens: this.maxTokens,
 		});
 
+		if (this._debug && this.debugPayloadPath) {
+			appendInferenceLog(this.debugPayloadPath, 1, {
+				system: systemPrompt,
+				messages: this.historyManager.toMessages(),
+				maxOutputTokens: this.maxTokens,
+			});
+		}
+
 		const fullTextPromise = result.text.then(async (text: string) => {
 			this.historyManager.push({ role: "assistant", content: text });
 
 			// Append intermediate messages (tool calls/results) from multi-step execution
 			const response = await result.response;
-			if (response.messages && response.messages.length > 0) {
-				// The response.messages include ALL messages from intermediate steps.
-				// The HistoryManager already has the user message and we just pushed the
-				// final assistant text. The intermediate tool-call/result messages are
-				// internal to the AI SDK's step loop and don't need to be replayed.
-				// Record real token usage for calibration.
-				const usage = await result.usage;
-				if (usage?.inputTokens != null && usage?.outputTokens != null) {
-					this.historyManager.recordUsage(
-						usage.inputTokens + usage.outputTokens,
-					);
-				}
+
+			if (this._debug && this.debugResponsePath) {
+				appendInferenceLog(this.debugResponsePath, 1, response);
+			}
+
+			// The response.messages include ALL messages from intermediate steps.
+			// The HistoryManager already has the user message and we just pushed the
+			// final assistant text. The intermediate tool-call/result messages are
+			// internal to the AI SDK's step loop and don't need to be replayed.
+
+			// Record real token usage for calibration — runs for all exchanges,
+			// not just ones with assistant messages.
+			const usage = await result.usage;
+			if (usage?.inputTokens != null && usage?.outputTokens != null) {
+				this.historyManager.recordUsage(
+					usage.inputTokens + usage.outputTokens,
+				);
 			}
 
 			if (this.vox && this.vox.mode !== "off") {

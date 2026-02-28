@@ -101,8 +101,6 @@ Existing knowledge entries (do NOT create duplicates — use "action": "update" 
 ${existingNames.map((n) => `- ${n}`).join("\n")}`;
 }
 
-/** @deprecated Use buildExtractionPrompt() — kept for test compatibility */
-export const EXTRACTION_PROMPT = EXTRACTION_PROMPT_BASE;
 
 interface ExtractedSmart {
 	action?: "create" | "update";
@@ -114,14 +112,10 @@ interface ExtractedSmart {
 }
 
 export class SmartsCurator {
-	private model: string;
-
 	constructor(
 		private store: SmartsStore,
 		private languageModel: LanguageModelV3,
-	) {
-		this.model = languageModel.modelId;
-	}
+	) {}
 
 	async extractFromConversation(messages: ConversationMessage[]): Promise<void> {
 		if (messages.length < MIN_MESSAGES_FOR_EXTRACTION) return;
@@ -154,7 +148,10 @@ export class SmartsCurator {
 				if (action === "update") {
 					const existing = await this.store.getByName(smart.name);
 					if (existing) {
-						await this.store.update(smart.name, smart.content);
+						await this.store.update(smart.name, smart.content, {
+						tags: smart.tags,
+						confidence: cappedConfidence,
+					});
 						continue;
 					}
 					// Entry not found — fall through to create

@@ -40,8 +40,10 @@ const gmailModule = {
 			return;
 		}
 
-		// SecretStore needs ScopedMemory — use in-process store for session
-		// Tokens persist through OS keychain; this holds encrypted blobs in memory
+		// SecretStore needs ScopedMemory for encrypted blob persistence.
+		// TODO: FridayModule.onLoad() receives no context — once the interface
+		// is extended to pass ModuleContext we should use context.memory here
+		// instead of an ephemeral Map (tokens still survive via OS keychain).
 		const memoryStore = new Map<string, unknown>();
 		const scopedMemory = {
 			get: async <T>(key: string) =>

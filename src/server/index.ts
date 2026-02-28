@@ -14,7 +14,6 @@ export interface FridayServerConfig {
 interface WSData {
 	clientId: string;
 	handler: WebSocketHandler;
-	pushInterval?: ReturnType<typeof setInterval>;
 }
 
 const MAX_CONNECTIONS = 10;
@@ -35,6 +34,7 @@ export async function createFridayServer(config: FridayServerConfig) {
 	});
 
 	const registry = new ClientRegistry();
+	const pushIntervals = new Map<string, ReturnType<typeof setInterval>>();
 
 	const server = Bun.serve<WSData>({
 		port: config.port,
@@ -108,10 +108,10 @@ export async function createFridayServer(config: FridayServerConfig) {
 				if (
 					runtime.isBooted &&
 					runtime.sensorium &&
-					!ws.data.pushInterval &&
+					!pushIntervals.has(ws.data.clientId) &&
 					registry.getById(ws.data.clientId)
 				) {
-					ws.data.pushInterval = setInterval(() => {
+					const interval = setInterval(() => {
 						try {
 							if (ws.readyState === 1) {
 								ws.data.handler.pushSensoriumUpdate(
@@ -124,12 +124,16 @@ export async function createFridayServer(config: FridayServerConfig) {
 							// Connection may have closed
 						}
 					}, 5000);
+					pushIntervals.set(ws.data.clientId, interval);
 				}
 			},
 			close(ws: ServerWebSocket<WSData>) {
-				if (ws.data.pushInterval) {
-					clearInterval(ws.data.pushInterval);
+				const interval = pushIntervals.get(ws.data.clientId);
+				if (interval) {
+					clearInterval(interval);
+					pushIntervals.delete(ws.data.clientId);
 				}
+				ws.data.handler.disconnect();
 				registry.unregister(ws.data.clientId);
 				// Do NOT shutdown runtime — it's shared!
 			},

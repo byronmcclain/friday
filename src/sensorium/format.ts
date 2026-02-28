@@ -1,7 +1,7 @@
 export function formatBytes(bytes: number): string {
 	if (bytes <= 0) return "0B";
 	const units = ["B", "KB", "MB", "GB", "TB"];
-	const i = Math.floor(Math.log(bytes) / Math.log(1024));
+	const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
 	const val = bytes / 1024 ** i;
 	return `${val.toFixed(1)}${units[i]}`;
 }

@@ -31,6 +31,10 @@ export class NotificationManager {
     this.channels.set(channel.name, channel);
   }
 
+  removeChannel(name: string): void {
+    this.channels.delete(name);
+  }
+
   async notify(
     notification: FridayNotification,
     channelNames?: string[],

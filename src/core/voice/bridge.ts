@@ -1,5 +1,5 @@
 import type { Cortex } from "../cortex.ts";
-import type { GrokVoice } from "./types.ts";
+import { type GrokVoice, VOX_WS_URL } from "./types.ts";
 import { buildTtsPrompt } from "./prompt.ts";
 
 export type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "error";
@@ -17,14 +17,13 @@ export interface VoiceBridgeCallbacks {
   onUserTranscript: (text: string) => void;
 }
 
-const WS_URL = "wss://api.x.ai/v1/realtime";
-
 export class VoiceBridge {
   private grokWs: WebSocket | null = null;
   private cortex: Cortex;
   private config: VoiceBridgeConfig;
   private callbacks: VoiceBridgeCallbacks;
   private active = false;
+  private _generation = 0;
   private userTranscriptBuffer = "";
 
   constructor(
@@ -48,10 +47,12 @@ export class VoiceBridge {
     if (!apiKey) throw new Error("XAI_API_KEY not set");
 
     this.active = true;
+    this._generation++;
+    const gen = this._generation;
     this.callbacks.onStateChange("idle");
 
     return new Promise<void>((resolve, reject) => {
-      const ws = new WebSocket(WS_URL, {
+      const ws = new WebSocket(VOX_WS_URL, {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
@@ -96,12 +97,14 @@ export class VoiceBridge {
 
       ws.addEventListener("error", () => {
         clearTimeout(timeout);
+        if (this._generation !== gen) return;
         this.active = false;
         this.callbacks.onStateChange("error");
         reject(new Error("Grok voice connection error"));
       });
 
       ws.addEventListener("close", () => {
+        if (this._generation !== gen) return;
         this.grokWs = null;
         if (this.active) {
           this.active = false;
@@ -165,6 +168,7 @@ export class VoiceBridge {
       }
 
       case "input_audio_buffer.committed": {
+        // Acknowledged server-side, no action needed
         break;
       }
 

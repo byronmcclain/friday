@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { SmartsCurator, EXTRACTION_PROMPT, buildExtractionPrompt } from "../../src/smarts/curator.ts";
+import { SmartsCurator, buildExtractionPrompt } from "../../src/smarts/curator.ts";
 import { SmartsStore } from "../../src/smarts/store.ts";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 import type { ConversationMessage } from "../../src/core/types.ts";
@@ -40,9 +40,10 @@ describe("SmartsCurator", () => {
 		]);
 	});
 
-	test("EXTRACTION_PROMPT is defined and non-empty", () => {
-		expect(EXTRACTION_PROMPT).toBeDefined();
-		expect(EXTRACTION_PROMPT.length).toBeGreaterThan(0);
+	test("buildExtractionPrompt returns non-empty prompt", () => {
+		const prompt = buildExtractionPrompt([]);
+		expect(prompt).toBeDefined();
+		expect(prompt.length).toBeGreaterThan(0);
 	});
 
 	test("skips extraction for short conversations (< 4 messages)", async () => {
@@ -109,12 +110,6 @@ That's what I found.`,
 		await curator.extractFromConversation(makeMessages(10));
 		expect(store.all()).toHaveLength(1);
 		expect(store.all()[0]!.name).toBe("fenced-knowledge");
-	});
-
-	test("uses modelId from LanguageModelV3 as internal model", () => {
-		const model = createMockModel({ text: "[]" });
-		const curator = new SmartsCurator(store, model);
-		expect(curator["model"]).toBe(model.modelId);
 	});
 
 	test("handles error gracefully", async () => {

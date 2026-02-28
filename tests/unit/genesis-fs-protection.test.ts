@@ -46,7 +46,7 @@ describe("Genesis filesystem protection", () => {
       makeContext(),
     );
     expect(result.success).toBe(false);
-    expect(result.output).toContain("BOSS-only");
+    expect(result.output).toContain("path is protected");
   });
 
   test("fs.write allows writes to non-protected paths", async () => {
@@ -63,6 +63,6 @@ describe("Genesis filesystem protection", () => {
       makeContext(),
     );
     expect(result.success).toBe(false);
-    expect(result.output).toContain("BOSS-only");
+    expect(result.output).toContain("path is protected");
   });
 });

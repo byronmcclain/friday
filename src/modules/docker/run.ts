@@ -101,6 +101,12 @@ export const dockerRun: FridayTool = {
 			}
 			if (env) {
 				for (const [key, value] of Object.entries(env)) {
+					if (key.includes("=")) {
+						return { success: false, output: `Invalid env var key "${key}": must not contain "="` };
+					}
+					if (key.startsWith("-")) {
+						return { success: false, output: `Invalid env var key "${key}": must not start with "-"` };
+					}
 					cmdParts.push("-e", `${key}=${value}`);
 				}
 			}

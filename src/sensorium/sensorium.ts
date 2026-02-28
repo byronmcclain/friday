@@ -48,7 +48,8 @@ export class Sensorium {
 	private _fastTimer?: ReturnType<typeof setInterval>;
 	private _slowTimer?: ReturnType<typeof setInterval>;
 	private _running = false;
-	private _polling = false;
+	private _pollingFast = false;
+	private _pollingSlow = false;
 
 	// Hysteresis state
 	private _alertStates = {
@@ -74,8 +75,8 @@ export class Sensorium {
 	}
 
 	async poll(): Promise<void> {
-		if (this._polling) return;
-		this._polling = true;
+		if (this._pollingSlow) return;
+		this._pollingSlow = true;
 		try {
 			const machineResult = await gatherMachine(this._prevCpuTimes);
 			this._prevCpuTimes = machineResult.cpuTimes;
@@ -96,13 +97,13 @@ export class Sensorium {
 
 			this.evaluateAlerts(this._snapshot);
 		} finally {
-			this._polling = false;
+			this._pollingSlow = false;
 		}
 	}
 
 	async pollFast(): Promise<void> {
-		if (this._polling) return;
-		this._polling = true;
+		if (this._pollingFast) return;
+		this._pollingFast = true;
 		try {
 			if (!this._snapshot) {
 				const machineResult = await gatherMachine(this._prevCpuTimes);
@@ -127,7 +128,7 @@ export class Sensorium {
 
 			this.evaluateAlerts(this._snapshot);
 		} finally {
-			this._polling = false;
+			this._pollingFast = false;
 		}
 	}
 

@@ -37,7 +37,7 @@ const LANGUAGES: Record<string, LanguageConfig> = {
 export const codeEval: FridayTool = {
 	name: "code.eval",
 	description:
-		"Execute a code snippet in a sandboxed temporary directory. Supports TypeScript, JavaScript, Python, and Bash. Returns stdout, stderr, and exit code.",
+		"Execute a code snippet in a sandboxed temporary directory. Supports TypeScript, JavaScript, Python, Bash, and sh. Returns stdout, stderr, and exit code.",
 	parameters: [
 		{
 			name: "code",
@@ -49,7 +49,7 @@ export const codeEval: FridayTool = {
 			name: "language",
 			type: "string",
 			description:
-				'Language: "typescript", "javascript", "python", "bash" (default: "typescript")',
+				'Language: "typescript", "javascript", "python", "bash", "sh" (default: "typescript")',
 			required: false,
 			default: "typescript",
 		},
@@ -87,7 +87,7 @@ export const codeEval: FridayTool = {
 		);
 
 		// Create a temporary sandbox directory under OS tmpdir (not working directory)
-		const sandboxDir = resolve(tmpdir(), `.friday-sandbox-${Date.now()}`);
+		const sandboxDir = resolve(tmpdir(), `.friday-sandbox-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`);
 
 		try {
 			// Write the code to a temp file (Bun.write creates parent dirs)

@@ -58,7 +58,7 @@ export const fsWrite: FridayTool = {
         detail: `Blocked write to protected path: ${resolved}`,
         success: false,
       });
-      return { success: false, output: "Access denied: GENESIS.md is BOSS-only" };
+      return { success: false, output: "Access denied: path is protected" };
     }
 
     try {

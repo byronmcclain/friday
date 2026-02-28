@@ -147,7 +147,9 @@ export class SQLiteMemory {
         .run(SQLiteMemory.MAX_CONVERSATIONS);
     })();
 
-    // Index the conversation's summary for recall search
+    // FTS5 indexing is intentionally non-atomic (separate from the main transaction above).
+    // The conversation row must be committed first so that indexConversation() can look it up.
+    // If FTS5 indexing fails, the conversation is still saved — recall search may miss it until re-indexed.
     if (session.summary) {
       await this.indexConversation(session);
     }
@@ -178,9 +180,18 @@ export class SQLiteMemory {
   }
 
   async deleteAllConversations(): Promise<void> {
-    await this.purgeNamespace("conversations");
-    this.db.query("DELETE FROM kv WHERE namespace = ?").run("conversations");
-    this.db.query("DELETE FROM conversations").run();
+    this.db.transaction(() => {
+      // purgeNamespace is synchronous internally (uses db.query().all/run)
+      const rows = this.db
+        .query<{ rowid: number }, [string]>("SELECT rowid FROM embeddings WHERE namespace = ?")
+        .all("conversations");
+      for (const row of rows) {
+        this.db.query("DELETE FROM embeddings_fts WHERE rowid = ?").run(row.rowid);
+      }
+      this.db.query("DELETE FROM embeddings WHERE namespace = ?").run("conversations");
+      this.db.query("DELETE FROM kv WHERE namespace = ?").run("conversations");
+      this.db.query("DELETE FROM conversations").run();
+    })();
   }
 
   async indexConversation(session: ConversationSession): Promise<void> {
@@ -282,7 +293,7 @@ export class SQLiteMemory {
   }
 
   async search(namespace: string, query: string, limit = 5): Promise<SemanticResult[]> {
-    const sanitized = query.replace(/['"*(){}[\]?:^~!@#$%&\\]/g, " ").trim();
+    const sanitized = query.replace(/['"*(){}[\]?:^~!@#$%&\\.]/g, " ").trim();
     if (!sanitized) return [];
     const terms = sanitized.split(/\s+/).filter(Boolean);
     if (terms.length === 0) return [];

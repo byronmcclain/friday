@@ -50,45 +50,43 @@ describe("LogStore", () => {
 
 	test("notifies subscribers on push", () => {
 		const store = new LogStore();
-		const received: LogEntry[] = [];
-		store.subscribe((entry) => received.push(entry));
-		const entry = makeEntry();
-		store.push(entry);
-		expect(received).toHaveLength(1);
-		expect(received[0]).toBe(entry);
+		let callCount = 0;
+		store.subscribe(() => callCount++);
+		store.push(makeEntry());
+		expect(callCount).toBe(1);
 	});
 
 	test("unsubscribe stops notifications", () => {
 		const store = new LogStore();
-		const received: LogEntry[] = [];
-		const cb = (entry: LogEntry) => received.push(entry);
+		let callCount = 0;
+		const cb = () => callCount++;
 		store.subscribe(cb);
 		store.push(makeEntry());
 		store.unsubscribe(cb);
 		store.push(makeEntry());
-		expect(received).toHaveLength(1);
+		expect(callCount).toBe(1);
 	});
 
 	test("multiple subscribers all receive entries", () => {
 		const store = new LogStore();
-		const r1: LogEntry[] = [];
-		const r2: LogEntry[] = [];
-		store.subscribe((e) => r1.push(e));
-		store.subscribe((e) => r2.push(e));
+		let c1 = 0;
+		let c2 = 0;
+		store.subscribe(() => c1++);
+		store.subscribe(() => c2++);
 		store.push(makeEntry());
-		expect(r1).toHaveLength(1);
-		expect(r2).toHaveLength(1);
+		expect(c1).toBe(1);
+		expect(c2).toBe(1);
 	});
 
 	test("subscriber errors do not break other subscribers", () => {
 		const store = new LogStore();
-		const received: LogEntry[] = [];
+		let callCount = 0;
 		store.subscribe(() => {
 			throw new Error("boom");
 		});
-		store.subscribe((e) => received.push(e));
+		store.subscribe(() => callCount++);
 		store.push(makeEntry());
-		expect(received).toHaveLength(1);
+		expect(callCount).toBe(1);
 	});
 
 	test("clear removes all entries", () => {

@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { assertContained } from "../filesystem/containment.ts";
 import { assertSafeArg } from "../validation.ts";
 
 const MAX_OUTPUT_BYTES = 500_000;
@@ -60,10 +61,24 @@ export const dockerBuild: FridayTool = {
 
 			const cmdParts = ["docker", "build", "-t", tag];
 			if (dockerfile) {
-				cmdParts.push("-f", resolve(context.workingDirectory, dockerfile));
+				const resolvedDockerfile = resolve(context.workingDirectory, dockerfile);
+				const containmentCheck = await assertContained(resolvedDockerfile, context.workingDirectory);
+				if (!containmentCheck.ok) {
+					return { success: false, output: `Invalid dockerfile path: ${containmentCheck.reason}` };
+				}
+				cmdParts.push("-f", resolvedDockerfile);
 			}
 			if (buildArgs) {
 				for (const [key, value] of Object.entries(buildArgs)) {
+					if (key.includes("=")) {
+						return { success: false, output: `Invalid build-arg key "${key}": must not contain "="` };
+					}
+					if (key.startsWith("-")) {
+						return { success: false, output: `Invalid build-arg key "${key}": must not start with "-"` };
+					}
+					if (/\s/.test(key)) {
+						return { success: false, output: `Invalid build-arg key "${key}": must not contain spaces` };
+					}
 					cmdParts.push("--build-arg", `${key}=${value}`);
 				}
 			}

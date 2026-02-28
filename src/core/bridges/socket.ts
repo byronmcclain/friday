@@ -48,6 +48,11 @@ export class SocketBridge implements RuntimeBridge {
       socket.on("close", () => {
         this.connected = false;
         this.socket = null;
+        // Drain all pending callbacks with a connection-closed error
+        for (const [, cb] of this.pendingCallbacks) {
+          cb.onError(new Error("connection closed"));
+        }
+        this.pendingCallbacks.clear();
       });
     });
   }
@@ -77,20 +82,23 @@ export class SocketBridge implements RuntimeBridge {
 
     this.send({ type: "chat", id: requestId, content });
 
-    while (!done) {
-      if (chunks.length > 0) {
-        yield chunks.shift()!;
-      } else {
-        await new Promise<void>((r) => { resolveWait = r; });
+    try {
+      while (!done) {
+        if (chunks.length > 0) {
+          yield chunks.shift()!;
+        } else {
+          await new Promise<void>((r) => { resolveWait = r; });
+        }
       }
-    }
 
-    while (chunks.length > 0) {
-      yield chunks.shift()!;
-    }
+      while (chunks.length > 0) {
+        yield chunks.shift()!;
+      }
 
-    this.pendingCallbacks.delete(requestId);
-    if (error) throw error;
+      if (error) throw error;
+    } finally {
+      this.pendingCallbacks.delete(requestId);
+    }
   }
 
   async process(input: string): Promise<{ output: string; source: string }> {

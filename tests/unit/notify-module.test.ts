@@ -133,22 +133,34 @@ describe("notify.send", () => {
 	});
 
 	test("sends webhook notification successfully", async () => {
-		const result = await notifySend.execute(
-			{ title: "Test Alert", body: "Something happened", channel: "webhook", url: mockWebhookUrl },
-			ctx,
-		);
-		expect(result.success).toBe(true);
-		expect(result.output).toContain("Webhook notification sent");
-		expect(result.artifacts?.channel).toBe("Webhook");
-		expect(result.artifacts?.title).toBe("Test Alert");
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = Object.assign(async () => new Response("ok", { status: 200 }), { preconnect: globalThis.fetch.preconnect }) as typeof fetch;
+		try {
+			const result = await notifySend.execute(
+				{ title: "Test Alert", body: "Something happened", channel: "webhook", url: "https://hooks.example.com/webhook" },
+				ctx,
+			);
+			expect(result.success).toBe(true);
+			expect(result.output).toContain("Webhook notification sent");
+			expect(result.artifacts?.channel).toBe("Webhook");
+			expect(result.artifacts?.title).toBe("Test Alert");
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
 	});
 
 	test("sends slack notification successfully", async () => {
-		const result = await notifySend.execute(
-			{ title: "Slack Test", body: "Hello Slack", channel: "slack", url: mockWebhookUrl },
-			ctx,
-		);
-		expect(result.success).toBe(true);
-		expect(result.output).toContain("Slack notification sent");
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = Object.assign(async () => new Response("ok", { status: 200 }), { preconnect: globalThis.fetch.preconnect }) as typeof fetch;
+		try {
+			const result = await notifySend.execute(
+				{ title: "Slack Test", body: "Hello Slack", channel: "slack", url: "https://hooks.slack.com/test" },
+				ctx,
+			);
+			expect(result.success).toBe(true);
+			expect(result.output).toContain("Slack notification sent");
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
 	});
 });

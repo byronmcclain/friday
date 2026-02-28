@@ -57,6 +57,8 @@ export class DirectiveEngine {
     for (const directive of this.store.listEnabled()) {
       if (directive.trigger.type === "signal") {
         needed.add(directive.trigger.signal);
+      } else if (directive.trigger.type !== "manual") {
+        console.warn("[DirectiveEngine] unimplemented trigger type:", directive.trigger.type);
       }
     }
 

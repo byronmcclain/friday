@@ -60,17 +60,6 @@ describe("ClientRegistry", () => {
     expect(chat.send).not.toHaveBeenCalled();
   });
 
-  test("getByType returns matching clients", () => {
-    const registry = new ClientRegistry();
-    registry.register(makeClient("v1", "voice"));
-    registry.register(makeClient("c1", "chat"));
-    registry.register(makeClient("v2", "voice"));
-
-    const voices = registry.getByType("voice");
-    expect(voices).toHaveLength(2);
-    expect(voices.map(c => c.id).sort()).toEqual(["v1", "v2"]);
-  });
-
   test("getById returns specific client", () => {
     const registry = new ClientRegistry();
     const c = makeClient("a");

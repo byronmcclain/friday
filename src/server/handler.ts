@@ -12,10 +12,13 @@ import type { GrokVoice } from "../core/voice/types.ts";
 
 export type SendFn = (msg: ServerMessage) => void;
 
+const VALID_VOICES: ReadonlySet<string> = new Set(["Ara", "Eve", "Rex", "Sal", "Leo"]);
+
 export class WebSocketHandler {
 	private runtime: FridayRuntime;
 	private registry: ClientRegistry;
 	private clientId: string;
+	private channelName: string;
 	private defaultSend?: SendFn;
 	private voiceBridge: VoiceBridge | null = null;
 	private assistantTranscriptBuffer = "";
@@ -24,6 +27,7 @@ export class WebSocketHandler {
 		this.runtime = runtime;
 		this.registry = registry;
 		this.clientId = clientId;
+		this.channelName = `websocket-${clientId}`;
 	}
 
 	async handle(raw: string, send: SendFn): Promise<void> {
@@ -62,6 +66,13 @@ export class WebSocketHandler {
 				code: "INTERNAL_ERROR",
 				message,
 			});
+		}
+	}
+
+	disconnect(): void {
+		// Remove per-client notification channel on disconnect
+		if (this.runtime.notifications) {
+			this.runtime.notifications.removeChannel(this.channelName);
 		}
 	}
 
@@ -121,11 +132,11 @@ export class WebSocketHandler {
 
 		this.defaultSend = send;
 
-		// Wire notification channel for this client
+		// Wire notification channel for this client (per-client name avoids collisions)
 		if (this.runtime.notifications) {
-			this.runtime.notifications.addChannel(
-				new WebSocketNotificationChannel(send),
-			);
+			const channel = new WebSocketNotificationChannel(send);
+			channel.name = this.channelName;
+			this.runtime.notifications.addChannel(channel);
 		}
 
 		send({
@@ -274,8 +285,13 @@ export class WebSocketHandler {
 
 				this.assistantTranscriptBuffer = "";
 
+				const requestedVoice = msg.voice;
+				const voice: GrokVoice = requestedVoice && VALID_VOICES.has(requestedVoice)
+					? requestedVoice as GrokVoice
+					: "Eve";
+
 				const voiceConfig: VoiceBridgeConfig = {
-					voice: ((msg as any).voice ?? "Eve") as GrokVoice,
+					voice,
 					sampleRate: 48000,
 					instructions: FRIDAY_VOICE_IDENTITY,
 				};
@@ -355,7 +371,7 @@ export class WebSocketHandler {
 				break;
 			}
 			case "voice:mode": {
-				// Voice mode switching handled by the client-side session
+				console.warn("[Handler] voice:mode not implemented server-side");
 				break;
 			}
 			case "history:list": {

@@ -21,6 +21,8 @@ export interface VoxOptions {
 	clearance?: ClearanceManager;
 }
 
+export const VOX_WS_URL = "wss://api.x.ai/v1/realtime";
+
 export const VOX_DEFAULTS: VoxConfig = {
 	defaultVoice: "Eve",
 	sampleRate: 48000,

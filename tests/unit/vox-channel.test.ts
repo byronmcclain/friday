@@ -28,9 +28,9 @@ describe("VoiceChannel", () => {
 		expect(channel.name).toBe("voice");
 	});
 
-	test("send() calls vox.speak with title and body", async () => {
+	test("send() calls vox.speak with title and body for warning level", async () => {
 		const notification: FridayNotification = {
-			level: "info",
+			level: "warning",
 			title: "Test Alert",
 			body: "Something happened",
 			source: "test",
@@ -39,6 +39,17 @@ describe("VoiceChannel", () => {
 		expect(spokenTexts).toHaveLength(1);
 		expect(spokenTexts[0]).toContain("Test Alert");
 		expect(spokenTexts[0]).toContain("Something happened");
+	});
+
+	test("send() skips info-level notifications", async () => {
+		const notification: FridayNotification = {
+			level: "info",
+			title: "Info Update",
+			body: "Low priority",
+			source: "test",
+		};
+		await channel.send(notification);
+		expect(spokenTexts).toHaveLength(0);
 	});
 
 	test("send() formats notification as natural speech", async () => {

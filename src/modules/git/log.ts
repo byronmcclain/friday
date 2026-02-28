@@ -72,6 +72,8 @@ export const gitLog: FridayTool = {
 			}
 			if (ref) cmdParts.push(ref);
 			if (path) {
+				const pathCheck = assertSafeArg(path, "path");
+				if (pathCheck) return pathCheck;
 				cmdParts.push("--");
 				cmdParts.push(path);
 			}

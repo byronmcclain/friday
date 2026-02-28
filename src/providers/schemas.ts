@@ -27,6 +27,8 @@ export function toZodSchema(params: ToolParameter[]): z.ZodObject<Record<string,
 			case "object":
 				field = z.record(z.string(), z.unknown()).describe(param.description);
 				break;
+			default:
+				throw new Error(`toZodSchema: unsupported parameter type '${(param as ToolParameter).type}'`);
 		}
 
 		if (!param.required) {

@@ -5,7 +5,7 @@ import { forgeValidate } from "./validate.ts";
 import { forgeRestart } from "./restart.ts";
 import { forgeStatus } from "./status.ts";
 
-const forgeModule: FridayModule = {
+const forgeModule = {
 	name: "forge",
 	description:
 		"The Forge — Friday's self-improvement system. Create new modules, patch existing ones, validate, and restart to load changes.",
@@ -22,6 +22,6 @@ const forgeModule: FridayModule = {
 		"system",
 		"forge-modify",
 	],
-};
+} satisfies FridayModule;
 
 export default forgeModule;

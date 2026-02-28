@@ -132,6 +132,3 @@ export function parseClientMessage(raw: string): ClientMessage | null {
 	return parsed as ClientMessage;
 }
 
-export function serializeServerMessage(msg: ServerMessage): string {
-	return JSON.stringify(msg);
-}

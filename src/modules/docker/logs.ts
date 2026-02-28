@@ -66,7 +66,11 @@ export const dockerLogs: FridayTool = {
 				String(tail),
 			];
 			if (timestamps) cmdParts.push("--timestamps");
-			if (since) cmdParts.push("--since", since);
+			if (since) {
+				const sinceCheck = assertSafeArg(since, "since");
+				if (sinceCheck) return sinceCheck;
+				cmdParts.push("--since", since);
+			}
 			cmdParts.push(container);
 
 			const proc = Bun.spawn(cmdParts, {

@@ -39,7 +39,7 @@ export class ConversationSummarizer {
 			const trimmed = result.text.trim();
 			return trimmed || undefined;
 		} catch (error) {
-			console.warn("Conversation summarization failed:", error instanceof Error ? error.message : error);
+			console.warn("[Summarizer] Conversation summarization failed:", error instanceof Error ? error.message : error);
 			return undefined;
 		}
 	}

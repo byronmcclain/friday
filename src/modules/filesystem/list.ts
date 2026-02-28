@@ -71,6 +71,11 @@ export const fsList: FridayTool = {
       const lines: string[] = [];
       for (const entry of entries) {
         const fullPath = resolve(resolved, entry);
+
+        // Re-check containment: glob results might escape the allowed directory
+        const entryContainment = await assertContained(fullPath, context.workingDirectory);
+        if (!entryContainment.ok) continue;
+
         try {
           const s = await stat(fullPath);
           const type = s.isDirectory() ? "dir " : "file";

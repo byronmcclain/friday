@@ -154,10 +154,10 @@ describe("assertInteger", () => {
 		if ("value" in result) expect(result.value).toBe(0);
 	});
 
-	test("floors floating point", () => {
+	test("rejects floating point", () => {
 		const result = assertInteger(2.7, "index");
-		expect("value" in result).toBe(true);
-		if ("value" in result) expect(result.value).toBe(2);
+		expect("success" in result).toBe(true);
+		if ("success" in result) expect(result.success).toBe(false);
 	});
 
 	test("rejects negative numbers", () => {

@@ -178,6 +178,62 @@ export class FridayRuntime {
 			});
 			this._directiveEngine.start();
 
+			// Wire directive action dispatch — routes actions to the appropriate subsystem.
+			// This must be set after Cortex/protocols are available, but the handler
+			// captures `this` so late-binding is fine. The engine buffers until a handler
+			// is registered, and directives won't fire until signals are emitted (post-boot).
+			this._directiveEngine.onDirectiveAction(async (_directive, action) => {
+				switch (action.type) {
+					case "protocol": {
+						const protocol = this._protocols.get(action.protocol);
+						if (!protocol) break;
+						await protocol.execute(
+							action.args ?? { rawArgs: "" },
+							{
+								workingDirectory: process.cwd(),
+								audit: this._audit,
+								signal: this._signals,
+								memory: this._memory?.scoped("directive") ?? {
+									get: async () => undefined,
+									set: async () => {},
+									delete: async () => {},
+									list: async () => [],
+								},
+								tools: new Map(),
+							},
+						);
+						break;
+					}
+					case "prompt": {
+						await this._cortex.chat(action.prompt);
+						break;
+					}
+					case "tool": {
+						const tool = this._cortex.availableTools.find(
+							(t) => t.name === action.tool,
+						);
+						if (!tool) break;
+						await tool.execute(action.args ?? {}, {
+							workingDirectory: process.cwd(),
+							audit: this._audit,
+							signal: this._signals,
+							memory: this._memory?.scoped("directive") ?? {
+								get: async () => undefined,
+								set: async () => {},
+								delete: async () => {},
+								list: async () => [],
+							},
+						});
+						break;
+					}
+					case "sequence": {
+						// Sequence actions are not yet dispatched — each step
+						// would need recursive handling. Leave as a no-op for now.
+						break;
+					}
+				}
+			});
+
 			if (config.dataDir) {
 				await mkdir(config.dataDir, { recursive: true });
 				const dbPath = `${config.dataDir}/friday.db`;
@@ -348,7 +404,7 @@ export class FridayRuntime {
 				this._forgeHealthReport = {
 					loaded: forgeResult.loaded.map((m) => m.name),
 					failed: forgeResult.failed,
-					pending: [],
+					pending: [], // TODO: populate when forge has pending/approval workflow
 				};
 
 				for (const mod of forgeResult.loaded) {
@@ -379,7 +435,7 @@ export class FridayRuntime {
 				this._audit.log({
 					action: "debug:enabled",
 					source: "runtime",
-					detail: "Debug prompt logging active — system prompts will be written to debug-prompt.log",
+					detail: "Debug inference logging active — payloads and responses will be written to last-inference-payload.log and last-inference-response.log",
 					success: true,
 				});
 			}

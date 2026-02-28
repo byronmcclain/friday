@@ -28,7 +28,7 @@ export function createArcProtocol(
 				case "show":
 					return handleShow(store, rest);
 				case "create":
-					return handleCreate(store, rawArgs.slice(subcommand.length).trim());
+					return handleCreate(store, rest);
 				case "pause":
 					return handlePause(store, rest);
 				case "resume":
@@ -82,6 +82,8 @@ function handleShow(store: RhythmStore, id: string): ProtocolResult {
 	return { success: true, summary: lines.join("\n") };
 }
 
+// Protocol-created rhythms are always prompt-type actions (description becomes the prompt).
+// For tool or protocol action types, use the manage_rhythm LLM tool instead.
 function handleCreate(store: RhythmStore, input: string): ProtocolResult {
 	// Parse: "cron expression" description text
 	const cronMatch = input.match(/^"([^"]+)"\s+(.+)$/);

@@ -117,8 +117,7 @@ export const forgeValidate: FridayTool = {
 				});
 			}
 		} catch (err: unknown) {
-			const isNotFound = err && typeof err === "object" && "code" in err && (err as { code: string }).code === "ENOENT";
-			steps.push({ name: "typecheck", passed: Boolean(isNotFound) });
+			steps.push({ name: "typecheck", passed: false, error: "bunx not found — check skipped" });
 		}
 
 		// Step 4: Lint (best-effort, non-blocking)
@@ -145,8 +144,7 @@ export const forgeValidate: FridayTool = {
 				});
 			}
 		} catch (err: unknown) {
-			const isNotFound = err && typeof err === "object" && "code" in err && (err as { code: string }).code === "ENOENT";
-			steps.push({ name: "lint", passed: Boolean(isNotFound) });
+			steps.push({ name: "lint", passed: false, error: "bunx not found — check skipped" });
 		}
 
 		const allPassed = steps.every((s) => s.passed);

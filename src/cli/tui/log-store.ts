@@ -1,6 +1,6 @@
 import { MAX_LOG_ENTRIES, type LogEntry } from "./log-types.ts";
 
-export type LogSubscriber = (entry: LogEntry) => void;
+export type LogSubscriber = () => void;
 
 export class LogStore {
 	private _entries: LogEntry[] = [];
@@ -22,7 +22,7 @@ export class LogStore {
 		}
 		for (const cb of this.subscribers) {
 			try {
-				cb(entry);
+				cb();
 			} catch {
 				// Isolate subscriber errors
 			}
