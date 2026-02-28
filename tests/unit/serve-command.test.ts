@@ -15,12 +15,6 @@ describe("serve command", () => {
 		expect(portOpt!.defaultValue).toBe("3000");
 	});
 
-	test("has --provider option", () => {
-		const cmd = program.commands.find((c) => c.name() === "serve");
-		const providerOpt = cmd!.options.find((o) => o.long === "--provider");
-		expect(providerOpt).toBeDefined();
-	});
-
 	test("has --model option", () => {
 		const cmd = program.commands.find((c) => c.name() === "serve");
 		const modelOpt = cmd!.options.find((o) => o.long === "--model");

@@ -8,19 +8,12 @@ import { homedir } from "node:os";
 import { createFridayServer } from "../../server/index.ts";
 import { FridaySocketServer } from "../../server/socket.ts";
 import { spawnTtyd } from "../../server/ttyd.ts";
-import type { ProviderName } from "../../core/types.ts";
-import { DEFAULT_PROVIDER } from "../../providers/index.ts";
 
 export function serveCommand(program: Command): void {
 	program
 		.command("serve")
 		.description("Start the Friday web UI server")
 		.option("--port <port>", "Port to listen on", "3000")
-		.option(
-			"-p, --provider <provider>",
-			"Default LLM provider (anthropic, grok)",
-			DEFAULT_PROVIDER,
-		)
 		.option("-m, --model <model>", "Default model (defaults per provider)")
 		.action(async function (this: Command, options) {
 			const globalOpts = this.optsWithGlobals();
@@ -35,7 +28,6 @@ export function serveCommand(program: Command): void {
 				port,
 				staticDir: resolve(projectRoot, "web/dist"),
 				runtimeConfig: {
-					provider: options.provider as ProviderName,
 					model: options.model,
 					smartsDir: resolve(projectRoot, "smarts"),
 					dataDir: resolve(projectRoot, "data"),
