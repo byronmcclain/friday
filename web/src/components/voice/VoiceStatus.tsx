@@ -6,7 +6,7 @@ export function VoiceStatus({ text, isTyping }: VoiceStatusProps) {
 
   return (
     <div
-      className="fixed left-1/2 -translate-x-1/2 text-center text-[0.9rem] min-h-[1.4em] z-10 transition-opacity duration-300 px-5 py-1.5 rounded-full"
+      className="font-mono-friday fixed left-1/2 -translate-x-1/2 text-center text-[0.9rem] min-h-[1.4em] z-10 transition-opacity duration-300 px-5 py-1.5 rounded-full"
       style={{
         bottom: "140px",
         color: "var(--color-friday-text, #F0E6D8)",

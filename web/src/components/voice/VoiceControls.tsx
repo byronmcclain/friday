@@ -10,7 +10,7 @@ export function VoiceControls({
 }: VoiceControlsProps) {
   return (
     <div
-      className="fixed bottom-10 left-1/2 -translate-x-1/2 flex gap-3 z-10 opacity-15 hover:opacity-100 transition-opacity duration-300"
+      className="fixed bottom-10 left-1/2 -translate-x-1/2 flex gap-3 z-10 opacity-25 hover:opacity-100 transition-opacity duration-300"
     >
       <button
         type="button"
