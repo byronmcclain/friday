@@ -30,11 +30,12 @@ bun run web:build      # Build frontend for production
 bun run start genesis init    # Seed GENESIS.md from built-in template
 bun run start genesis show    # Print current identity prompt
 bun run start genesis edit    # Open GENESIS.md in $EDITOR
+bun run start genesis update  # Overwrite GENESIS.md with latest template
 bun run start genesis check   # Validate file exists and permissions
 bun run start genesis path    # Print resolved file path
-friday --debug chat           # Chat with debug prompt logging (writes debug-prompt.log)
-friday --debug serve          # Serve with debug prompt logging
-friday --debug                # Default (chat) with debug prompt logging
+friday --debug chat           # Chat with debug inference logging (writes last-inference-payload.log)
+friday --debug serve          # Serve with debug inference logging
+friday --debug                # Default (chat) with debug inference logging
 ```
 
 ## Architecture
@@ -51,7 +52,9 @@ src/
 │       ├── state.ts        # AppState reducer, Message types, phase state machine
 │       ├── theme.ts        # Friday amber palette, SyntaxStyle, shared text attributes
 │       ├── filter-commands.ts  # TypeaheadEntry and filterCommands() for /command suggestions
-│       ├── components/    # UI components (Header, ChatArea, InputBar, Message, Splash, etc.)
+│       ├── log-store.ts   # LogStore — state store for TUI debug log panel
+│       ├── log-types.ts   # LogEntry types for structured log display
+│       ├── components/    # UI components (Header, ChatArea, InputBar, Message, Splash, LogPanel, etc.)
 │       ├── lib/           # ANSI parser, color utils, chafa logo processor
 │       └── channels/      # TuiChannel — notification bridge into TUI toasts
 ├── core/
@@ -68,11 +71,17 @@ src/
 │   ├── notifications.ts   # NotificationManager — multi-channel alerts (terminal, log, slack, webhook)
 │   ├── types.ts           # Core types (FridayConfig, ConversationMessage, ProviderName)
 │   ├── prompts.ts         # GENESIS_TEMPLATE — seed template for Friday's identity prompt
+│   ├── secrets.ts         # SecretStore — AES-256-GCM encrypted storage (OS keychain + fallback)
+│   ├── bridges/           # Runtime bridge abstractions for singleton mode
+│   │   ├── local.ts       # LocalBridge — direct in-process runtime access
+│   │   ├── socket.ts      # SocketBridge — Unix socket IPC to running server
+│   │   └── types.ts       # RuntimeBridge interface — abstraction over local/socket access
 │   └── voice/             # Vox — voice output subsystem (TTS via Grok Voice Agent API)
 │       ├── types.ts        # VoiceMode, GrokVoice, VoxConfig, VoxOptions, VOX_DEFAULTS
 │       ├── audio.ts        # pcmToWav, detectPlayer, playAudio, cleanupTempFile
 │       ├── prompt.ts       # classifyContent, buildTtsPrompt, FRIDAY_VOICE_IDENTITY
 │       ├── vox.ts          # Vox class — WebSocket lifecycle, modes, speak/cancel, idle eviction
+│       ├── bridge.ts       # VoiceBridge — Grok realtime API WebSocket for conversational voice
 │       ├── channel.ts      # VoiceChannel — notification bridge (NotificationChannel impl)
 │       └── protocol.ts     # /voice protocol (on, off, whisper, test, status)
 ├── audit/
@@ -107,6 +116,7 @@ src/
 │   ├── types.ts           # SystemSnapshot, SensorConfig, AlertThresholds
 │   ├── sensors.ts         # Pure functions: gatherMachine(), gatherContainers(), gatherDev()
 │   ├── sensorium.ts       # Sensorium class — polling loop, snapshot management, alert evaluation
+│   ├── format.ts          # Formatting utilities for snapshot display
 │   ├── protocol.ts        # /env protocol (status, cpu, memory, docker, ports, git)
 │   └── tool.ts            # getEnvironmentStatus FridayTool
 ├── arc-rhythm/
@@ -121,20 +131,28 @@ src/
 │   └── protocol.ts        # /history protocol (list, show, clear) — session persistence
 ├── server/
 │   ├── index.ts           # Bun.serve() HTTP + WebSocket server
-│   ├── protocol.ts        # Shared message types (ClientMessage, ServerMessage)
+│   ├── protocol.ts        # Shared message types (ClientMessage, ServerMessage, voice messages)
 │   ├── handler.ts         # WebSocketHandler — message routing to FridayRuntime
+│   ├── client-registry.ts # ClientRegistry — multi-client WebSocket tracking
+│   ├── socket.ts          # Unix socket server for singleton IPC (~/.friday/friday.sock)
+│   ├── ttyd.ts            # Terminal-in-browser support (spawns ttyd on port 7681)
 │   └── ws-channel.ts      # WebSocket notification channel
 ├── providers/             # AI SDK model factory (createModel), Zod schema converter
 │   ├── index.ts           # createModel(), PROVIDER_DEFAULTS, DEFAULT_PROVIDER
 │   ├── schemas.ts         # toZodSchema() — converts FridayTool parameters to Zod for AI SDK
 │   └── debug-log.ts       # appendInferenceLog() — shared debug logging for providers
 ├── config/                # Runtime configuration loading — future
-└── utils/                 # Shared utilities — future
-web/                       # React web UI (Vite + Tailwind)
+└── utils/
+    └── timeout.ts         # Shared timeout utilities
+web/                       # React web UI (Vite + Tailwind) — voice-focused architecture
 ├── src/
-│   ├── components/        # React components (layout, chat, sidebar, input)
-│   ├── hooks/             # useWebSocket, useChat, useSession, useSensorium, useSmarts, useHistory, useNotifications
-│   ├── contexts/          # WebSocket, Chat, Session providers
+│   ├── App.tsx            # Root app component
+│   ├── main.tsx           # Vite entry point
+│   ├── components/
+│   │   ├── voice/         # VoiceControls, VoiceOrb, VoiceMode, VoiceStatus
+│   │   ├── terminal/      # TerminalEmbed — embedded terminal via ttyd
+│   │   └── menu/          # MenuBar — navigation and controls
+│   ├── hooks/             # useVoiceAudio, useVoiceSession
 │   └── index.css          # Tailwind theme (Friday amber palette)
 smarts/                    # Runtime-generated knowledge files (gitignored, user-specific)
 forge/                     # Friday-authored modules (gitignored, AI-generated)
@@ -169,6 +187,11 @@ tests/
 - **Prompts** live in `src/core/prompts.ts` as exported constants. `GENESIS_TEMPLATE` is the seed template for Friday's identity — it gets written to `~/.friday/GENESIS.md` on first run. The system prompt includes current date/time injection and recall_memory tool usage guidance.
 - **Vox** (`src/core/voice/`) is Friday's voice output — her mouth. Uses the xAI Grok Voice Agent API via persistent WebSocket to speak responses aloud. Three modes: Off (default), On, Whisper. Dynamic TTS prompt system classifies content (tables, code, lists) and adjusts instructions per utterance. Persistent WebSocket with 60s idle eviction. Fire-and-forget speech after Cortex chat responses. VoiceChannel bridges notifications into speech. `/voice` protocol for human control (aliases: `/vox`, `/speak`). Default voice: Eve (override with `FRIDAY_VOICE` env var). Platform-detected audio: `afplay` (macOS), `paplay` (Linux), PowerShell (Windows).
 - **Debug Inference Logging** — `--debug` global CLI flag enables inference payload and response logging on every `provider.chat()` call. At the start of each `Cortex.chat()`, two files are cleared: `last-inference-payload.log` and `last-inference-response.log` in the project root. Each tool loop round appends a timestamped separator and the provider-specific wire-format JSON (the exact params sent to the API and the raw response received). This captures what the LLM actually sees and returns — essential for debugging hallucinations. The system prompt is also logged to the AuditLogger (`action: "debug:system-prompt"`). A `debug:enabled` audit entry is logged at boot. File I/O uses `appendFile` from `node:fs/promises` for round appending and `Bun.write()` for clearing — all wrapped in try/catch so debug failures never crash the primary chat function. `ChatOptions.debug` carries `payloadPath`, `responsePath`, and `round` number from Cortex to providers. Config flows: CLI global option → `optsWithGlobals()` → `launchTui()` → `RuntimeConfig.debug` → `CortexConfig.debug` → Cortex private fields. The default command handler explicitly forwards `--debug` through re-parse args.
+- **Singleton Mode** — Friday supports a singleton runtime pattern: run `friday serve` in one terminal, then `friday chat` in another. The chat command auto-detects a running server via `~/.friday/friday.pid` and `~/.friday/friday.sock` and connects via `SocketBridge` instead of booting a local runtime. `RuntimeBridge` (`src/core/bridges/types.ts`) is the abstraction — `LocalBridge` wraps an in-process runtime, `SocketBridge` wraps Unix socket IPC to the server. The server writes PID/socket files at startup and cleans them on shutdown.
+- **Client Registry** (`src/server/client-registry.ts`) tracks connected WebSocket clients with metadata (client type: chat, voice, tui). Enables the server to push targeted messages to specific client types.
+- **VoiceBridge** (`src/core/voice/bridge.ts`) is the realtime conversational voice interface — distinct from Vox's fire-and-forget TTS. Connects to the Grok Realtime API via WebSocket (`wss://api.x.ai/v1/realtime`), with a state machine (idle → listening → thinking → speaking → error). Handles session updates, audio deltas, and transcript deltas with callbacks.
+- **TUI Log Panel** (`src/cli/tui/components/log-panel.tsx`) provides an in-TUI debug log viewer. `LogStore` (`log-store.ts`) manages log entries, and `LogEntry` types (`log-types.ts`) define the structured log format.
+- **Terminal-in-Browser** (`src/server/ttyd.ts`) spawns a ttyd process on port 7681 when the web server starts (if ttyd is installed), enabling a terminal interface embedded in the web UI via the `TerminalEmbed` component.
 
 ## Testing
 
@@ -213,6 +236,9 @@ Optional: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` for Gmail module (OAuth 
 Optional: `FRIDAY_SECRET_KEY` — fallback master key for SecretStore when OS keychain is unavailable.
 Optional: `FRIDAY_GENESIS_PATH` to override default `~/.friday/GENESIS.md` location.
 Optional: `FRIDAY_VOICE` to override default voice (Eve). Available: Ara, Eve, Rex, Sal, Leo.
+Optional: `FRIDAY_SLACK_WEBHOOK_URL` for Slack notification channel.
+Optional: `FRIDAY_WEBHOOK_URL` for generic webhook notification channel.
+Optional: `FRIDAY_EMAIL_WEBHOOK_URL` for email webhook notification channel.
 
 ## Docker
 
@@ -238,10 +264,16 @@ docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
 - Arc Rhythm scheduling: `docs/plans/2026-02-24-arc-rhythm-scheduling-design.md`
 - Gmail module design: `docs/plans/2026-02-25-gmail-module-design.md`
 - Genesis identity prompt design: `docs/plans/2026-02-25-genesis-identity-prompt-design.md`
+- TUI log panel: `docs/plans/2026-02-24-tui-log-panel-design.md`
 - Vox voice output: `docs/plans/2026-02-25-vox-voice-output-design.md`
-- Vox implementation plan: `docs/plans/2026-02-25-vox-implementation-plan.md`
+- Debug prompt logging: `docs/plans/2026-02-26-debug-prompt-logging-design.md`
+- Genesis prompt optimization: `docs/plans/2026-02-26-genesis-prompt-optimization-design.md`
+- Max tokens truncation: `docs/plans/2026-02-26-max-tokens-truncation-design.md`
 - Inference payload logging: `docs/plans/2026-02-27-inference-payload-logging-design.md`
-- Cortex AI SDK migration: `docs/plans/2026-02-27-cortex-ai-sdk-migration-plan.md`
+- Cortex AI SDK migration: `docs/plans/2026-02-27-cortex-ai-sdk-migration-design.md`
+- Voice conversation UI PoC: `docs/plans/2026-02-27-voice-conversation-ui-poc-design.md`
+- Voice UI React components: `docs/plans/2026-02-27-voice-ui-react-components-design.md`
+- Voice web integration: `docs/plans/2026-02-27-voice-web-integration-design.md`
 - MCU concept mapping: Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler, Genesis=identity template, Vox=voice
 
 ## Worktrees

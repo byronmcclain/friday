@@ -16,7 +16,7 @@ TUI-first. Module-driven. Built to think, remember, and adapt.
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tests](https://img.shields.io/badge/tests-959%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-949%20passing-brightgreen)]()
 [![Biome](https://img.shields.io/badge/lint-Biome-60a5fa?logo=biome)](https://biomejs.dev)
 
 <br />
@@ -447,30 +447,34 @@ Key UX features:
 
 ### 🌐 Web UI — Browser Interface
 
-The Web UI provides a full browser-based interface to Friday over WebSocket. The React frontend (Vite + Tailwind) connects to a `Bun.serve()` backend that routes messages through the same `FridayRuntime` as the TUI — same Cortex, same modules, same knowledge.
+The Web UI provides a voice-focused browser interface to Friday over WebSocket. The React frontend (Vite + Tailwind) connects to a `Bun.serve()` backend that routes messages through the same `FridayRuntime` as the TUI — same Cortex, same modules, same knowledge. The UI has been redesigned around voice interaction, with an embedded terminal for text-based chat.
 
 ```mermaid
 flowchart LR
     subgraph Browser ["React Frontend (Vite + Tailwind)"]
-        CHAT[Chat interface]
-        SIDE[Sidebar: history, SMARTS browser]
-        SENSOR[Sensorium status bar]
-        NOTIF[Notification panel]
+        VOICE[Voice: VoiceOrb, VoiceControls, VoiceMode, VoiceStatus]
+        TERM[TerminalEmbed: embedded terminal via ttyd]
+        MENU[MenuBar: navigation and controls]
     end
 
     subgraph Server ["Bun.serve() Backend"]
         WS[WebSocketHandler]
+        CR[ClientRegistry: multi-client tracking]
         RT[FridayRuntime]
+        SOCK[Unix Socket Server: singleton IPC]
+        TTYD[ttyd: terminal-in-browser on port 7681]
     end
 
     Browser <-->|"WebSocket (bidirectional)"| WS
-    WS -->|"chat, protocol, history, smarts"| RT
+    WS --> CR
+    CR -->|"chat, protocol, voice, history, smarts"| RT
     RT -->|"responses"| WS
-    WS -.->|"Push: sensorium:update"| SENSOR
-    WS -.->|"Push: notifications"| NOTIF
+    WS -.->|"Push: voice:state, voice:audio, voice:transcript"| VOICE
+    TERM <-.->|"ttyd WebSocket"| TTYD
+    SOCK <-->|"Unix socket IPC"| TUI["friday chat (singleton mode)"]
 ```
 
-The WebSocket protocol supports: `session:boot`, `session:shutdown`, `chat`, `protocol`, `history:list`, `history:load`, `smarts:list`, `smarts:search`. Sensorium snapshots and notifications are pushed to connected clients in real-time via dedicated channels.
+The WebSocket protocol supports: `session:boot`, `session:shutdown`, `chat`, `protocol`, `history:list`, `history:load`, `smarts:list`, `smarts:search`, `voice:start`, `voice:stop`, `voice:mode`, and `session:identify` for client-type registration. The server runs in **singleton mode** — `friday chat` in another terminal auto-detects the running server via `~/.friday/friday.pid` + `~/.friday/friday.sock` and connects via `SocketBridge`.
 
 `bun run serve` · `bun run web:dev`
 
@@ -549,6 +553,106 @@ The conversation table is capped at 500 sessions with oldest-first eviction. Sum
 
 ---
 
+### 🗣️ Vox — Voice Output
+
+Vox is Friday's **voice** — her mouth. Using the xAI Grok Voice Agent API via persistent WebSocket, she can speak responses aloud. This isn't text-to-speech bolted on as an afterthought — it's an integrated subsystem with content-aware prompting, idle eviction, and three operational modes.
+
+```mermaid
+flowchart TB
+    subgraph Modes ["Voice Modes"]
+        OFF["Off (default)"]
+        ON["On — speak all responses"]
+        WHISPER["Whisper — reduced volume"]
+    end
+
+    subgraph Pipeline ["TTS Pipeline"]
+        A[Cortex returns response] --> B{Vox mode?}
+        B -->|Off| SKIP[No audio]
+        B -->|On / Whisper| C[classifyContent]
+        C --> D["Detect: code, tables, lists, URLs"]
+        D --> E[buildTtsPrompt]
+        E --> F["Dynamic TTS instructions per utterance"]
+        F --> G[WebSocket to Grok Voice API]
+        G --> H[PCM16 audio chunks]
+        H --> I[pcmToWav: 44-byte WAV header]
+        I --> J[detectPlayer: afplay / paplay / PowerShell]
+        J --> K[Play audio]
+    end
+
+    subgraph Lifecycle ["WebSocket Lifecycle"]
+        L[First speak call] --> M[Open WebSocket]
+        M --> N[60s idle timer starts]
+        N --> O{New speak?}
+        O -->|Yes| P[Reset idle timer]
+        O -->|No, timeout| Q[Close WebSocket]
+    end
+```
+
+The **dynamic TTS prompt system** is the key innovation: `classifyContent()` detects what kind of content Friday is about to speak (tables, code blocks, bullet lists, URLs) and `buildTtsPrompt()` injects specific instructions for that utterance. A table gets "summarize the data verbally", while code gets "describe the code's purpose, don't read syntax aloud". The voice identity (`FRIDAY_VOICE_IDENTITY`) specifies a Kerry Condon-inspired County Tipperary Irish accent.
+
+**VoiceBridge** (`src/core/voice/bridge.ts`) provides a separate conversational voice interface — connecting to the Grok Realtime API (`wss://api.x.ai/v1/realtime`) for bidirectional audio conversations, with a state machine (idle → listening → thinking → speaking → error).
+
+| Feature | Detail |
+|---|---|
+| Fire-and-forget | `vox.speak(text).catch(() => {})` — never blocks Cortex response |
+| Persistent WebSocket | Stays open between utterances, 60s idle eviction |
+| Content classification | Tables, code, lists, URLs get tailored TTS instructions |
+| Platform audio | `afplay` (macOS), `paplay` (Linux), PowerShell (Windows) |
+| VoiceChannel | Bridges NotificationManager into speech |
+| 5 voices | Ara, Eve (default), Rex, Sal, Leo — override with `FRIDAY_VOICE` |
+
+`/voice on` · `/voice off` · `/voice whisper` · `/voice test` · `/voice status`
+
+---
+
+### 🪪 Genesis — Identity Prompt
+
+Genesis is Friday's **identity** — the personality prompt that defines who she is. Unlike hardcoded system prompts, Genesis lives as an editable file at `~/.friday/GENESIS.md`, loaded at boot and injected into every Cortex conversation. The BOSS controls it; Friday cannot modify it.
+
+```mermaid
+flowchart TB
+    subgraph Boot ["Boot Sequence"]
+        A[FridayRuntime.boot] --> B[resolveGenesisPath]
+        B --> C{File exists?}
+        C -->|Yes| D[loadGenesis: read file content]
+        C -->|No| E["seedGenesis: write GENESIS_TEMPLATE"]
+        E --> F["chmod 600 file, chmod 700 dir"]
+        F --> D
+        D --> G[Pass genesisPrompt to Cortex]
+    end
+
+    subgraph Protection ["Protected Path System"]
+        H[setProtectedPaths at boot]
+        H --> I[fs.write checks isProtectedPath]
+        H --> J[fs.delete checks isProtectedPath]
+        H --> K[Forge apply checks isProtectedPath]
+        I --> L[Denied + audit log]
+        J --> L
+        K --> L
+    end
+
+    subgraph CLI ["Genesis CLI"]
+        M["genesis init"] --> N[Seed from GENESIS_TEMPLATE]
+        O["genesis show"] --> P[Display current content]
+        Q["genesis edit"] --> R["Open in $EDITOR"]
+        S["genesis update"] --> T[Overwrite with latest template]
+        U["genesis check"] --> V[Validate file + permissions]
+        W["genesis path"] --> X[Print resolved path]
+    end
+```
+
+| Feature | Detail |
+|---|---|
+| Location | `~/.friday/GENESIS.md` (override: `FRIDAY_GENESIS_PATH`) |
+| Permissions | Directory: 700, File: 600 — enforced on seed and every boot |
+| Seed template | `GENESIS_TEMPLATE` in `src/core/prompts.ts` |
+| Protection | `isProtectedPath()` blocks writes from filesystem tools and Forge |
+| Audit | `genesis:write-denied` logged on blocked write attempts |
+
+`friday genesis show` · `friday genesis init` · `friday genesis edit` · `friday genesis update` · `friday genesis check` · `friday genesis path`
+
+---
+
 ### 🛡️ Clearance & Audit — Trust but Verify
 
 Every tool call, directive execution, and module action in Friday passes through a **permission gate** before it can execute. The ClearanceManager maintains a set of granted permissions, and every action must declare what it needs.
@@ -564,7 +668,7 @@ flowchart TB
     F --> H[AuditLogger.log: blocked]
 ```
 
-**11 clearance types** control every capability boundary:
+**12 clearance types** control every capability boundary:
 
 | Clearance | What It Gates |
 |---|---|
@@ -579,6 +683,7 @@ flowchart TB
 | `system` | System-level operations (restart, env access) |
 | `forge-modify` | Creating or patching forge modules |
 | `email-send` | Sending or replying to emails |
+| `audio-output` | Playing audio / voice output via Vox |
 
 The **AuditLogger** records every action with structured entries: `action` (what happened), `source` (who did it), `detail` (human-readable description), `success` (boolean), and optional `metadata` (signal name, directive ID, etc.). This creates a complete trail of everything Friday does.
 
@@ -607,6 +712,7 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 | "I remember when..." | **Deja Vu** | Conversational memory recall — FTS5 search across past sessions |
 | Heartbeat / scheduler | **Arc Rhythm** | Autonomous scheduled task execution — cron-driven, headless |
 | Email identity | **Gmail** | Email via Gmail API — search, read, send, reply with OAuth 2.0 |
+| Friday's voice | **Vox** | Voice output via Grok Voice Agent API — fire-and-forget TTS, content-aware prompts |
 
 ---
 
@@ -631,6 +737,7 @@ graph TB
     RT --> SM["SmartsStore"]
     RT --> SEN["Sensorium"]
     RT --> GEN["Genesis"]
+    RT --> VOX2["Vox"]
     RT --> CX["Cortex"]
     RT --> RC["Recall Tool"]
     RT --> ARC["Arc Rhythm"]
@@ -642,6 +749,7 @@ graph TB
     DE -->|logs to| AU
 
     GEN -->|identity prompt| CX
+    VOX2 -->|speak after chat| CX
 
     CX -->|queries| SM
     CX -->|reads| SEN
@@ -684,7 +792,8 @@ flowchart LR
     G --> H[SmartsStore]
     H --> I[Sensorium]
     I --> GEN[Genesis]
-    GEN --> J[Cortex]
+    GEN --> VOX[Vox]
+    VOX --> J[Cortex]
     J --> K[Recall Tool]
     K --> L["Arc Rhythm<br/>(store + executor + scheduler)"]
     L --> M[Module Discovery]
@@ -728,11 +837,11 @@ sequenceDiagram
 ## CLI Usage
 
 ```bash
-# Start interactive chat (default provider)
+# Start interactive chat (default provider: grok)
 bun run start chat
 
 # Use a specific provider
-bun run start chat --provider grok
+bun run start chat --provider anthropic
 
 # Use a specific model
 bun run start chat --model claude-sonnet-4-20250514
@@ -747,8 +856,15 @@ bun run start chat --provider grok --model grok-3
 bun run start genesis init     # Seed GENESIS.md from template
 bun run start genesis show     # Print current identity prompt
 bun run start genesis edit     # Open GENESIS.md in $EDITOR
+bun run start genesis update   # Overwrite with latest template
+bun run start genesis check    # Validate file + permissions
+bun run start genesis path     # Print resolved file path
 
-# Start the web UI server
+# Debug inference logging
+friday --debug chat            # Log inference payloads and responses
+friday --debug serve           # Debug mode for web server
+
+# Start the web UI server (singleton mode)
 bun run serve
 ```
 
@@ -784,6 +900,9 @@ bun run serve
 | `/gmail read <id>` | Read a specific email |
 | `/gmail send` | Compose and send an email |
 | `/gmail labels` | List Gmail labels |
+| `/voice on` / `off` / `whisper` | Set voice output mode |
+| `/voice test` | Speak a test phrase |
+| `/voice status` | Show voice system status |
 | `exit`, `quit`, `bye` | Ends the session |
 
 ### Provider Defaults
@@ -855,11 +974,11 @@ cp .env.example .env
 ```
 
 ```env
-# Required for Anthropic provider (default)
-ANTHROPIC_API_KEY=sk-ant-...
-
-# Required for Grok provider (--provider grok)
+# Required for default Grok provider
 XAI_API_KEY=xai-...
+
+# Required for Anthropic provider (--provider anthropic)
+ANTHROPIC_API_KEY=sk-ant-...
 
 # Optional: Override reasoning model (CLI: --model)
 FRIDAY_REASONING_MODEL=claude-sonnet-4-20250514
@@ -876,6 +995,14 @@ FRIDAY_SECRET_KEY=...
 
 # Optional: Override identity prompt path (default: ~/.friday/GENESIS.md)
 FRIDAY_GENESIS_PATH=...
+
+# Optional: Override voice (default: Eve). Available: Ara, Eve, Rex, Sal, Leo
+FRIDAY_VOICE=Eve
+
+# Optional: Notification webhooks
+FRIDAY_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+FRIDAY_WEBHOOK_URL=https://example.com/webhook
+FRIDAY_EMAIL_WEBHOOK_URL=https://example.com/email-webhook
 ```
 
 Bun loads `.env` automatically — no dotenv needed.
@@ -886,7 +1013,7 @@ Bun loads `.env` automatically — no dotenv needed.
 
 ```bash
 bun run dev              # Auto-restart on file changes
-bun test                 # Run all tests (843 tests across 79 files)
+bun test                 # Run all tests (949 tests across 94 files)
 bun test --watch         # Watch mode
 bun test tests/unit/cortex.test.ts  # Single test file
 bun run lint             # Lint check
@@ -912,22 +1039,38 @@ src/
 │       ├── state.ts        # AppState reducer, Message types, phase state machine
 │       ├── theme.ts        # Friday amber palette, SyntaxStyle definitions
 │       ├── filter-commands.ts  # Command typeahead filtering
-│       ├── components/    # Header, ChatArea, InputBar, Message, Splash, Thinking, Welcome
+│       ├── log-store.ts   # LogStore — state for TUI debug log panel
+│       ├── log-types.ts   # LogEntry types for structured log display
+│       ├── components/    # Header, ChatArea, InputBar, Message, Splash, Thinking, Welcome, LogPanel
 │       ├── lib/           # ANSI parser, color utils, chafa logo processor
 │       └── channels/      # TuiChannel — notification bridge
 ├── core/
 │   ├── cortex.ts          # LLM brain and conversation state
+│   ├── history-manager.ts # Token-budget conversation history with compaction
+│   ├── stream-types.ts    # ChatStream interface — textStream, fullText, usage
 │   ├── summarizer.ts      # Session summaries via fast model
 │   ├── runtime.ts         # Boot/shutdown orchestrator
 │   ├── events.ts          # SignalBus — typed event system
-│   ├── clearance.ts       # Permission gates
+│   ├── clearance.ts       # Permission gates (12 clearance types)
 │   ├── memory.ts          # SQLite persistence, FTS5 search, conversation indexing
 │   ├── recall-tool.ts     # recall_memory tool — conversation memory search (Deja Vu)
 │   ├── genesis.ts         # Identity prompt loader (~/.friday/GENESIS.md)
 │   ├── secrets.ts         # SecretStore — AES-256-GCM encrypted storage
 │   ├── notifications.ts   # Multi-channel notification system
 │   ├── types.ts           # Core TypeScript interfaces
-│   └── prompts.ts         # GENESIS_TEMPLATE — seed template for identity prompt
+│   ├── prompts.ts         # GENESIS_TEMPLATE — seed template for identity prompt
+│   ├── bridges/           # Runtime bridge abstractions for singleton mode
+│   │   ├── local.ts       # LocalBridge — direct in-process runtime access
+│   │   ├── socket.ts      # SocketBridge — Unix socket IPC to running server
+│   │   └── types.ts       # RuntimeBridge interface
+│   └── voice/             # Vox — voice output and realtime conversational voice
+│       ├── vox.ts         # Vox class — fire-and-forget TTS, idle eviction
+│       ├── bridge.ts      # VoiceBridge — Grok Realtime API WebSocket
+│       ├── audio.ts       # pcmToWav, detectPlayer, playAudio
+│       ├── prompt.ts      # classifyContent, buildTtsPrompt, FRIDAY_VOICE_IDENTITY
+│       ├── channel.ts     # VoiceChannel — notification bridge
+│       ├── protocol.ts    # /voice protocol (on, off, whisper, test, status)
+│       └── types.ts       # VoiceMode, GrokVoice, VoxConfig
 ├── audit/                 # Action tracking and filtering
 ├── modules/
 │   ├── types.ts           # FridayModule, FridayTool interfaces
@@ -953,6 +1096,7 @@ src/
 │   ├── types.ts           # SystemSnapshot, SensorConfig types
 │   ├── sensors.ts         # Pure sensor functions (machine, Docker, dev)
 │   ├── sensorium.ts       # Polling loop, alerts, context block
+│   ├── format.ts          # Formatting utilities for snapshot display
 │   ├── protocol.ts        # /env protocol handler
 │   └── tool.ts            # LLM-accessible environment tool
 ├── arc-rhythm/
@@ -967,20 +1111,26 @@ src/
 │   └── protocol.ts        # /history protocol (list, show, clear)
 ├── server/
 │   ├── index.ts           # Bun.serve() HTTP + WebSocket server
-│   ├── protocol.ts        # Shared message types (ClientMessage, ServerMessage)
+│   ├── protocol.ts        # Shared message types (ClientMessage, ServerMessage, voice messages)
 │   ├── handler.ts         # WebSocket message routing to FridayRuntime
+│   ├── client-registry.ts # ClientRegistry — multi-client WebSocket tracking
+│   ├── socket.ts          # Unix socket server for singleton IPC (~/.friday/friday.sock)
+│   ├── ttyd.ts            # Terminal-in-browser support (spawns ttyd on port 7681)
 │   └── ws-channel.ts      # WebSocket notification channel
-├── providers/             # LLM provider adapters
-└── utils/                 # Shared utilities
-web/                       # React web UI (Vite + Tailwind)
+├── providers/             # LLM provider adapters (createModel, Zod schema converter, debug-log)
+└── utils/
+    └── timeout.ts         # Shared timeout utilities
+web/                       # React web UI (Vite + Tailwind) — voice-focused architecture
 ├── src/
-│   ├── components/        # Layout, chat, sidebar, input components
-│   ├── hooks/             # useWebSocket, useChat, useSession, useSensorium, useSmarts, useHistory, useNotifications
-│   ├── contexts/          # WebSocket, Chat, Session providers
+│   ├── components/
+│   │   ├── voice/         # VoiceControls, VoiceOrb, VoiceMode, VoiceStatus
+│   │   ├── terminal/      # TerminalEmbed — embedded terminal via ttyd
+│   │   └── menu/          # MenuBar — navigation and controls
+│   ├── hooks/             # useVoiceAudio, useVoiceSession
 │   └── index.css          # Tailwind theme (Friday amber palette)
 tests/
-├── helpers/               # Shared test stubs
-├── unit/                  # 843 tests across 79 files
+├── helpers/               # Shared test stubs (createMockModel, createErrorModel)
+├── unit/                  # 949 tests across 94 files
 └── integration/           # Integration tests — future
 ```
 
