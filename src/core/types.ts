@@ -1,11 +1,6 @@
-/** Supported LLM provider names */
-export type ProviderName = "anthropic" | "grok";
-
 /** Configuration for Cortex */
 export interface FridayConfig {
-  /** Which LLM provider to use */
-  provider: ProviderName;
-  /** Model identifier (provider-specific, e.g., "claude-sonnet-4-20250514" or "grok-3") */
+  /** Model identifier (e.g., "grok-4-1-fast-reasoning-latest") */
   model: string;
   /** Fast model for utility tasks (summarization, knowledge extraction) */
   fastModel?: string;

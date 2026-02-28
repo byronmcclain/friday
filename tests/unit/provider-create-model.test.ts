@@ -1,22 +1,15 @@
 import { describe, test, expect } from "bun:test";
-import { createModel, PROVIDER_DEFAULTS } from "../../src/providers/index.ts";
+import { createModel, GROK_DEFAULTS } from "../../src/providers/index.ts";
 
 describe("createModel", () => {
-	test("creates xai model for grok provider", () => {
-		const model = createModel("grok", PROVIDER_DEFAULTS.grok.model);
+	test("creates xai model for the given model ID", () => {
+		const model = createModel(GROK_DEFAULTS.model);
 		expect(model.modelId).toContain("grok");
 		expect(model.provider).toContain("xai");
 	});
 
-	test("creates anthropic model for anthropic provider", () => {
-		const model = createModel("anthropic", PROVIDER_DEFAULTS.anthropic.model);
-		expect(model.modelId).toContain("claude");
-		expect(model.provider).toContain("anthropic");
-	});
-
-	test("throws for unknown provider", () => {
-		expect(() => createModel("unknown" as any, "some-model")).toThrow(
-			"Unknown provider",
-		);
+	test("GROK_DEFAULTS has reasoning and fast model", () => {
+		expect(GROK_DEFAULTS.model).toBe("grok-4-1-fast-reasoning-latest");
+		expect(GROK_DEFAULTS.fastModel).toBe("grok-4-1-fast-non-reasoning");
 	});
 });
