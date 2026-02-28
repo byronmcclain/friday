@@ -15,7 +15,7 @@ const MODES: { mode: AppMode; label: string }[] = [
 function Divider() {
 	return (
 		<div
-			className="h-3.5 w-px mx-2.5"
+			className="h-3.5 w-px mx-1.5"
 			style={{ background: "rgba(232, 148, 58, 0.15)" }}
 		/>
 	);
@@ -84,7 +84,7 @@ export function MenuBar({ activeMode, onModeChange }: MenuBarProps) {
 			<div className="relative flex items-center w-full px-3 z-10">
 				{/* Diamond icon — brand presence without redundant text */}
 				<span
-					className="friday-diamond mr-2.5"
+					className="friday-diamond mr-1"
 					style={{
 						color: "var(--color-friday-amber)",
 						fontSize: "12px",
