@@ -293,7 +293,7 @@ export class SQLiteMemory {
   }
 
   async search(namespace: string, query: string, limit = 5): Promise<SemanticResult[]> {
-    const sanitized = query.replace(/['"*(){}[\]?:^~!@#$%&\\.]/g, " ").trim();
+    const sanitized = query.replace(/['"*(){}[\]?:^~!@#$%&\\./+-]/g, " ").trim();
     if (!sanitized) return [];
     const terms = sanitized.split(/\s+/).filter(Boolean);
     if (terms.length === 0) return [];

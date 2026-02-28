@@ -26,13 +26,28 @@ export const BOLD_DIM = createTextAttributes({ bold: true, dim: true });
 
 export const FRIDAY_SYNTAX_STYLE = SyntaxStyle.fromStyles({
 	"markup.heading.1": { fg: RGBA.fromHex(PALETTE.amberPrimary), bold: true },
+	"markup.heading.2": { fg: RGBA.fromHex(PALETTE.amberPrimary), bold: true },
+	"markup.heading.3": { fg: RGBA.fromHex(PALETTE.amberGlow), bold: true },
+	"markup.heading.4": { fg: RGBA.fromHex(PALETTE.amberGlow), bold: true },
+	"markup.heading.5": { fg: RGBA.fromHex(PALETTE.amberGlow) },
+	"markup.heading.6": { fg: RGBA.fromHex(PALETTE.amberGlow) },
 	"markup.heading": { fg: RGBA.fromHex(PALETTE.amberGlow), bold: true },
 	"markup.list": { fg: RGBA.fromHex(PALETTE.copperAccent) },
 	"markup.raw": { fg: RGBA.fromHex(PALETTE.amberGlow) },
+	"markup.strong": { fg: RGBA.fromHex(PALETTE.textPrimary), bold: true },
+	"markup.italic": { fg: RGBA.fromHex(PALETTE.textPrimary), italic: true },
+	"markup.strikethrough": { fg: RGBA.fromHex(PALETTE.textMuted), dim: true },
+	"markup.link.label": {
+		fg: RGBA.fromHex(PALETTE.amberPrimary),
+		underline: true,
+	},
+	"markup.link.url": { fg: RGBA.fromHex(PALETTE.textMuted) },
 	"markup.link": {
 		fg: RGBA.fromHex(PALETTE.amberPrimary),
 		underline: true,
 	},
+	"punctuation.special": { fg: RGBA.fromHex(PALETTE.borderDim) },
+	conceal: { fg: RGBA.fromHex(PALETTE.borderDim) },
 	keyword: { fg: RGBA.fromHex("#FF7B72"), bold: true },
 	string: { fg: RGBA.fromHex("#A5D6FF") },
 	comment: { fg: RGBA.fromHex(PALETTE.textMuted), italic: true },

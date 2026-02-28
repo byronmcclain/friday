@@ -235,6 +235,18 @@ describe("SQLiteMemory — Semantic Search", () => {
     expect(results.length).toBeGreaterThan(0);
   });
 
+  test("search handles slash characters in query without FTS5 error", async () => {
+    await memory.embed("test-ns", "voice command protocol handler");
+    const results = await memory.search("test-ns", "what is the /voice command?", 5);
+    expect(results.length).toBeGreaterThan(0);
+  });
+
+  test("search handles dash and plus operators in query", async () => {
+    await memory.embed("test-ns", "debug flag configuration options");
+    const results = await memory.search("test-ns", "fix --debug +verbose flag", 5);
+    expect(results.length).toBeGreaterThan(0);
+  });
+
   test("search returns empty array for empty query", async () => {
     await memory.embed("test-ns", "Some content");
     const results = await memory.search("test-ns", "", 5);

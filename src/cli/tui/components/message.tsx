@@ -40,12 +40,32 @@ function useThrottled(value: string, ms: number, active: boolean): string {
 }
 
 /**
- * Strip HTML tags that LLMs commonly emit in markdown responses.
- * OpenTUI's <markdown> component doesn't process embedded HTML,
- * so tags like <br> render as literal text.
+ * Normalize LLM markdown output for the OpenTUI <markdown> renderer.
+ *
+ * - Converts <br> tags to newlines (OpenTUI doesn't process HTML)
+ * - Inserts blank lines before pipe tables that aren't already separated
+ *   (marked requires block-level blank line separation)
+ * - Inserts blank lines before fenced code blocks not already separated
+ *
+ * Table detection: matches a header row + delimiter row (|---|---) to avoid
+ * false positives on random pipe characters.
  */
-function fixLineBreaks(text: string): string {
-	return text.replace(/<br\s*\/?>/gi, "\n");
+export function _normalizeContent(text: string): string {
+	// 1. Convert <br> tags to newlines
+	let result = text.replace(/<br\s*\/?>/gi, "\n");
+
+	// 2. Insert blank line before pipe tables not already preceded by a blank line.
+	//    Matches: non-blank line, then a table header row, then a delimiter row.
+	result = result.replace(
+		/([^\n])\n(\|.+\|)\n(\|[\s:]*-[-\s:|]*\|)/g,
+		"$1\n\n$2\n$3",
+	);
+
+	// 3. Insert blank line before opening fenced code blocks not already preceded by a blank line.
+	//    Only matches opening fences (```<lang>) — closing fences (bare ```) are left alone.
+	result = result.replace(/([^\n])\n(```[a-zA-Z])/g, "$1\n\n$2");
+
+	return result;
 }
 
 function RoleBadge({ label, fg }: { label: string; fg: string }) {
@@ -121,8 +141,9 @@ export function Message({ message, streaming }: MessageProps) {
 			>
 				<markdown
 					key={streaming ? "stream" : "final"}
-					content={fixLineBreaks(streaming ? displayContent : content)}
+					content={_normalizeContent(streaming ? displayContent : content)}
 					syntaxStyle={FRIDAY_SYNTAX_STYLE}
+					streaming={!!streaming}
 				/>
 			</box>
 		</box>
