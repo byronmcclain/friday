@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { PALETTE, BOLD, DIM } from "../theme.ts";
 import { lerpColor } from "../lib/color-utils.ts";
 
-const TITLE_TEXT = "◆ F.R.I.D.A.Y.";
+const TITLE_TEXT =
+	process.env.FRIDAY_CONTEXT === "browser" ? "F.R.I.D.A.Y." : "◆ F.R.I.D.A.Y.";
 const SHIMMER_TICK_MS = 60;
 const SHIMMER_RADIUS = 3;
 const PAUSE_MS = 4000;
