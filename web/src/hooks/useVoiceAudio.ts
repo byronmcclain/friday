@@ -86,7 +86,7 @@ export function useVoiceAudio(
     const int16 = new Int16Array(bytes.buffer);
     const float32 = new Float32Array(int16.length);
     for (let i = 0; i < int16.length; i++) {
-      float32[i] = int16[i] / 32768;
+      float32[i] = int16[i]! / 32768;
     }
 
     const buffer = ctx.createBuffer(1, float32.length, 48000);

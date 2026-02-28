@@ -35,32 +35,3 @@ export const STATE_COLORS: Record<VoiceState, StateColor> = {
 };
 
 export const SPARK_COLOR = { r: 139, g: 94, b: 60 };
-
-export const DEMO_RESPONSES = [
-  "I found 3 unread emails from today.",
-  "Your Docker containers are all healthy.",
-  "The build passed. 957 tests, zero failures.",
-  "Checking your calendar... you're free until 3pm.",
-  "I've summarized the PR — 4 files changed, 2 comments.",
-];
-
-export const DEMO_SCHEDULE: Array<{
-  state: VoiceState;
-  duration: number;
-  status: string | null;
-  typewriter: boolean;
-}> = [
-  { state: "idle", duration: 3000, status: "Ready.", typewriter: false },
-  { state: "listening", duration: 3000, status: "Listening...", typewriter: false },
-  { state: "thinking", duration: 2000, status: "Processing...", typewriter: false },
-  { state: "speaking", duration: 4000, status: null, typewriter: true },
-  { state: "idle", duration: 2000, status: "", typewriter: false },
-];
-
-export const STATUS_FOR_STATE: Record<VoiceState, string> = {
-  idle: "Ready.",
-  listening: "Listening...",
-  thinking: "Processing...",
-  speaking: "",
-  error: "Error.",
-};

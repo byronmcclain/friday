@@ -44,11 +44,11 @@ describe("VoiceBridge", () => {
 
     // Should send: session.update, conversation.item.create, response.create
     expect(messages).toHaveLength(3);
-    const item = JSON.parse(messages[1]);
+    const item = JSON.parse(messages[1]!);
     expect(item.type).toBe("conversation.item.create");
     expect(item.item.content[0].text).toBe("Hello world");
 
-    const response = JSON.parse(messages[2]);
+    const response = JSON.parse(messages[2]!);
     expect(response.type).toBe("response.create");
     expect(response.response.modalities).toEqual(["audio"]);
   });
