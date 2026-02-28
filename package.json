@@ -22,7 +22,6 @@
     "serve": "bun run src/main.ts serve"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.48",
     "@ai-sdk/xai": "^3.0.59",
     "@opentui-ui/toast": "^0.0.5",
     "@opentui/core": "^0.1.81",
