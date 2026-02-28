@@ -144,6 +144,14 @@ export class FridayRuntime {
 		return this._fastModel;
 	}
 
+	get summarizer(): ConversationSummarizer | undefined {
+		return this._summarizer;
+	}
+
+	get curator(): SmartsCurator | undefined {
+		return this._curator;
+	}
+
 	async boot(config: RuntimeConfig = {}): Promise<void> {
 		if (this._booting) throw new Error("Boot already in progress");
 		this._booting = true;
