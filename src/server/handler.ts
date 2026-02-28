@@ -4,7 +4,7 @@ import {
 	type ClientMessage,
 	type ServerMessage,
 } from "./protocol.ts";
-import { ClientRegistry } from "./client-registry.ts";
+import type { SessionHub } from "./session-hub.ts";
 import { WebSocketNotificationChannel } from "./ws-channel.ts";
 import { VoiceBridge, type VoiceBridgeConfig } from "../core/voice/bridge.ts";
 import { FRIDAY_VOICE_IDENTITY } from "../core/voice/prompt.ts";
@@ -16,16 +16,16 @@ const VALID_VOICES: ReadonlySet<string> = new Set(["Ara", "Eve", "Rex", "Sal", "
 
 export class WebSocketHandler {
 	private runtime: FridayRuntime;
-	private registry: ClientRegistry;
+	private hub: SessionHub;
 	private clientId: string;
 	private channelName: string;
 	private defaultSend?: SendFn;
 	private voiceBridge: VoiceBridge | null = null;
 	private assistantTranscriptBuffer = "";
 
-	constructor(runtime: FridayRuntime, registry: ClientRegistry, clientId: string) {
+	constructor(runtime: FridayRuntime, hub: SessionHub, clientId: string) {
 		this.runtime = runtime;
-		this.registry = registry;
+		this.hub = hub;
 		this.clientId = clientId;
 		this.channelName = `websocket-${clientId}`;
 	}
@@ -123,14 +123,14 @@ export class WebSocketHandler {
 			capabilities.add("audio-out");
 		}
 
-		this.registry.register({
+		this.defaultSend = send;
+
+		this.hub.registerClient({
 			id: this.clientId,
 			clientType: msg.clientType,
 			send,
 			capabilities,
 		});
-
-		this.defaultSend = send;
 
 		// Wire notification channel for this client (per-client name avoids collisions)
 		if (this.runtime.notifications) {
@@ -153,14 +153,14 @@ export class WebSocketHandler {
 		send: SendFn,
 	): void {
 		// Singleton is already booted. Register client implicitly and respond.
-		if (!this.registry.getById(this.clientId)) {
-			this.registry.register({
+		if (!this.hub.getClientById(this.clientId)) {
+			this.defaultSend = send;
+			this.hub.registerClient({
 				id: this.clientId,
 				clientType: "chat",
 				send,
 				capabilities: new Set(["text"]),
 			});
-			this.defaultSend = send;
 		}
 
 		send({
@@ -198,14 +198,14 @@ export class WebSocketHandler {
 					});
 
 					// Broadcast to other clients
-					this.registry.broadcast(
+					this.hub.broadcast(
 						{
 							type: "conversation:message",
 							role: "user",
 							content: msg.content,
 							source: "chat",
 						},
-						(c) => c.id !== this.clientId,
+						this.clientId,
 					);
 					break;
 				}
@@ -214,14 +214,14 @@ export class WebSocketHandler {
 					const stream = await this.runtime.cortex.chatStream(msg.content);
 
 					// Broadcast user message to other clients
-					this.registry.broadcast(
+					this.hub.broadcast(
 						{
 							type: "conversation:message",
 							role: "user",
 							content: msg.content,
 							source: "chat",
 						},
-						(c) => c.id !== this.clientId,
+						this.clientId,
 					);
 
 					for await (const chunk of stream.textStream) {
@@ -240,14 +240,14 @@ export class WebSocketHandler {
 					});
 
 					// Broadcast assistant response to other clients
-					this.registry.broadcast(
+					this.hub.broadcast(
 						{
 							type: "conversation:message",
 							role: "assistant",
 							content: fullText,
 							source: "chat",
 						},
-						(c) => c.id !== this.clientId,
+						this.clientId,
 					);
 				} catch (streamErr) {
 					const message =
@@ -313,14 +313,14 @@ export class WebSocketHandler {
 								done,
 							});
 							if (done) {
-								this.registry.broadcast(
+								this.hub.broadcast(
 									{
 										type: "conversation:message",
 										role: "assistant",
 										content: this.assistantTranscriptBuffer,
 										source: "voice",
 									},
-									(c) => c.id !== this.clientId,
+									this.clientId,
 								);
 								this.assistantTranscriptBuffer = "";
 							}
@@ -334,14 +334,14 @@ export class WebSocketHandler {
 								delta: text,
 								done: true,
 							});
-							this.registry.broadcast(
+							this.hub.broadcast(
 								{
 									type: "conversation:message",
 									role: "user",
 									content: text,
 									source: "voice",
 								},
-								(c) => c.id !== this.clientId,
+								this.clientId,
 							);
 						},
 					},

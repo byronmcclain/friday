@@ -46,7 +46,7 @@ export function serveCommand(program: Command): void {
 
 			// Start Unix socket server for IPC
 			await mkdir(`${homedir()}/.friday`, { recursive: true });
-			const socketServer = new FridaySocketServer(result.runtime);
+			const socketServer = new FridaySocketServer(result.runtime, result.hub);
 			await socketServer.start();
 
 			// Spawn ttyd for terminal-in-browser
@@ -69,6 +69,7 @@ export function serveCommand(program: Command): void {
 					ttydProc.kill();
 				}
 				await socketServer.stop();
+				await result.hub.saveIfActive();
 				if (result.runtime.isBooted) {
 					await result.runtime.shutdown();
 				}

@@ -1,13 +1,13 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { WebSocketHandler } from "../../src/server/handler.ts";
-import { ClientRegistry } from "../../src/server/client-registry.ts";
+import { SessionHub } from "../../src/server/session-hub.ts";
 import { FridayRuntime } from "../../src/core/runtime.ts";
 import { createMockModel } from "../helpers/stubs.ts";
 import type { ServerMessage } from "../../src/server/protocol.ts";
 
 describe("WebSocketHandler", () => {
 	let runtime: FridayRuntime;
-	let registry: ClientRegistry;
+	let hub: SessionHub;
 	let handler: WebSocketHandler;
 	let sent: ServerMessage[];
 
@@ -18,8 +18,8 @@ describe("WebSocketHandler", () => {
 	beforeEach(async () => {
 		runtime = new FridayRuntime();
 		await runtime.boot({ injectedModel: createMockModel() });
-		registry = new ClientRegistry();
-		handler = new WebSocketHandler(runtime, registry, "test-client");
+		hub = new SessionHub({ runtime });
+		handler = new WebSocketHandler(runtime, hub, "test-client");
 		sent = [];
 	});
 
@@ -58,7 +58,7 @@ describe("WebSocketHandler", () => {
 		expect(ready.capabilities).toContain("text");
 		expect(ready.capabilities).toContain("audio-in");
 		expect(ready.capabilities).toContain("audio-out");
-		expect(registry.count).toBe(1);
+		expect(hub.clientCount).toBe(1);
 	});
 
 	test("handles chat after identify — streams chunks then final response", async () => {

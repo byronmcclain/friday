@@ -5,6 +5,7 @@ export type AppMode = "terminal" | "voice";
 interface MenuBarProps {
 	activeMode: AppMode;
 	onModeChange: (mode: AppMode) => void;
+	connected?: boolean;
 }
 
 const MODES: { mode: AppMode; label: string }[] = [
@@ -61,7 +62,7 @@ function ModeTab({
 	);
 }
 
-export function MenuBar({ activeMode, onModeChange }: MenuBarProps) {
+export function MenuBar({ activeMode, onModeChange, connected }: MenuBarProps) {
 	return (
 		<nav
 			className="menu-bar relative flex items-center h-9 shrink-0 z-50"
@@ -108,8 +109,22 @@ export function MenuBar({ activeMode, onModeChange }: MenuBarProps) {
 					))}
 				</div>
 
-				{/* Right side — expansion area for future items */}
-				<div className="ml-auto flex items-center gap-3" />
+				{/* Right side — status indicator */}
+				<div className="ml-auto flex items-center gap-2">
+					<div
+						className="rounded-full transition-colors duration-500"
+						style={{
+							width: "6px",
+							height: "6px",
+							backgroundColor: connected
+								? "var(--color-friday-success)"
+								: "var(--color-friday-amber-dim)",
+							boxShadow: connected
+								? "0 0 4px rgba(74, 222, 128, 0.4)"
+								: "none",
+						}}
+					/>
+				</div>
 			</div>
 		</nav>
 	);

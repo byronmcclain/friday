@@ -1,22 +1,27 @@
 import { unlink, writeFile } from "node:fs/promises";
 import type { FridayRuntime } from "../core/runtime.ts";
 import { parseClientMessage, type ServerMessage } from "./protocol.ts";
+import type { SessionHub } from "./session-hub.ts";
 
 const DEFAULT_SOCKET_PATH = `${process.env.HOME}/.friday/friday.sock`;
 const DEFAULT_PID_PATH = `${process.env.HOME}/.friday/friday.pid`;
 
 export class FridaySocketServer {
   private runtime: FridayRuntime;
+  private hub: SessionHub;
   private socketPath: string;
   private pidPath: string;
   private server: ReturnType<typeof Bun.listen> | null = null;
+  private socketClients = new Map<unknown, string>();
 
   constructor(
     runtime: FridayRuntime,
+    hub: SessionHub,
     socketPath = DEFAULT_SOCKET_PATH,
     pidPath = DEFAULT_PID_PATH,
   ) {
     this.runtime = runtime;
+    this.hub = hub;
     this.socketPath = socketPath;
     this.pidPath = pidPath;
   }
@@ -32,10 +37,14 @@ export class FridaySocketServer {
     this.server = Bun.listen({
       unix: this.socketPath,
       socket: {
-        open: (_socket) => {
-          // New IPC client connected
+        open: (socket) => {
+          const clientId = crypto.randomUUID();
+          this.socketClients.set(socket, clientId);
         },
         data: (socket, data) => {
+          const clientId = this.socketClients.get(socket);
+          if (!clientId) return;
+
           // Newline-delimited JSON protocol
           const lines = data.toString().split("\n").filter(Boolean);
           for (const line of lines) {
@@ -46,11 +55,15 @@ export class FridaySocketServer {
               socket.write(JSON.stringify(response) + "\n");
             };
 
-            void this.handleMessage(msg, send);
+            void this.handleMessage(msg, send, clientId);
           }
         },
-        close: (_socket) => {
-          // IPC client disconnected
+        close: (socket) => {
+          const clientId = this.socketClients.get(socket);
+          if (clientId) {
+            void this.hub.unregisterClient(clientId);
+            this.socketClients.delete(socket);
+          }
         },
         error: (_socket, _error) => {
           // IPC error — log but don't crash
@@ -71,10 +84,32 @@ export class FridaySocketServer {
   private async handleMessage(
     msg: ReturnType<typeof parseClientMessage> & {},
     send: (msg: ServerMessage) => void,
+    clientId: string,
   ): Promise<void> {
     switch (msg.type) {
-      case "session:identify":
+      case "session:identify": {
+        this.hub.registerClient({
+          id: clientId,
+          clientType: msg.clientType,
+          send,
+          capabilities: new Set(["text"]),
+        });
+        send({
+          type: "session:ready",
+          requestId: msg.id,
+          provider: this.runtime.cortex.providerName,
+          model: this.runtime.cortex.modelName,
+          capabilities: ["text"],
+        });
+        break;
+      }
       case "session:boot": {
+        this.hub.registerClient({
+          id: clientId,
+          clientType: "chat",
+          send,
+          capabilities: new Set(["text"]),
+        });
         send({
           type: "session:ready",
           requestId: msg.id,
@@ -106,11 +141,21 @@ export class FridaySocketServer {
             content: result.output,
             source: result.source,
           });
+          this.hub.broadcast(
+            { type: "conversation:message", role: "user", content: msg.content, source: "chat" },
+            clientId,
+          );
           break;
         }
 
         try {
           const stream = await this.runtime.cortex.chatStream(msg.content);
+
+          this.hub.broadcast(
+            { type: "conversation:message", role: "user", content: msg.content, source: "chat" },
+            clientId,
+          );
+
           for await (const chunk of stream.textStream) {
             send({ type: "chat:chunk", requestId: msg.id, text: chunk });
           }
@@ -121,6 +166,11 @@ export class FridaySocketServer {
             content: fullText,
             source: "cortex",
           });
+
+          this.hub.broadcast(
+            { type: "conversation:message", role: "assistant", content: fullText, source: "chat" },
+            clientId,
+          );
         } catch (err) {
           send({
             type: "error",
