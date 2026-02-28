@@ -23,8 +23,8 @@ export function chatCommand(program: Command): void {
 			"Fast model for utility tasks (summarization, knowledge extraction)",
 		)
 		.option(
-			"--fresh",
-			"Start a fresh session without loading previous conversation",
+			"--no-fresh",
+			"Resume the previous conversation instead of starting fresh",
 		)
 		.action(async function (this: Command, options) {
 			const globalOpts = this.optsWithGlobals();

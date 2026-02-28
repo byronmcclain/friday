@@ -97,6 +97,47 @@ describe("TUI state reducer", () => {
 	test("initialState phase is splash", () => {
 		expect(initialState.phase).toBe("splash");
 	});
+
+	test("chat:chunk creates new assistant message when none exists", () => {
+		const state = appReducer(initialState, { type: "chat:chunk", text: "Hello" });
+		expect(state.messages).toHaveLength(1);
+		expect(state.messages[0]!.role).toBe("assistant");
+		expect(state.messages[0]!.content).toBe("Hello");
+	});
+
+	test("chat:chunk appends to existing assistant message", () => {
+		let state = appReducer(initialState, { type: "chat:chunk", text: "Hel" });
+		state = appReducer(state, { type: "chat:chunk", text: "lo" });
+		expect(state.messages).toHaveLength(1);
+		expect(state.messages[0]!.content).toBe("Hello");
+	});
+
+	test("chat:chunk clears isThinking and sets isStreaming", () => {
+		let state = appReducer(initialState, { type: "set-thinking", value: true });
+		expect(state.isThinking).toBe(true);
+		expect(state.isStreaming).toBe(false);
+		state = appReducer(state, { type: "chat:chunk", text: "Hi" });
+		expect(state.isThinking).toBe(false);
+		expect(state.isStreaming).toBe(true);
+	});
+
+	test("chat:done clears isStreaming", () => {
+		let state = appReducer(initialState, { type: "chat:chunk", text: "Hi" });
+		expect(state.isStreaming).toBe(true);
+		state = appReducer(state, { type: "chat:done" });
+		expect(state.isStreaming).toBe(false);
+	});
+
+	test("chat:chunk creates new message after user message", () => {
+		let state = appReducer(initialState, {
+			type: "add-message",
+			message: createMessage("user", "Question"),
+		});
+		state = appReducer(state, { type: "chat:chunk", text: "Answer" });
+		expect(state.messages).toHaveLength(2);
+		expect(state.messages[1]!.role).toBe("assistant");
+		expect(state.messages[1]!.content).toBe("Answer");
+	});
 });
 
 describe("isExitWord", () => {

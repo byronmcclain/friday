@@ -4,6 +4,7 @@ import {
 	resolveGenesisPath,
 	loadGenesis,
 	seedGenesis,
+	updateGenesis,
 	checkGenesis,
 } from "../../core/genesis.ts";
 
@@ -53,6 +54,17 @@ export function genesisCommand(program: Command): void {
 					chalk.yellow(`${path} already exists — not overwriting`),
 				);
 			}
+		});
+
+	genesis
+		.command("update")
+		.description(
+			"Overwrite GENESIS.md with the latest built-in template",
+		)
+		.action(async () => {
+			const path = resolveGenesisPath();
+			await updateGenesis(path);
+			console.log(chalk.green(`Updated ${path} from built-in template`));
 		});
 
 	genesis

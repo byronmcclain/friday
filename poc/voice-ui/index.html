@@ -6,14 +6,14 @@
   <title>F.R.I.D.A.Y. — Voice Mode</title>
   <style>
     :root {
-      --friday-deep: #0B0E14;
-      --friday-bg: #111620;
-      --friday-surface: #1A1F2E;
-      --friday-amber: #F5A623;
-      --friday-amber-light: #FFCC66;
-      --friday-copper: #E8852A;
-      --friday-text: #E8E0D4;
-      --friday-text-dim: #7A7262;
+      --friday-deep: #0D1117;
+      --friday-bg: #131A24;
+      --friday-surface: #1A2332;
+      --friday-amber: #E8943A;
+      --friday-amber-light: #FFD090;
+      --friday-copper: #C47A3A;
+      --friday-text: #F0E6D8;
+      --friday-text-dim: #6B5540;
       --friday-error: #F87171;
     }
 
@@ -25,7 +25,7 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      background: radial-gradient(ellipse at center, #0B0E14 0%, #080A0F 100%);
+      background: radial-gradient(ellipse at center, #0D1117 0%, #090C12 100%);
       color: var(--friday-text);
       min-height: 100vh;
       display: flex;
@@ -47,27 +47,32 @@
     }
 
     .title {
+      position: fixed;
+      top: 32px;
+      left: 50%;
+      transform: translateX(-50%);
       letter-spacing: 0.3em;
       color: var(--friday-amber);
       font-size: 1.4rem;
       font-weight: 300;
       user-select: none;
-      z-index: 2;
-      margin-bottom: 4px;
+      z-index: 10;
     }
 
     .subtitle {
+      position: fixed;
+      top: 62px;
+      left: 50%;
+      transform: translateX(-50%);
       color: var(--friday-text-dim);
       font-size: 0.85rem;
-      z-index: 2;
-      margin-bottom: 16px;
+      z-index: 10;
     }
 
     .canvas-container {
-      width: min(50vh, 50vw);
-      height: min(50vh, 50vw);
-      position: relative;
-      z-index: 2;
+      position: fixed;
+      inset: 0;
+      z-index: 0;
     }
 
     .canvas-container canvas {
@@ -77,14 +82,17 @@
     }
 
     .status-text {
+      position: fixed;
+      bottom: 140px;
+      left: 50%;
+      transform: translateX(-50%);
       text-align: center;
       color: var(--friday-text);
       font-size: 0.9rem;
       min-height: 1.4em;
-      margin-top: 16px;
       opacity: 0;
       transition: opacity 300ms ease;
-      z-index: 2;
+      z-index: 10;
     }
 
     .status-text.visible {
@@ -115,10 +123,19 @@
     }
 
     .controls {
+      position: fixed;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
       gap: 12px;
-      margin-top: 32px;
-      z-index: 2;
+      z-index: 10;
+      opacity: 0.15;
+      transition: opacity 300ms ease;
+    }
+
+    .controls:hover {
+      opacity: 1;
     }
 
     .pill-btn {
@@ -166,8 +183,7 @@
     .dev-controls {
       position: fixed;
       bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
+      left: 20px;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -175,7 +191,7 @@
       background: var(--friday-surface);
       padding: 8px 16px;
       border-radius: 12px;
-      border: 1px solid rgba(245, 166, 35, 0.15);
+      border: 1px solid rgba(232, 148, 58, 0.15);
     }
 
     .state-btn {
@@ -287,15 +303,15 @@
 
     // --- Constants ---
     const COLORS = {
-      deep: '#0B0E14',
-      amber: '#F5A623',
-      amberLight: '#FFCC66',
-      copper: '#E8852A',
-      text: '#E8E0D4',
-      textDim: '#7A7262',
+      deep: '#0D1117',
+      amber: '#E8943A',
+      amberLight: '#FFD090',
+      copper: '#C47A3A',
+      text: '#F0E6D8',
+      textDim: '#6B5540',
       error: '#F87171',
     };
-    const PARTICLE_COUNT = 150;
+    const PARTICLE_COUNT = 1000;
     const SPHERE_RADIUS = 0.35; // fraction of canvas size
 
     // --- Particle class ---
@@ -318,10 +334,11 @@
         this.vy = 0;
         this.vz = 0;
 
-        this.baseSize = 1.5 + Math.random() * 1.5;
+        this.baseSize = 0.4 + Math.random() * 0.6;
         this.size = this.baseSize;
         this.baseOpacity = 0.5 + Math.random() * 0.5;
         this.opacity = this.baseOpacity;
+        this.sparked = 0;
       }
 
       project(cx, cy, radius) {
@@ -334,23 +351,220 @@
       }
     }
 
+    // --- Particle sprite cache (GPU-friendly: drawImage instead of per-particle gradients) ---
+    const SPRITE_SIZE = 64;
+    const spriteCache = {};
+
+    function getSprite(r, g, b) {
+      const key = `${r},${g},${b}`;
+      if (spriteCache[key]) return spriteCache[key];
+      const c = document.createElement('canvas');
+      c.width = SPRITE_SIZE;
+      c.height = SPRITE_SIZE;
+      const sCtx = c.getContext('2d');
+      const half = SPRITE_SIZE / 2;
+      const grad = sCtx.createRadialGradient(half, half, 0, half, half, half);
+      grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 1)`);
+      grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+      sCtx.fillStyle = grad;
+      sCtx.fillRect(0, 0, SPRITE_SIZE, SPRITE_SIZE);
+      spriteCache[key] = c;
+      return c;
+    }
+
+    // --- Circuit board background (offscreen, drawn once, stamped each frame) ---
+    const circuitCanvas = document.createElement('canvas');
+    const circuitCtx = circuitCanvas.getContext('2d');
+
+    function drawCircuitBoard() {
+      const dpr = window.devicePixelRatio || 1;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      circuitCanvas.width = vw * dpr;
+      circuitCanvas.height = vh * dpr;
+      circuitCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      circuitCtx.clearRect(0, 0, vw, vh);
+
+      const cx = vw / 2;
+      const cy = vh / 2;
+      const maxDist = Math.sqrt(cx * cx + cy * cy);
+
+      // Seeded PRNG for deterministic pattern
+      let seed = 42;
+      function sr() {
+        seed = (seed * 16807) % 2147483647;
+        return (seed - 1) / 2147483646;
+      }
+
+      // Alpha based on distance from center — gentle falloff, stays visible to edges
+      function alphaAt(x, y) {
+        const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+        return Math.max(0.15, 0.7 * (1 - (dist / maxDist) * 0.7));
+      }
+
+      // Draw a line segment with distance-based alpha
+      function traceLine(x1, y1, x2, y2, width, bright) {
+        const midA = alphaAt((x1 + x2) / 2, (y1 + y2) / 2);
+        const a = bright ? Math.min(midA * 1.4, 0.9) : midA;
+        circuitCtx.beginPath();
+        circuitCtx.moveTo(x1, y1);
+        circuitCtx.lineTo(x2, y2);
+        circuitCtx.strokeStyle = `rgba(180, 125, 60, ${a})`;
+        circuitCtx.lineWidth = width;
+        circuitCtx.stroke();
+      }
+
+      // Draw a circular pad/node
+      function drawPad(x, y, r) {
+        const a = alphaAt(x, y);
+        circuitCtx.beginPath();
+        circuitCtx.arc(x, y, r, 0, Math.PI * 2);
+        circuitCtx.fillStyle = `rgba(180, 125, 60, ${a * 0.8})`;
+        circuitCtx.fill();
+      }
+
+      // Perpendicular turn directions
+      function perps(dx, dy) {
+        if (dx !== 0 && dy !== 0) return [{ dx, dy: 0 }, { dx: 0, dy }];
+        if (dx !== 0) return [{ dx: 0, dy: 1 }, { dx: 0, dy: -1 }];
+        return [{ dx: 1, dy: 0 }, { dx: -1, dy: 0 }];
+      }
+
+      // ── LAYER 1: Long radial bus lines from center to edges ──
+      // These are the backbone — like the logo's prominent straight lines
+      const busAngles = [0, 30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330];
+      for (const deg of busAngles) {
+        const rad = deg * Math.PI / 180;
+        const startR = 30 + sr() * 40;
+        const endR = maxDist * (0.7 + sr() * 0.3);
+        const sx = cx + Math.cos(rad) * startR;
+        const sy = cy + Math.sin(rad) * startR;
+        const ex = cx + Math.cos(rad) * endR;
+        const ey = cy + Math.sin(rad) * endR;
+        const isBright = (deg % 90 === 0); // cardinal lines brighter
+        traceLine(sx, sy, ex, ey, isBright ? 1.2 : 0.8, isBright);
+        drawPad(ex, ey, 2.5);
+        drawPad(sx, sy, 2);
+
+        // Parallel companion line (offset perpendicular) — like the logo
+        if (sr() > 0.3) {
+          const px = -Math.sin(rad) * (8 + sr() * 6);
+          const py = Math.cos(rad) * (8 + sr() * 6);
+          const pStartR = startR + 20 + sr() * 40;
+          const pEndR = endR * (0.5 + sr() * 0.4);
+          traceLine(
+            cx + Math.cos(rad) * pStartR + px, cy + Math.sin(rad) * pStartR + py,
+            cx + Math.cos(rad) * pEndR + px, cy + Math.sin(rad) * pEndR + py,
+            0.6, false
+          );
+        }
+      }
+
+      // ── LAYER 2: Branching trace networks from center outward ──
+      const dirs8 = [
+        { dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 },
+        { dx: 1, dy: 1 }, { dx: -1, dy: -1 }, { dx: 1, dy: -1 }, { dx: -1, dy: 1 },
+      ];
+
+      for (const baseDir of dirs8) {
+        const traceCount = 5 + Math.floor(sr() * 4);
+        for (let t = 0; t < traceCount; t++) {
+          let x = cx + baseDir.dx * (30 + sr() * 50);
+          let y = cy + baseDir.dy * (30 + sr() * 50);
+          // Spread traces apart
+          const spread = (t - traceCount / 2) * (10 + sr() * 8);
+          if (baseDir.dx === 0) x += spread;
+          else if (baseDir.dy === 0) y += spread;
+          else { x += spread * 0.5; y -= spread * 0.5; }
+
+          let dx = baseDir.dx, dy = baseDir.dy;
+          const segments = 6 + Math.floor(sr() * 8);
+
+          for (let s = 0; s < segments; s++) {
+            const len = 20 + sr() * 50;
+            const diag = (dx !== 0 && dy !== 0) ? 0.707 : 1;
+            const nx = x + dx * len * diag;
+            const ny = y + dy * len * diag;
+
+            // Allow traces to reach edges
+            if (nx < -20 || nx > vw + 20 || ny < -20 || ny > vh + 20) break;
+
+            traceLine(x, y, nx, ny, 0.7 + sr() * 0.4, false);
+
+            // Node at turn points
+            if (s > 0 && sr() > 0.5) drawPad(x, y, 1.5 + sr() * 1.5);
+
+            x = nx; y = ny;
+
+            // Turn with 50% probability
+            if (sr() > 0.5) {
+              const turns = perps(dx, dy);
+              const pick = turns[Math.floor(sr() * turns.length)];
+              dx = pick.dx; dy = pick.dy;
+            }
+
+            // Branch spur — short perpendicular stub like IC pins
+            if (sr() > 0.65) {
+              const turns = perps(dx, dy);
+              const bd = turns[Math.floor(sr() * turns.length)];
+              const bLen = 10 + sr() * 20;
+              const bDiag = (bd.dx !== 0 && bd.dy !== 0) ? 0.707 : 1;
+              const bx = x + bd.dx * bLen * bDiag;
+              const by = y + bd.dy * bLen * bDiag;
+              traceLine(x, y, bx, by, 0.5, false);
+              drawPad(bx, by, 1.5);
+            }
+          }
+          // End pad
+          drawPad(x, y, 2);
+        }
+      }
+
+      // ── LAYER 3: Short stubs radiating around a "chip" zone near center ──
+      // Mimics the dense pin-grid visible around the icon in the logo
+      const chipRadius = Math.min(vw, vh) * 0.18;
+      for (let i = 0; i < 48; i++) {
+        const angle = (i / 48) * Math.PI * 2 + sr() * 0.1;
+        const innerR = chipRadius + sr() * 15;
+        const outerR = innerR + 15 + sr() * 30;
+        const sx = cx + Math.cos(angle) * innerR;
+        const sy = cy + Math.sin(angle) * innerR;
+        const ex = cx + Math.cos(angle) * outerR;
+        const ey = cy + Math.sin(angle) * outerR;
+        traceLine(sx, sy, ex, ey, 0.6, false);
+        drawPad(ex, ey, 1.5);
+      }
+
+      // ── LAYER 4: Scattered pads in outer regions ──
+      for (let i = 0; i < 40; i++) {
+        const px = sr() * vw;
+        const py = sr() * vh;
+        const dist = Math.sqrt((px - cx) ** 2 + (py - cy) ** 2);
+        if (dist < chipRadius) continue; // skip center
+        drawPad(px, py, 1 + sr() * 2);
+      }
+    }
+
+    drawCircuitBoard();
+    window.addEventListener('resize', () => requestAnimationFrame(drawCircuitBoard));
+
     // --- Canvas setup ---
     const canvas = document.getElementById('orb');
     const ctx = canvas.getContext('2d');
     let centerX, centerY, orbRadius;
 
     function resize() {
-      const container = canvas.parentElement;
-      const rect = container.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      canvas.width = vw * dpr;
+      canvas.height = vh * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      centerX = rect.width / 2;
-      centerY = rect.height / 2;
-      orbRadius = Math.min(rect.width, rect.height) * SPHERE_RADIUS;
+      centerX = vw / 2;
+      centerY = vh / 2;
+      orbRadius = Math.min(vw, vh) * SPHERE_RADIUS;
       ctx.fillStyle = COLORS.deep;
-      ctx.fillRect(0, 0, rect.width, rect.height);
+      ctx.fillRect(0, 0, vw, vh);
     }
 
     window.addEventListener('resize', resize);
@@ -442,7 +656,7 @@
             forceX = (sTargetX - p.x) * 0.001;
             forceY = (sTargetY - p.y) * 0.001;
             forceZ = (sTargetZ - p.z) * 0.001;
-            targetSize = p.baseSize * 1.3;
+            targetSize = p.baseSize * 1.15;
             targetOpacity = 0.8 + Math.sin(time * 4) * 0.2;
             break;
           }
@@ -463,6 +677,14 @@
             break;
           }
         }
+
+        // Random spark — flash a particle bright then let it decay
+        if (!muted && Math.random() < 0.0015) {
+          p.size = p.baseSize * 3;
+          p.opacity = 1;
+          p.sparked = 6; // frames remaining for spark color
+        }
+        if (p.sparked > 0) p.sparked--;
 
         // Whisper modifier
         if (whisperMode) {
@@ -507,12 +729,12 @@
     // --- State color resolver ---
     function getStateColor() {
       switch (currentState) {
-        case STATES.IDLE: return { r: 245, g: 166, b: 35 };       // amber
-        case STATES.LISTENING: return { r: 245, g: 166, b: 35 };   // amber
-        case STATES.THINKING: return { r: 232, g: 133, b: 42 };    // copper
-        case STATES.SPEAKING: return { r: 255, g: 204, b: 102 };   // amber light
+        case STATES.IDLE: return { r: 232, g: 148, b: 58 };       // amber-orange
+        case STATES.LISTENING: return { r: 232, g: 148, b: 58 };   // amber-orange
+        case STATES.THINKING: return { r: 196, g: 122, b: 58 };    // copper
+        case STATES.SPEAKING: return { r: 255, g: 208, b: 144 };   // warm golden
         case STATES.ERROR: return { r: 248, g: 113, b: 113 };      // error red
-        default: return { r: 245, g: 166, b: 35 };
+        default: return { r: 232, g: 148, b: 58 };
       }
     }
 
@@ -560,26 +782,26 @@
         alpha *= 0.5;
       }
 
-      // Outer glow
+      // Outer glow (very subtle)
       ctx.beginPath();
       ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(${colorR}, ${colorG}, ${colorB}, ${alpha * 0.3})`;
-      ctx.lineWidth = lineWidth * 6;
+      ctx.strokeStyle = `rgba(${colorR}, ${colorG}, ${colorB}, ${alpha * 0.15})`;
+      ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Inner ring (sharp)
+      // Inner ring (hair-thin, high contrast)
       ctx.beginPath();
       ctx.arc(centerX, centerY, ringRadius, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(${colorR}, ${colorG}, ${colorB}, ${alpha})`;
-      ctx.lineWidth = lineWidth;
+      ctx.strokeStyle = `rgba(${colorR}, ${colorG}, ${colorB}, ${Math.min(alpha * 2.5, 1)})`;
+      ctx.lineWidth = 0.5;
       ctx.stroke();
 
       // THINKING special: spinning arc segment
       if (currentState === STATES.THINKING) {
         ctx.beginPath();
         ctx.arc(centerX, centerY, ringRadius, time * 3, time * 3 + Math.PI * 0.6);
-        ctx.strokeStyle = `rgba(${colorR}, ${colorG}, ${colorB}, 0.8)`;
-        ctx.lineWidth = lineWidth * 1.5;
+        ctx.strokeStyle = `rgba(${colorR}, ${colorG}, ${colorB}, ${Math.min(alpha * 3, 1)})`;
+        ctx.lineWidth = 0.8;
         ctx.stroke();
       }
 
@@ -587,12 +809,86 @@
       if (currentState === STATES.SPEAKING) {
         const pulsePhase = (time * 2) % 1;
         const pulseRadius = ringRadius + pulsePhase * orbRadius * 0.3;
-        const pulseAlpha = alpha * (1 - pulsePhase);
+        const pulseAlpha = Math.min(alpha * 2.5, 1) * (1 - pulsePhase);
         ctx.beginPath();
         ctx.arc(centerX, centerY, pulseRadius, 0, Math.PI * 2);
         ctx.strokeStyle = `rgba(${colorR}, ${colorG}, ${colorB}, ${pulseAlpha})`;
-        ctx.lineWidth = lineWidth * (1 - pulsePhase);
+        ctx.lineWidth = 0.5;
         ctx.stroke();
+      }
+    }
+
+    // --- Electron arcs ---
+    const arcs = [];
+    const ARC_SEGMENTS = 6;
+    const ARC_MAX_LIFE = 12; // frames
+
+    function spawnArc() {
+      // Pick two random front-facing particles
+      const frontParticles = particles.filter(p => p.z > 0);
+      if (frontParticles.length < 2) return;
+      const a = frontParticles[Math.floor(Math.random() * frontParticles.length)];
+      let b = a;
+      // Pick a nearby-ish second particle (not the same one)
+      for (let tries = 0; tries < 10; tries++) {
+        b = frontParticles[Math.floor(Math.random() * frontParticles.length)];
+        const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist > 0.15 && dist < 0.8) break; // sweet spot distance
+      }
+      if (a === b) return;
+
+      // Project endpoints
+      const pa = a.project(centerX, centerY, orbRadius);
+      const pb = b.project(centerX, centerY, orbRadius);
+
+      // Build zig-zag points between pa and pb
+      const points = [{ x: pa.px, y: pa.py }];
+      for (let i = 1; i < ARC_SEGMENTS; i++) {
+        const t = i / ARC_SEGMENTS;
+        const mx = pa.px + (pb.px - pa.px) * t;
+        const my = pa.py + (pb.py - pa.py) * t;
+        // Perpendicular offset for zig-zag
+        const dx = pb.px - pa.px;
+        const dy = pb.py - pa.py;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        const nx = -dy / len;
+        const ny = dx / len;
+        const jitter = (Math.random() - 0.5) * len * 0.3;
+        points.push({ x: mx + nx * jitter, y: my + ny * jitter });
+      }
+      points.push({ x: pb.px, y: pb.py });
+
+      arcs.push({ points, life: ARC_MAX_LIFE });
+    }
+
+    function drawArcs() {
+      for (let i = arcs.length - 1; i >= 0; i--) {
+        const arc = arcs[i];
+        const fade = arc.life / ARC_MAX_LIFE;
+
+        // Glow layer
+        ctx.beginPath();
+        ctx.moveTo(arc.points[0].x, arc.points[0].y);
+        for (let j = 1; j < arc.points.length; j++) {
+          ctx.lineTo(arc.points[j].x, arc.points[j].y);
+        }
+        ctx.strokeStyle = `rgba(139, 94, 60, ${fade * 0.12})`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Sharp core
+        ctx.beginPath();
+        ctx.moveTo(arc.points[0].x, arc.points[0].y);
+        for (let j = 1; j < arc.points.length; j++) {
+          ctx.lineTo(arc.points[j].x, arc.points[j].y);
+        }
+        ctx.strokeStyle = `rgba(232, 168, 90, ${fade * 0.32})`;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        arc.life--;
+        if (arc.life <= 0) arcs.splice(i, 1);
       }
     }
 
@@ -605,40 +901,49 @@
 
       updateParticles(dt);
 
-      const dpr = window.devicePixelRatio || 1;
-      const w = canvas.width / dpr;
-      const h = canvas.height / dpr;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
 
       // Trail effect
-      ctx.fillStyle = 'rgba(11, 14, 20, 0.15)';
+      ctx.fillStyle = 'rgba(13, 17, 23, 0.15)';
       ctx.fillRect(0, 0, w, h);
+
+      // Stamp circuit board background each frame (counteracts trail fade to maintain visibility)
+      ctx.globalAlpha = 0.06;
+      ctx.drawImage(circuitCanvas, 0, 0, w, h);
+      ctx.globalAlpha = 1;
 
       // Sort back to front
       particles.sort((a, b) => a.z - b.z);
 
-      // Get state color once per frame
+      // Get state color + cached sprites once per frame
       const stateColor = getStateColor();
+      const sprite = getSprite(stateColor.r, stateColor.g, stateColor.b);
+      const sparkSprite = getSprite(139, 94, 60); // copper-bronze for sparks
 
       ctx.globalCompositeOperation = 'lighter';
 
       for (const p of particles) {
         const { px, py, depth, scale } = p.project(centerX, centerY, orbRadius);
-        const size = p.size * scale * (orbRadius / 80);
+        const size = p.size * scale * (orbRadius / 140);
         const alpha = p.opacity * (0.3 + depth * 0.7);
 
         if (size < 0.2) continue;
 
-        const grad = ctx.createRadialGradient(px, py, 0, px, py, size * 2);
-        grad.addColorStop(0, `rgba(${stateColor.r}, ${stateColor.g}, ${stateColor.b}, ${alpha})`);
-        grad.addColorStop(1, `rgba(${stateColor.r}, ${stateColor.g}, ${stateColor.b}, 0)`);
-
-        ctx.beginPath();
-        ctx.arc(px, py, size * 2, 0, Math.PI * 2);
-        ctx.fillStyle = grad;
-        ctx.fill();
+        const drawSize = size * 2.4;
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(p.sparked > 0 ? sparkSprite : sprite, px - drawSize, py - drawSize, drawSize * 2, drawSize * 2);
       }
+      ctx.globalAlpha = 1;
 
       ctx.globalCompositeOperation = 'source-over';
+
+      // Spawn occasional electron arcs (idle, listening, speaking only)
+      const arcStates = [STATES.IDLE, STATES.LISTENING, STATES.SPEAKING];
+      if (!muted && !sessionEnded && arcStates.includes(currentState) && Math.random() < 0.03) {
+        spawnArc();
+      }
+      drawArcs();
 
       // Draw ring glow after particles
       const time = performance.now() * 0.001;

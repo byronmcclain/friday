@@ -118,6 +118,30 @@ export class SocketBridge implements RuntimeBridge {
     });
   }
 
+  /** Ask the server for its actual provider and model names. */
+  async identify(): Promise<{ provider: string; model: string }> {
+    const requestId = crypto.randomUUID();
+
+    return new Promise((resolve, reject) => {
+      this.pendingCallbacks.set(requestId, {
+        onComplete: (msg) => {
+          this.pendingCallbacks.delete(requestId);
+          if (msg.type === "session:ready") {
+            resolve({ provider: msg.provider, model: msg.model });
+          } else {
+            resolve({ provider: "unknown", model: "unknown" });
+          }
+        },
+        onError: (err) => {
+          this.pendingCallbacks.delete(requestId);
+          reject(err);
+        },
+      });
+
+      this.send({ type: "session:identify", id: requestId, clientType: "tui" });
+    });
+  }
+
   isBooted(): boolean {
     return this.connected;
   }

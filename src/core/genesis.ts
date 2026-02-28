@@ -57,6 +57,17 @@ export async function seedGenesis(path: string): Promise<boolean> {
 	return true;
 }
 
+/**
+ * Overwrite GENESIS.md with the current built-in template.
+ * Creates the file if it doesn't exist. Sets permissions to 600.
+ */
+export async function updateGenesis(path: string): Promise<void> {
+	const dir = dirname(path);
+	await mkdir(dir, { recursive: true, mode: 0o700 });
+	await Bun.write(path, GENESIS_TEMPLATE);
+	await chmod(path, 0o600);
+}
+
 export interface GenesisCheckResult {
 	ok: boolean;
 	issues?: string[];

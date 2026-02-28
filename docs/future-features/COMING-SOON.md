@@ -13,3 +13,21 @@ Trim long audit log entries in the default display so the log stays clean and sc
 ## Sub-Friday Spawning (Mother Friday)
 
 Allow the main Friday instance to spawn child Fridays that work on tasks in parallel. The primary Friday acts as the "mom" — she delegates subtasks to spawned child instances, monitors their progress, and collects their results. Each child Friday operates independently on its assigned work but reports back to the parent. Mother Friday orchestrates the whole operation: breaking down complex requests, dispatching children, handling failures, and assembling the final outcome. A parent-child hierarchy that lets Friday scale herself out when the workload demands it.
+
+## Visor — Dynamic HUD Overlay
+
+Give Friday an Iron Man-style heads-up display. The Visor is a dynamic UI layer that directives can activate on the fly — alert banners, confirmation dialogs, text inputs, selection lists, and progress bars that appear over the chat interface without interrupting the conversation flow. Think of it as Friday's helmet display: contextual information and interactive controls that surface exactly when a directive needs them.
+
+Any directive action can attach a HUD side-effect with a timing hint: **before** (gate the action behind a confirmation or input), **during** (show a progress bar while the action runs), or **after** (display a result alert once the action completes). This keeps HUD behavior composable — a "push to remote" directive can require a tap-to-confirm before executing, while a "run test suite" directive can show a live progress bar.
+
+Five fixed widget templates cover the use cases:
+
+- **Alert** — A directive-triggered banner (info, warning, or critical) with an optional auto-dismiss timer. Styled in the Friday amber palette: copper borders, amber text, matching the existing Header and LogPanel aesthetic.
+- **Confirm** — A yes/no decision gate. BOSS taps a button instead of having to say "yes" aloud.
+- **Text Input** — A single text field for structured input: branch names, commit messages, search queries. Optional regex validation.
+- **Select** — Pick from a list of labeled options: choose a branch, a label, a deployment target.
+- **Progress** — A horizontal gauge with percentage and status (running, done, failed) for long-running directives.
+
+The real power is the voice-mode synergy. When Vox is active and BOSS is speaking to Friday, the Visor gives him a tactile fallback — Friday says "I need a target branch, check the HUD" and a text-input widget appears in the TUI or Web UI. BOSS types instead of dictating. Form responses flow back through the bridge to resolve the directive's pending request, so the action sequence continues seamlessly.
+
+Under the hood, a `VisorManager` core subsystem (MCU name: **Visor**) manages an ordered stack of active widgets with max-concurrency limits and TTL-based auto-dismiss. It boots after Vox and before Cortex so both directives and Cortex tools can trigger HUD elements. Both the TUI (OpenTUI `HudOverlay` component) and the Web UI (React `HudLayer` floating cards) subscribe to the same VisorManager events via their respective bridges, keeping rendering fully decoupled from logic. The WebSocket protocol gains `hud:show`, `hud:dismiss`, `hud:update`, and `hud:response` message types.

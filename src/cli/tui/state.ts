@@ -14,6 +14,7 @@ export interface AppState {
 	phase: "splash" | "booting" | "active" | "shutting-down";
 	messages: Message[];
 	isThinking: boolean;
+	isStreaming: boolean;
 	welcomeInfo?: WelcomeInfo;
 	logPanelVisible: boolean;
 }
@@ -21,6 +22,7 @@ export interface AppState {
 export type AppAction =
 	| { type: "add-message"; message: Message }
 	| { type: "chat:chunk"; text: string }
+	| { type: "chat:done" }
 	| { type: "set-thinking"; value: boolean }
 	| { type: "set-phase"; phase: AppState["phase"] }
 	| { type: "set-welcome"; info: WelcomeInfo }
@@ -31,6 +33,7 @@ export const initialState: AppState = {
 	phase: "splash",
 	messages: [],
 	isThinking: false,
+	isStreaming: false,
 	logPanelVisible: false,
 };
 
@@ -51,8 +54,10 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 					timestamp: new Date(),
 				});
 			}
-			return { ...state, messages: msgs };
+			return { ...state, messages: msgs, isThinking: false, isStreaming: true };
 		}
+		case "chat:done":
+			return { ...state, isStreaming: false };
 		case "set-thinking":
 			return { ...state, isThinking: action.value };
 		case "set-phase":

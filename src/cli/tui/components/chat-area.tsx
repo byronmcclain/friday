@@ -18,10 +18,11 @@ function TurnSeparator() {
 interface ChatAreaProps {
 	messages: MessageType[];
 	isThinking: boolean;
+	isStreaming: boolean;
 	welcomeInfo?: WelcomeInfo;
 }
 
-export function ChatArea({ messages, isThinking, welcomeInfo }: ChatAreaProps) {
+export function ChatArea({ messages, isThinking, isStreaming, welcomeInfo }: ChatAreaProps) {
 	const hasUserMessage = messages.some((m) => m.role === "user");
 
 	// Build elements with turn separators between conversation turns
@@ -35,7 +36,9 @@ export function ChatArea({ messages, isThinking, welcomeInfo }: ChatAreaProps) {
 				elements.push(<TurnSeparator key={`sep-${msg.id}`} />);
 			}
 		}
-		elements.push(<Message key={msg.id} message={msg} />);
+		// Only the last assistant message can be actively streaming
+		const streaming = isStreaming && msg.role === "assistant" && i === messages.length - 1;
+		elements.push(<Message key={msg.id} message={msg} streaming={streaming} />);
 	}
 
 	return (

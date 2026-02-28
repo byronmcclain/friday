@@ -20,6 +20,10 @@
   --color-friday-error: #F87171;
 }
 
+html, body, #root {
+  height: 100%;
+}
+
 body {
   margin: 0;
   font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
@@ -52,3 +56,38 @@ body {
 .voice-ellipsis span:nth-child(1) { animation-delay: 0s; }
 .voice-ellipsis span:nth-child(2) { animation-delay: 0.2s; }
 .voice-ellipsis span:nth-child(3) { animation-delay: 0.4s; }
+
+/* ─── Menu bar ─────────────────────────────────────────────── */
+
+/* Diamond icon pulse — Friday's heartbeat */
+@keyframes diamond-pulse {
+  0%, 100% {
+    opacity: 0.8;
+    filter: drop-shadow(0 0 2px rgba(245, 166, 35, 0.2));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 6px rgba(245, 166, 35, 0.5));
+  }
+}
+
+.friday-diamond {
+  animation: diamond-pulse 3s ease-in-out infinite;
+}
+
+/* Bottom glow line — amber HUD divider, bright center, fading edges */
+.menu-glow-line {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(232, 148, 58, 0.15) 15%,
+    rgba(245, 166, 35, 0.35) 50%,
+    rgba(232, 148, 58, 0.15) 85%,
+    transparent 100%
+  );
+}
+
+/* Mode tab hover */
+.menu-tab:hover {
+  color: var(--color-friday-text) !important;
+  background: rgba(245, 166, 35, 0.05) !important;
+}

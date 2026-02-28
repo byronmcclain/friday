@@ -151,17 +151,28 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 
 					if (cancelled) return;
 
+					// Query the server for actual provider/model info
+					let runtimeProvider = options.provider;
+					let runtimeModel = options.model ?? "...";
+					try {
+						const info = await socketBridge.identify();
+						runtimeProvider = info.provider;
+						runtimeModel = info.model;
+					} catch {
+						// Identification failed — use CLI options as fallback
+					}
+
 					dispatch({
 						type: "set-welcome",
-						info: { provider: options.provider, model: options.model ?? "singleton" },
+						info: { provider: runtimeProvider, model: runtimeModel },
 					});
 					dispatch({
 						type: "add-message",
-						message: createMessage("system", "Connected to singleton runtime."),
+						message: createMessage("system", `Connected to singleton runtime. (${runtimeProvider}: ${runtimeModel})`),
 					});
 					if (cancelled) return;
 					setBootComplete(true);
-					pushLog("success", "runtime", "Connected to singleton runtime.");
+					pushLog("success", "runtime", `Connected to singleton runtime. (${runtimeProvider}: ${runtimeModel})`);
 				} catch (error) {
 					if (cancelled) return;
 					const msg =
@@ -384,13 +395,14 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 						message: createMessage("assistant", result.output),
 					});
 				} else {
-					// Streaming path — dispatch chunks as they arrive
+					// Streaming path — dispatch chunks as they arrive.
+					// isThinking stays true until chat:chunk clears it (first token).
 					const stream = bridge.chat(input);
-					dispatch({ type: "set-thinking", value: false });
 
 					for await (const chunk of stream) {
 						dispatch({ type: "chat:chunk", text: chunk });
 					}
+					dispatch({ type: "chat:done" });
 				}
 
 				// Forge restart check (only applies to local runtime)
@@ -519,7 +531,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 	}
 
 	// Determine input state
-	const inputDisabled = state.phase !== "active" || state.isThinking;
+	const inputDisabled = state.phase !== "active" || state.isThinking || state.isStreaming;
 	const placeholder =
 		state.phase === "booting"
 			? "Booting..."
@@ -527,14 +539,14 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 				? "Shutting down..."
 				: "Type a message or /command...";
 
-	// Provider info for header
+	// Provider info for header — prefer runtime (local), then welcomeInfo (singleton), then CLI options
 	const headerRuntime = runtimeRef.current;
 	const provider = headerRuntime?.isBooted
 		? headerRuntime.cortex.providerName
-		: options.provider;
+		: (state.welcomeInfo?.provider ?? options.provider);
 	const model = headerRuntime?.isBooted
 		? headerRuntime.cortex.modelName
-		: (options.model ?? (options.socketPath ? "singleton" : "..."));
+		: (state.welcomeInfo?.model ?? options.model ?? "...");
 
 	const panelWidth = Math.min(60, Math.floor(renderer.width * 0.3));
 
@@ -553,6 +565,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 					<ChatArea
 						messages={state.messages}
 						isThinking={state.isThinking}
+						isStreaming={state.isStreaming}
 						welcomeInfo={state.welcomeInfo}
 					/>
 					<InputBar
