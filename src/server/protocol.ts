@@ -1,4 +1,3 @@
-import type { ProviderName } from "../core/types.ts";
 import type { SignalName } from "../core/events.ts";
 
 // ─── Client → Server ────────────────────────────────────────────
@@ -9,7 +8,6 @@ export type ClientMessage =
 	| {
 			type: "session:boot";
 			id: string;
-			provider?: ProviderName;
 			model?: string;
 			fastModel?: string;
 			fresh?: boolean;
@@ -41,7 +39,7 @@ export type ServerMessage =
 			content: string;
 			success: boolean;
 	  }
-	| { type: "session:booted"; requestId: string; provider: string; model: string; fastModel: string }
+	| { type: "session:booted"; requestId: string; model: string; fastModel: string }
 	| { type: "session:closed"; requestId: string }
 	| { type: "history:result"; requestId: string; data: unknown }
 	| { type: "smarts:result"; requestId: string; data: unknown }
@@ -60,7 +58,7 @@ export type ServerMessage =
 			source: string;
 	  }
 	| { type: "error"; requestId?: string; code: string; message: string }
-	| { type: "session:ready"; requestId: string; provider: string; model: string; capabilities: string[] }
+	| { type: "session:ready"; requestId: string; model: string; capabilities: string[] }
 	| { type: "session:protocols"; requestId: string; protocols: { name: string; description: string; aliases?: string[] }[] }
 	| { type: "voice:state"; state: "idle" | "listening" | "thinking" | "speaking" | "error" }
 	| { type: "voice:transcript"; role: "user" | "assistant"; delta: string; done: boolean }

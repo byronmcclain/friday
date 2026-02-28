@@ -97,7 +97,6 @@ export class FridaySocketServer {
         send({
           type: "session:ready",
           requestId: msg.id,
-          provider: this.runtime.cortex.providerName,
           model: this.runtime.cortex.modelName,
           capabilities: ["text"],
         });
@@ -113,7 +112,6 @@ export class FridaySocketServer {
         send({
           type: "session:ready",
           requestId: msg.id,
-          provider: this.runtime.cortex.providerName,
           model: this.runtime.cortex.modelName,
           capabilities: ["text"],
         });

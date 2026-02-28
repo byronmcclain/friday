@@ -142,7 +142,6 @@ export class WebSocketHandler {
 		send({
 			type: "session:ready",
 			requestId: msg.id,
-			provider: this.runtime.cortex.providerName,
 			model: this.runtime.cortex.modelName,
 			capabilities: [...capabilities],
 		});
@@ -166,7 +165,6 @@ export class WebSocketHandler {
 		send({
 			type: "session:booted",
 			requestId: msg.id,
-			provider: this.runtime.cortex.providerName,
 			model: this.runtime.cortex.modelName,
 			fastModel: this.runtime.fastModel,
 		});
