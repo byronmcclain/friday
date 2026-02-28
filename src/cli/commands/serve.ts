@@ -63,19 +63,34 @@ export function serveCommand(program: Command): void {
 				),
 			);
 
+			let shuttingDown = false;
 			const shutdown = async () => {
-				console.log(chalk.hex("#8B6914")("\nShutting down server..."));
-				if (ttydProc) {
-					ttydProc.kill();
+				if (shuttingDown) return;
+				shuttingDown = true;
+
+				// Hard timeout — if graceful shutdown hangs, force exit
+				const forceExit = setTimeout(() => {
+					console.error(chalk.red("\nShutdown timed out — forcing exit"));
+					process.exit(1);
+				}, 15_000);
+				forceExit.unref();
+
+				try {
+					console.log(chalk.hex("#8B6914")("\nShutting down server..."));
+					if (ttydProc) {
+						ttydProc.kill();
+					}
+					await socketServer.stop();
+					await result.hub.saveIfActive();
+					if (result.runtime.isBooted) {
+						await result.runtime.shutdown();
+					}
+					result.server.stop(true);
+				} catch (err) {
+					console.warn(chalk.yellow("Shutdown error:"), err instanceof Error ? err.message : err);
+				} finally {
+					process.exit(0);
 				}
-				await socketServer.stop();
-				await result.hub.saveIfActive();
-				if (result.runtime.isBooted) {
-					await result.runtime.shutdown();
-				}
-				result.server.stop(true);
-				await new Promise((r) => setTimeout(r, 1000));
-				process.exit(0);
 			};
 			process.on("SIGINT", () => void shutdown());
 			process.on("SIGTERM", () => void shutdown());

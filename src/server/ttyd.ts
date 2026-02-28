@@ -39,7 +39,7 @@ export async function spawnTtyd(config: TtydConfig): Promise<Subprocess | null> 
   ];
 
   const proc = spawn([ttydPath, ...args], {
-    stdio: ["ignore", "inherit", "inherit"],
+    stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env, FRIDAY_CONTEXT: "browser" },
   });
 
