@@ -2,11 +2,7 @@ import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { streamText, tool as aiTool, stepCountIs } from "ai";
 import type { FridayConfig, ConversationMessage } from "./types.ts";
 import { GENESIS_TEMPLATE } from "./prompts.ts";
-import {
-	createModel,
-	DEFAULT_PROVIDER,
-	PROVIDER_DEFAULTS,
-} from "../providers/index.ts";
+import { createModel, GROK_DEFAULTS } from "../providers/index.ts";
 import type { FridayTool } from "../modules/types.ts";
 import type { ClearanceManager } from "./clearance.ts";
 import type { SmartsStore } from "../smarts/store.ts";
@@ -40,7 +36,6 @@ export class Cortex {
 	private historyManager: HistoryManager;
 
 	// Shared
-	private _providerName: string;
 	private _modelName: string;
 	private maxTokens: number;
 	private tools: Map<string, FridayTool> = new Map();
@@ -59,13 +54,11 @@ export class Cortex {
 	private debugResponsePath?: string;
 
 	constructor(config: CortexConfig = {}) {
-		const providerName = config.provider ?? DEFAULT_PROVIDER;
-		this._modelName = config.model ?? PROVIDER_DEFAULTS[providerName].model;
+		this._modelName = config.model ?? GROK_DEFAULTS.model;
 		this.maxTokens = config.maxTokens ?? 12288;
 		this.maxToolIterations = config.maxToolIterations ?? 10;
 
-		this.aiModel = config.injectedModel ?? createModel(providerName, this._modelName);
-		this._providerName = providerName;
+		this.aiModel = config.injectedModel ?? createModel(this._modelName);
 
 		this.historyManager = new HistoryManager({ maxTokens: 128000 });
 		this.clearance = config.clearance;
@@ -81,10 +74,6 @@ export class Cortex {
 			this.debugPayloadPath = `${config.projectRoot}/last-inference-payload.log`;
 			this.debugResponsePath = `${config.projectRoot}/last-inference-response.log`;
 		}
-	}
-
-	get providerName(): string {
-		return this._providerName;
 	}
 
 	get modelName(): string {

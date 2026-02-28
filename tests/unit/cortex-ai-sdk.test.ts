@@ -96,14 +96,6 @@ describe("Cortex (AI SDK)", () => {
 		expect(debugEntry).toBeDefined();
 	});
 
-	test("providerName returns configured provider", () => {
-		const cortex = new Cortex({
-			injectedModel: createMockModel(),
-			provider: "grok",
-		});
-		expect(cortex.providerName).toBe("grok");
-	});
-
 	test("modelName returns configured model", () => {
 		const cortex = new Cortex({
 			injectedModel: createMockModel(),

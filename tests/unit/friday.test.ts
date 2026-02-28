@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { GENESIS_TEMPLATE } from "../../src/core/prompts.ts";
 import { Cortex } from "../../src/core/cortex.ts";
-import { PROVIDER_DEFAULTS } from "../../src/providers/index.ts";
+import { GROK_DEFAULTS } from "../../src/providers/index.ts";
 import { SmartsStore } from "../../src/smarts/store.ts";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 import { mkdir, writeFile, rm, unlink } from "node:fs/promises";
@@ -28,14 +28,9 @@ describe("Cortex", () => {
     expect(GENESIS_TEMPLATE).toContain("Friday");
   });
 
-  test("defaults to grok provider", () => {
-    const cortex = new Cortex({ injectedModel: createMockModel(), provider: "grok" });
-    expect(cortex.providerName).toBe("grok");
-  });
-
   test("defaults to grok-4-1-fast-reasoning-latest model", () => {
-    const cortex = new Cortex({ injectedModel: createMockModel(), provider: "grok" });
-    expect(cortex.modelName).toBe(PROVIDER_DEFAULTS.grok.model);
+    const cortex = new Cortex({ injectedModel: createMockModel() });
+    expect(cortex.modelName).toBe(GROK_DEFAULTS.model);
   });
 
   test("accepts custom model", () => {
