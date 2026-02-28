@@ -9,7 +9,6 @@ function createMockRuntime(history: { role: string; content: string }[] = []) {
 			clearHistory: () => {
 				history.length = 0;
 			},
-			providerName: "test-provider",
 			modelName: "test-model",
 		},
 		memory: {

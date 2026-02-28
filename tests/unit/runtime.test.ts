@@ -388,7 +388,7 @@ describe("FridayRuntime — Sensorium integration", () => {
 });
 
 describe("FridayRuntime — dual-model architecture", () => {
-	test("fastModel returns provider default when no override", async () => {
+	test("fastModel returns GROK_DEFAULTS when no override", async () => {
 		const runtime = new FridayRuntime();
 		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.fastModel).toBe(GROK_DEFAULTS.fastModel);

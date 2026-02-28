@@ -14,7 +14,7 @@ export function serveCommand(program: Command): void {
 		.command("serve")
 		.description("Start the Friday web UI server")
 		.option("--port <port>", "Port to listen on", "3000")
-		.option("-m, --model <model>", "Default model (defaults per provider)")
+		.option("-m, --model <model>", "Override reasoning model")
 		.action(async function (this: Command, options) {
 			const globalOpts = this.optsWithGlobals();
 			const port = Number.parseInt(options.port, 10);

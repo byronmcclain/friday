@@ -38,7 +38,7 @@ describe("WebSocketHandler", () => {
 
 	test("handles legacy session:boot by responding with session:booted", async () => {
 		await handler.handle(
-			'{"type":"session:boot","id":"1","provider":"grok"}',
+			'{"type":"session:boot","id":"1"}',
 			mockSend,
 		);
 		expect(sent).toHaveLength(1);
