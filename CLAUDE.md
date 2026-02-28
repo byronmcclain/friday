@@ -134,6 +134,7 @@ src/
 │   ├── index.ts           # Bun.serve() HTTP + WebSocket server
 │   ├── protocol.ts        # Shared message types (ClientMessage, ServerMessage, voice messages)
 │   ├── handler.ts         # WebSocketHandler — message routing to FridayRuntime
+│   ├── session-hub.ts     # SessionHub — session lifecycle, hydration, cross-client sync
 │   ├── client-registry.ts # ClientRegistry — multi-client WebSocket tracking
 │   ├── socket.ts          # Unix socket server for singleton IPC (~/.friday/friday.sock)
 │   ├── ttyd.ts            # Terminal-in-browser support (spawns ttyd on port 7681)
@@ -183,7 +184,8 @@ tests/
 | **Arc Rhythm** | `src/arc-rhythm/` | 60s scheduler tick. Auto-pause after 5 failures. Shares Memory's SQLite via `memory.database`. |
 | **The Forge** | `src/modules/forge/` | Self-improvement. Failed modules don't crash boot. Filesystem module + Forge are core-protected. |
 | **Bridges** | `src/core/bridges/` | Singleton mode IPC. `LocalBridge` (in-process) / `SocketBridge` (Unix socket to server). |
-| **Server** | `src/server/` | HTTP + WebSocket + Unix socket. ClientRegistry tracks clients. ttyd for terminal-in-browser. |
+| **SessionHub** | `src/server/session-hub.ts` | Session lifecycle for singleton. Hydrates clients on connect, saves on last disconnect, reconnect guard. Unified ClientRegistry across transports. |
+| **Server** | `src/server/` | HTTP + WebSocket + Unix socket. SessionHub coordinates session lifecycle. ttyd for terminal-in-browser. |
 
 **Boot order:** SignalBus → ClearanceManager → AuditLogger → NotificationManager → ProtocolRegistry → DirectiveStore/Engine → Memory → SmartsStore → Sensorium → Genesis → Vox → Cortex → Recall Tool → Arc Rhythm → Modules → `session:start`
 
@@ -198,11 +200,12 @@ tests/
 - **Gmail**: send/reply tools require `"email-send"` clearance. OAuth tokens encrypted via `SecretStore` (AES-256-GCM).
 - **Debug logging**: `--debug` writes `last-inference-payload.log` + `last-inference-response.log` — cleared per `Cortex.chat()`, round-appended. Config chain: CLI → `RuntimeConfig.debug` → `CortexConfig.debug`.
 - **Singleton mode**: `friday serve` writes PID + socket files; `friday chat` auto-detects and connects via `SocketBridge`
+- **SessionHub**: Owns client lifecycle in server mode. Both WebSocket and Unix socket transports register/unregister via hub. History hydrated on connect via `conversation:message` with `source: "replay"`. Saves conversation + clears history on last client disconnect. Reconnect guard prevents clearing if a new client connects during save.
 - **Protected paths**: `isProtectedPath()` in `src/modules/filesystem/containment.ts` — blocks writes to Genesis and core modules
 
 ## Testing
 
-- 949 tests across 94 files (as of 2026-02-28)
+- 964 tests across 96 files (as of 2026-02-28)
 - Tests use `injectedModel: createMockModel()` (AI SDK `MockLanguageModelV3` from `ai/test` with call capture via `.doStreamCalls`/`.doGenerateCalls`)
 - Use `createErrorModel()` for models that throw on `doGenerate`/`doStream`
 - Shared test stubs live in `tests/helpers/stubs.ts`

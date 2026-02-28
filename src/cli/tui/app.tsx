@@ -151,6 +151,15 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 					await socketBridge.connect();
 					bridgeRef.current = socketBridge;
 
+					// Wire conversation sync — receives both history replay and live messages from other clients
+					socketBridge.onConversationMessage = (msg) => {
+						if (cancelled) return;
+						dispatch({
+							type: "add-message",
+							message: createMessage(msg.role as "user" | "assistant", msg.content),
+						});
+					};
+
 					if (cancelled) return;
 
 					// Query the server for actual provider/model info

@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { FridayRuntime, type RuntimeConfig } from "../core/runtime.ts";
 import { WebSocketHandler, type SendFn } from "./handler.ts";
-import { ClientRegistry } from "./client-registry.ts";
+import { SessionHub } from "./session-hub.ts";
 import type { ServerMessage } from "./protocol.ts";
 import type { ServerWebSocket } from "bun";
 
@@ -33,7 +33,11 @@ export async function createFridayServer(config: FridayServerConfig) {
 		...config.runtimeConfig,
 	});
 
-	const registry = new ClientRegistry();
+	const hub = new SessionHub({
+		runtime,
+		summarizer: runtime.summarizer,
+		curator: runtime.curator,
+	});
 	const pushIntervals = new Map<string, ReturnType<typeof setInterval>>();
 
 	const server = Bun.serve<WSData>({
@@ -48,12 +52,12 @@ export async function createFridayServer(config: FridayServerConfig) {
 					return new Response("Forbidden: invalid origin", { status: 403 });
 				}
 
-				if (registry.count >= MAX_CONNECTIONS) {
+				if (hub.clientCount >= MAX_CONNECTIONS) {
 					return new Response("Service Unavailable: connection limit reached", { status: 503 });
 				}
 
 				const clientId = crypto.randomUUID();
-				const handler = new WebSocketHandler(runtime, registry, clientId);
+				const handler = new WebSocketHandler(runtime, hub, clientId);
 				const upgraded = server.upgrade(req, {
 					data: { clientId, handler },
 				});
@@ -109,7 +113,7 @@ export async function createFridayServer(config: FridayServerConfig) {
 					runtime.isBooted &&
 					runtime.sensorium &&
 					!pushIntervals.has(ws.data.clientId) &&
-					registry.getById(ws.data.clientId)
+					hub.getClientById(ws.data.clientId)
 				) {
 					const interval = setInterval(() => {
 						try {
@@ -134,11 +138,11 @@ export async function createFridayServer(config: FridayServerConfig) {
 					pushIntervals.delete(ws.data.clientId);
 				}
 				ws.data.handler.disconnect();
-				registry.unregister(ws.data.clientId);
+				void hub.unregisterClient(ws.data.clientId);
 				// Do NOT shutdown runtime — it's shared!
 			},
 		},
 	});
 
-	return { server, runtime, registry };
+	return { server, runtime, hub };
 }

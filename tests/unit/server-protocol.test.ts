@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { parseClientMessage } from "../../src/server/protocol.ts";
+import type { ServerMessage } from "../../src/server/protocol.ts";
 
 describe("parseClientMessage — voice messages", () => {
   test("parses session:identify", () => {
@@ -54,4 +55,16 @@ describe("parseClientMessage — voice messages", () => {
     }));
     expect(msg).toBeNull();
   });
+});
+
+describe("ServerMessage types", () => {
+	test("conversation:message supports replay source", () => {
+		const msg: ServerMessage = {
+			type: "conversation:message",
+			role: "user",
+			content: "hello",
+			source: "replay",
+		};
+		expect(msg.source).toBe("replay");
+	});
 });

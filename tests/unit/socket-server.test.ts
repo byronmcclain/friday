@@ -1,36 +1,105 @@
 import { describe, test, expect, afterEach } from "bun:test";
 import { unlink } from "node:fs/promises";
 import { FridaySocketServer } from "../../src/server/socket.ts";
+import { SessionHub } from "../../src/server/session-hub.ts";
 
 const TEST_SOCKET = "/tmp/friday-test.sock";
 const TEST_PID = "/tmp/friday-test.pid";
 
+function createMockHub() {
+	let registered = false;
+	let unregisterCount = 0;
+	const hub = {
+		registerClient: () => { registered = true; },
+		unregisterClient: async () => { unregisterCount++; },
+		broadcast: () => {},
+		clientCount: 0,
+		getClientById: () => undefined,
+		get wasRegistered() { return registered; },
+		get unregisterCount() { return unregisterCount; },
+	} as any;
+	return hub;
+}
+
 afterEach(async () => {
-  try { await unlink(TEST_SOCKET); } catch {}
-  try { await unlink(TEST_PID); } catch {}
+	try { await unlink(TEST_SOCKET); } catch {}
+	try { await unlink(TEST_PID); } catch {}
 });
 
 describe("FridaySocketServer", () => {
-  test("creates socket file on start", async () => {
-    const mockRuntime = { isBooted: true, cortex: { providerName: "test", modelName: "test" } } as any;
-    const server = new FridaySocketServer(mockRuntime, TEST_SOCKET, TEST_PID);
-    await server.start();
+	test("creates socket file on start", async () => {
+		const mockRuntime = { isBooted: true, cortex: { providerName: "test", modelName: "test" } } as any;
+		const hub = createMockHub();
+		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
+		await server.start();
 
-    const pidFile = Bun.file(TEST_PID);
-    expect(await pidFile.exists()).toBe(true);
-    const pid = await pidFile.text();
-    expect(Number.parseInt(pid, 10)).toBe(process.pid);
+		const pidFile = Bun.file(TEST_PID);
+		expect(await pidFile.exists()).toBe(true);
+		const pid = await pidFile.text();
+		expect(Number.parseInt(pid, 10)).toBe(process.pid);
 
-    await server.stop();
-  });
+		await server.stop();
+	});
 
-  test("cleans up on stop", async () => {
-    const mockRuntime = { isBooted: true, cortex: { providerName: "test", modelName: "test" } } as any;
-    const server = new FridaySocketServer(mockRuntime, TEST_SOCKET, TEST_PID);
-    await server.start();
-    await server.stop();
+	test("cleans up on stop", async () => {
+		const mockRuntime = { isBooted: true, cortex: { providerName: "test", modelName: "test" } } as any;
+		const hub = createMockHub();
+		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
+		await server.start();
+		await server.stop();
 
-    const pidFile = Bun.file(TEST_PID);
-    expect(await pidFile.exists()).toBe(false);
-  });
+		const pidFile = Bun.file(TEST_PID);
+		expect(await pidFile.exists()).toBe(false);
+	});
+
+	test("session:shutdown does not double-unregister (close handler handles it)", async () => {
+		const mockRuntime = {
+			isBooted: true,
+			cortex: { providerName: "test", modelName: "test" },
+			protocols: { isProtocol: () => false },
+		} as any;
+		const hub = createMockHub();
+		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
+		await server.start();
+
+		const { connect } = await import("node:net");
+		const socket = connect({ path: TEST_SOCKET });
+		await new Promise<void>((resolve) => { socket.on("connect", resolve); });
+		socket.write(JSON.stringify({ type: "session:identify", id: "r1", clientType: "tui" }) + "\n");
+		await new Promise((r) => setTimeout(r, 50));
+
+		// Send session:shutdown — should NOT call unregisterClient
+		socket.write(JSON.stringify({ type: "session:shutdown", id: "r2" }) + "\n");
+		await new Promise((r) => setTimeout(r, 50));
+		expect(hub.unregisterCount).toBe(0);
+
+		// Closing the socket triggers the close handler — single unregister
+		socket.end();
+		await new Promise((r) => setTimeout(r, 100));
+		expect(hub.unregisterCount).toBe(1);
+
+		await server.stop();
+	});
+
+	test("registers client with hub on session:identify", async () => {
+		const mockRuntime = {
+			isBooted: true,
+			cortex: { providerName: "test", modelName: "test" },
+			protocols: { isProtocol: () => false },
+		} as any;
+		const hub = createMockHub();
+		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
+		await server.start();
+
+		const { connect } = await import("node:net");
+		const socket = connect({ path: TEST_SOCKET });
+		await new Promise<void>((resolve) => { socket.on("connect", resolve); });
+		socket.write(JSON.stringify({ type: "session:identify", id: "r1", clientType: "tui" }) + "\n");
+
+		await new Promise((r) => setTimeout(r, 100));
+		expect(hub.wasRegistered).toBe(true);
+
+		socket.end();
+		await server.stop();
+	});
 });
