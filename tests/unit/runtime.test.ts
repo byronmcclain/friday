@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { FridayRuntime, type ShutdownStep } from "../../src/core/runtime.ts";
 import { mkdir, writeFile, rm, unlink } from "node:fs/promises";
 import { mkdirSync } from "node:fs";
-import { PROVIDER_DEFAULTS } from "../../src/providers/index.ts";
+import { GROK_DEFAULTS } from "../../src/providers/index.ts";
 import { createMockModel } from "../helpers/stubs.ts";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 
@@ -25,7 +25,7 @@ describe("FridayRuntime", () => {
 		runtime = new FridayRuntime();
 		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.cortex).toBeDefined();
-		expect(runtime.cortex.providerName).toBe("grok");
+		expect(runtime.cortex.modelName).toBe(GROK_DEFAULTS.model);
 	});
 
 	test("exposes protocol registry after boot", async () => {
@@ -391,7 +391,7 @@ describe("FridayRuntime — dual-model architecture", () => {
 	test("fastModel returns provider default when no override", async () => {
 		const runtime = new FridayRuntime();
 		await runtime.boot({ injectedModel: createMockModel() });
-		expect(runtime.fastModel).toBe(PROVIDER_DEFAULTS.grok.fastModel);
+		expect(runtime.fastModel).toBe(GROK_DEFAULTS.fastModel);
 		await runtime.shutdown();
 	});
 

@@ -1,7 +1,7 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
-import type { FridayConfig, ProviderName } from "./types.ts";
+import type { FridayConfig } from "./types.ts";
 import { Cortex } from "./cortex.ts";
-import { createModel, PROVIDER_DEFAULTS } from "../providers/index.ts";
+import { createModel, GROK_DEFAULTS } from "../providers/index.ts";
 import { SignalBus } from "./events.ts";
 import { ClearanceManager } from "./clearance.ts";
 import { AuditLogger } from "../audit/logger.ts";
@@ -277,11 +277,9 @@ export class FridayRuntime {
 				this._protocols.register(createSmartProtocol(this._smarts));
 			}
 
-			// Resolve dual models: CLI flag > env var > provider default
-			const providerName: ProviderName = config.provider ?? "grok";
-			const defaults = PROVIDER_DEFAULTS[providerName];
-			const reasoningModel = config.model ?? process.env.FRIDAY_REASONING_MODEL ?? defaults.model;
-			this._fastModel = config.fastModel ?? process.env.FRIDAY_FAST_MODEL ?? defaults.fastModel;
+			// Resolve dual models: CLI flag > env var > default
+			const reasoningModel = config.model ?? process.env.FRIDAY_REASONING_MODEL ?? GROK_DEFAULTS.model;
+			this._fastModel = config.fastModel ?? process.env.FRIDAY_FAST_MODEL ?? GROK_DEFAULTS.fastModel;
 
 			// Sensorium — before Cortex so context block is available from first chat()
 			if (config.enableSensorium !== false) {
@@ -323,7 +321,6 @@ export class FridayRuntime {
 			}
 
 			this._cortex = new Cortex({
-				provider: providerName,
 				model: reasoningModel,
 				maxTokens: config.maxTokens,
 				injectedModel: config.injectedModel,
@@ -375,7 +372,7 @@ export class FridayRuntime {
 
 			// Subsystem model for curator/summarizer.
 			const subsystemModel: LanguageModelV3 =
-				config.injectedFastModel ?? config.injectedModel ?? createModel(providerName, this._fastModel);
+				config.injectedFastModel ?? config.injectedModel ?? createModel(this._fastModel);
 
 			if (this._smarts) {
 				this._curator = new SmartsCurator(this._smarts, subsystemModel);
@@ -435,7 +432,7 @@ export class FridayRuntime {
 			this._audit.log({
 				action: "runtime:boot",
 				source: "runtime",
-				detail: `Friday online. Provider: ${this._cortex.providerName}, Modules: ${this._modules.length}`,
+				detail: `Friday online. Model: ${reasoningModel}, Modules: ${this._modules.length}`,
 				success: true,
 			});
 
@@ -585,7 +582,7 @@ export class FridayRuntime {
 						id: this._sessionId,
 						startedAt: this._sessionStartedAt,
 						endedAt: new Date(),
-						provider: this._cortex.providerName,
+						provider: "grok",
 						model: this._cortex.modelName,
 						messages: history,
 						summary,
