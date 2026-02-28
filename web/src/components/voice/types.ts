@@ -17,14 +17,6 @@ export interface VoiceControlsProps {
   onEndSession: () => void;
 }
 
-export interface VoiceDevControlsProps {
-  currentState: VoiceState;
-  speedMultiplier: number;
-  onForceState: (state: VoiceState) => void;
-  onSetSpeed: (speed: number) => void;
-  onResumeAutoDemo: () => void;
-}
-
 export interface VoiceStatusProps {
   text: string;
   isTyping: boolean;
