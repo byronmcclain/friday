@@ -1,4 +1,4 @@
-import type { FridayProtocol } from "./types.ts";
+import type { FridayProtocol } from "../modules/types.ts";
 
 export interface ParsedProtocolInput {
   name: string;

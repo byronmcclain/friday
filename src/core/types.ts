@@ -1,7 +1,7 @@
 /** Supported LLM provider names */
 export type ProviderName = "anthropic" | "grok";
 
-/** Configuration for FridayCore */
+/** Configuration for Cortex */
 export interface FridayConfig {
   /** Which LLM provider to use */
   provider: ProviderName;

@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { FridayRuntime } from "../../src/core/runtime.ts";
-import { stubProvider } from "../helpers/stubs.ts";
+import { createMockModel } from "../helpers/stubs.ts";
 import { mkdir, unlink } from "node:fs/promises";
 
 const TEST_DATA_DIR = "/tmp/friday-vox-runtime-test";
@@ -28,7 +28,7 @@ describe("Runtime + Vox", () => {
 
 	test("runtime boots with vox enabled (default)", async () => {
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			dataDir: TEST_DATA_DIR,
 			enableSensorium: false,
 		});
@@ -38,7 +38,7 @@ describe("Runtime + Vox", () => {
 
 	test("runtime boots with vox disabled", async () => {
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			dataDir: TEST_DATA_DIR,
 			enableVox: false,
 			enableSensorium: false,
@@ -48,7 +48,7 @@ describe("Runtime + Vox", () => {
 
 	test("/voice protocol is registered when vox enabled", async () => {
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			dataDir: TEST_DATA_DIR,
 			enableSensorium: false,
 		});
@@ -59,7 +59,7 @@ describe("Runtime + Vox", () => {
 
 	test("vox is stopped on shutdown", async () => {
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			dataDir: TEST_DATA_DIR,
 			enableSensorium: false,
 		});

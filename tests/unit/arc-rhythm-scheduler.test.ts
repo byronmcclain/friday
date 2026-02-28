@@ -9,7 +9,9 @@ import { AuditLogger } from "../../src/audit/logger.ts";
 import { ClearanceManager } from "../../src/core/clearance.ts";
 import { Cortex } from "../../src/core/cortex.ts";
 import { ProtocolRegistry } from "../../src/protocols/registry.ts";
-import { stubProvider } from "../helpers/stubs.ts";
+import { createMockModel, buildUsage } from "../helpers/stubs.ts";
+import { MockLanguageModelV3 } from "ai/test";
+import { simulateReadableStream } from "ai";
 import { Database } from "bun:sqlite";
 import { unlink } from "node:fs/promises";
 
@@ -33,7 +35,7 @@ beforeEach(() => {
 	audit = new AuditLogger();
 
 	const clearance = new ClearanceManager(["system", "read-fs", "network", "provider"]);
-	const cortex = new Cortex({ injectedProvider: stubProvider });
+	const cortex = new Cortex({ injectedModel: createMockModel() });
 	const protocols = new ProtocolRegistry();
 	executor = new RhythmExecutor({ cortex, protocols, clearance, audit });
 
@@ -219,13 +221,32 @@ describe("RhythmScheduler", () => {
 	test("reentrant guard skips rhythm that is already running", async () => {
 		const clearance = new ClearanceManager(["system", "provider"]);
 		const slowCortex = new Cortex({
-			injectedProvider: {
-				...stubProvider,
-				chat: async () => {
+			injectedModel: new MockLanguageModelV3({
+				doGenerate: async () => {
 					await new Promise((r) => setTimeout(r, 200));
-					return { type: "text" as const, text: "done", truncated: false };
+					return {
+						content: [{ type: "text" as const, text: "done" }],
+						finishReason: { unified: "stop" as const, raw: undefined },
+						usage: buildUsage(),
+						warnings: [],
+					};
 				},
-			},
+				doStream: async () => {
+					await new Promise((r) => setTimeout(r, 200));
+					return {
+						stream: simulateReadableStream({
+							chunks: [
+								{ type: "text-start" as const, id: "text-0" },
+								{ type: "text-delta" as const, id: "text-0", delta: "done" },
+								{ type: "text-end" as const, id: "text-0" },
+								{ type: "finish" as const, finishReason: { unified: "stop" as const, raw: undefined }, usage: buildUsage() },
+							],
+							initialDelayInMs: null,
+							chunkDelayInMs: null,
+						}),
+					};
+				},
+			}),
 		});
 		const slowExecutor = new RhythmExecutor({
 			cortex: slowCortex,

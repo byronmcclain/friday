@@ -10,7 +10,7 @@ import { ClearanceManager } from "../../src/core/clearance.ts";
 import { AuditLogger } from "../../src/audit/logger.ts";
 import { SignalBus } from "../../src/core/events.ts";
 import { NotificationManager } from "../../src/core/notifications.ts";
-import { stubProvider } from "../helpers/stubs.ts";
+import { createMockModel } from "../helpers/stubs.ts";
 import type { ProtocolContext } from "../../src/modules/types.ts";
 import { Database } from "bun:sqlite";
 import { unlink } from "node:fs/promises";
@@ -35,7 +35,7 @@ beforeEach(() => {
 	store = new RhythmStore(db);
 
 	const clearance = new ClearanceManager(["system", "provider"]);
-	const cortex = new Cortex({ injectedProvider: stubProvider });
+	const cortex = new Cortex({ injectedModel: createMockModel() });
 	const protocols = new ProtocolRegistry();
 	const executor = new RhythmExecutor({ cortex, protocols, clearance, audit: new AuditLogger() });
 

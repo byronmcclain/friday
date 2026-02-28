@@ -5,7 +5,7 @@ import { Cortex } from "../../src/core/cortex.ts";
 import { ProtocolRegistry } from "../../src/protocols/registry.ts";
 import { ClearanceManager } from "../../src/core/clearance.ts";
 import { AuditLogger } from "../../src/audit/logger.ts";
-import { stubProvider } from "../helpers/stubs.ts";
+import { createMockModel } from "../helpers/stubs.ts";
 import type { Rhythm } from "../../src/arc-rhythm/types.ts";
 
 let executor: RhythmExecutor;
@@ -36,7 +36,7 @@ function makeRhythm(overrides: Partial<Rhythm> = {}): Rhythm {
 beforeEach(() => {
 	clearance = new ClearanceManager(["system", "read-fs", "network", "provider"]);
 	audit = new AuditLogger();
-	cortex = new Cortex({ injectedProvider: stubProvider });
+	cortex = new Cortex({ injectedModel: createMockModel() });
 	protocols = new ProtocolRegistry();
 	executor = new RhythmExecutor({ cortex, protocols, clearance, audit });
 });

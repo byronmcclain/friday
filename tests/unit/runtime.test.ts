@@ -1,10 +1,9 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { FridayRuntime, type ShutdownStep } from "../../src/core/runtime.ts";
-import type { LLMProvider } from "../../src/providers/types.ts";
 import { mkdir, writeFile, rm, unlink } from "node:fs/promises";
 import { mkdirSync } from "node:fs";
 import { PROVIDER_DEFAULTS } from "../../src/providers/index.ts";
-import { stubProvider, textResponse } from "../helpers/stubs.ts";
+import { createMockModel } from "../helpers/stubs.ts";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 
 describe("FridayRuntime", () => {
@@ -18,32 +17,32 @@ describe("FridayRuntime", () => {
 
 	test("boots with default configuration", async () => {
 		runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.isBooted).toBe(true);
 	});
 
 	test("exposes cortex after boot", async () => {
 		runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.cortex).toBeDefined();
-		expect(runtime.cortex.providerName).toBe("stub");
+		expect(runtime.cortex.providerName).toBe("grok");
 	});
 
 	test("exposes protocol registry after boot", async () => {
 		runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.protocols).toBeDefined();
 	});
 
 	test("exposes signal bus after boot", async () => {
 		runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.signals).toBeDefined();
 	});
 
 	test("process routes protocol input to protocol handler", async () => {
 		runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		runtime.protocols.register({
 			name: "test",
 			description: "test",
@@ -58,20 +57,20 @@ describe("FridayRuntime", () => {
 
 	test("non-protocol input is not detected as protocol", async () => {
 		runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.protocols.isProtocol("hello")).toBe(false);
 	});
 
 	test("shutdown completes cleanly", async () => {
 		runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		await runtime.shutdown();
 		expect(runtime.isBooted).toBe(false);
 	});
 
 	test("shutdown calls onProgress callback for each step", async () => {
 		runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		const validSteps: ShutdownStep[] = ["arc-rhythm", "vox", "sensorium", "conversation", "knowledge", "modules", "cleanup"];
 		const captured: Array<{ step: ShutdownStep; label: string }> = [];
 		await runtime.shutdown((step, label) => {
@@ -100,7 +99,7 @@ describe("FridayRuntime", () => {
 
 	test("protocol handler receives rawArgs", async () => {
 		runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		let receivedArgs: Record<string, unknown> = {};
 		runtime.protocols.register({
 			name: "deploy",
@@ -108,7 +107,7 @@ describe("FridayRuntime", () => {
 			aliases: [],
 			parameters: [],
 			clearance: [],
-			execute: async (args) => {
+			execute: async (args: Record<string, unknown>) => {
 				receivedArgs = args;
 				return { success: true, summary: "deployed" };
 			},
@@ -119,20 +118,20 @@ describe("FridayRuntime", () => {
 
 	test("boot is idempotent — double boot does not throw", async () => {
 		runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
+		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.isBooted).toBe(true);
 	});
 
 	test("restartRequested defaults to false", async () => {
 		runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.restartRequested).toBe(false);
 	});
 
 	test("restartRequested can be set to true", async () => {
 		runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		runtime.restartRequested = true;
 		expect(runtime.restartRequested).toBe(true);
 	});
@@ -168,7 +167,7 @@ This is test knowledge.`,
 	test("boots with smartsDir and loads SMARTS", async () => {
 		const runtime = new FridayRuntime();
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			smartsDir: TEST_SMARTS_DIR_RT,
 		});
 		expect(runtime.smarts).toBeDefined();
@@ -178,28 +177,18 @@ This is test knowledge.`,
 
 	test("boots without smartsDir (backwards compatible)", async () => {
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.smarts).toBeUndefined();
 		await runtime.shutdown();
 	});
 
 	test("shutdown triggers SMARTS extraction for long conversations", async () => {
-		let extractionTriggered = false;
-		const capturingProvider: LLMProvider = {
-			name: "capturing",
-			defaultModel: "capture",
-			defaultFastModel: "capture-fast",
-			chat: async (systemPrompt) => {
-				if (systemPrompt.includes("strict knowledge extraction system")) {
-					extractionTriggered = true;
-				}
-				return textResponse("[]");
-			},
-		};
+		const fastModel = createMockModel({ text: "[]" });
 
 		const runtime = new FridayRuntime();
 		await runtime.boot({
-			injectedProvider: capturingProvider,
+			injectedModel: createMockModel(),
+			injectedFastModel: fastModel,
 			smartsDir: TEST_SMARTS_DIR_RT,
 		});
 
@@ -209,26 +198,17 @@ This is test knowledge.`,
 		}
 
 		await runtime.shutdown();
-		expect(extractionTriggered).toBe(true);
+		// The fast model should have been called by the curator for extraction
+		expect(fastModel.doGenerateCalls.length).toBeGreaterThan(0);
 	});
 
 	test("shutdown skips extraction for short conversations", async () => {
-		let extractionTriggered = false;
-		const capturingProvider: LLMProvider = {
-			name: "capturing",
-			defaultModel: "capture",
-			defaultFastModel: "capture-fast",
-			chat: async (systemPrompt) => {
-				if (systemPrompt.includes("strict knowledge extraction system")) {
-					extractionTriggered = true;
-				}
-				return textResponse("[]");
-			},
-		};
+		const fastModel = createMockModel({ text: "[]" });
 
 		const runtime = new FridayRuntime();
 		await runtime.boot({
-			injectedProvider: capturingProvider,
+			injectedModel: createMockModel(),
+			injectedFastModel: fastModel,
 			smartsDir: TEST_SMARTS_DIR_RT,
 		});
 
@@ -236,7 +216,8 @@ This is test knowledge.`,
 		await runtime.process("Quick question");
 
 		await runtime.shutdown();
-		expect(extractionTriggered).toBe(false);
+		// The fast model should NOT have been called (conversation too short)
+		expect(fastModel.doGenerateCalls.length).toBe(0);
 	});
 });
 
@@ -259,21 +240,21 @@ describe("FridayRuntime — conversation persistence", () => {
 
 	test("boot creates main memory when dataDir is provided", async () => {
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider, dataDir });
+		await runtime.boot({ injectedModel: createMockModel(), dataDir });
 		expect(runtime.memory).toBeDefined();
 		await runtime.shutdown();
 	});
 
 	test("memory is undefined when dataDir is not provided", async () => {
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.memory).toBeUndefined();
 		await runtime.shutdown();
 	});
 
 	test("conversation is saved on shutdown", async () => {
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider, dataDir });
+		await runtime.boot({ injectedModel: createMockModel(), dataDir });
 		await runtime.process("Hello Friday");
 		await runtime.shutdown();
 
@@ -286,19 +267,19 @@ describe("FridayRuntime — conversation persistence", () => {
 
 	test("last session is auto-loaded on boot", async () => {
 		const runtime1 = new FridayRuntime();
-		await runtime1.boot({ injectedProvider: stubProvider, dataDir });
+		await runtime1.boot({ injectedModel: createMockModel(), dataDir });
 		await runtime1.process("Hello Friday");
 		await runtime1.shutdown();
 
 		const runtime2 = new FridayRuntime();
-		await runtime2.boot({ injectedProvider: stubProvider, dataDir });
+		await runtime2.boot({ injectedModel: createMockModel(), dataDir });
 		expect(runtime2.cortex.historyLength).toBeGreaterThanOrEqual(2);
 		await runtime2.shutdown();
 	});
 
 	test("history protocol is registered when dataDir is provided", async () => {
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider, dataDir });
+		await runtime.boot({ injectedModel: createMockModel(), dataDir });
 		const historyProtocol = runtime.protocols.get("history");
 		expect(historyProtocol).toBeDefined();
 		expect(historyProtocol!.name).toBe("history");
@@ -307,13 +288,13 @@ describe("FridayRuntime — conversation persistence", () => {
 
 	test("fresh flag skips loading last session", async () => {
 		const runtime1 = new FridayRuntime();
-		await runtime1.boot({ injectedProvider: stubProvider, dataDir });
+		await runtime1.boot({ injectedModel: createMockModel(), dataDir });
 		await runtime1.process("Hello Friday");
 		await runtime1.shutdown();
 
 		const runtime2 = new FridayRuntime();
 		await runtime2.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			dataDir,
 			fresh: true,
 		});
@@ -323,7 +304,7 @@ describe("FridayRuntime — conversation persistence", () => {
 
 	test("recall_memory tool is registered when dataDir is provided", async () => {
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider, dataDir });
+		await runtime.boot({ injectedModel: createMockModel(), dataDir });
 		const recallTool = runtime.cortex.availableTools.find((t) => t.name === "recall_memory");
 		expect(recallTool).toBeDefined();
 		expect(recallTool!.name).toBe("recall_memory");
@@ -332,7 +313,7 @@ describe("FridayRuntime — conversation persistence", () => {
 
 	test("shutdown reports conversation step via onProgress", async () => {
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider, dataDir });
+		await runtime.boot({ injectedModel: createMockModel(), dataDir });
 		await runtime.process("Hello Friday");
 		const steps: string[] = [];
 		await runtime.shutdown((step) => {
@@ -345,7 +326,7 @@ describe("FridayRuntime — conversation persistence", () => {
 describe("FridayRuntime — Sensorium integration", () => {
 	test("boots with sensorium enabled by default", async () => {
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.sensorium).toBeDefined();
 		expect(runtime.sensorium!.currentSnapshot).not.toBeNull();
 		expect(runtime.sensorium!.isRunning).toBe(true);
@@ -355,7 +336,7 @@ describe("FridayRuntime — Sensorium integration", () => {
 	test("sensorium disabled when enableSensorium is false", async () => {
 		const runtime = new FridayRuntime();
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			enableSensorium: false,
 		});
 		expect(runtime.sensorium).toBeUndefined();
@@ -364,14 +345,14 @@ describe("FridayRuntime — Sensorium integration", () => {
 
 	test("shutdown stops sensorium polling", async () => {
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.sensorium!.isRunning).toBe(true);
 		await runtime.shutdown();
 	});
 
 	test("/env protocol is registered when sensorium is enabled", async () => {
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		const envProtocol = runtime.protocols.get("env");
 		expect(envProtocol).toBeDefined();
 		expect(envProtocol!.name).toBe("env");
@@ -379,30 +360,25 @@ describe("FridayRuntime — Sensorium integration", () => {
 	});
 
 	test("process sends environment context in system prompt", async () => {
-		let capturedPrompt = "";
-		const capturingProvider: LLMProvider = {
-			name: "capturing",
-			defaultModel: "capture",
-			defaultFastModel: "capture-fast",
-			chat: async (systemPrompt) => {
-				capturedPrompt = systemPrompt;
-				return textResponse("I can see the system!");
-			},
-		};
+		const model = createMockModel();
 
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: capturingProvider });
+		await runtime.boot({ injectedModel: model });
 		await runtime.process("What's the system status?");
 
-		expect(capturedPrompt).toContain("[ENVIRONMENT]");
-		expect(capturedPrompt).toContain("cores");
+		const call = model.doStreamCalls[0]!;
+		const systemPart = (call.prompt as Array<{ role: string; content: string }>).find(
+			(p) => p.role === "system",
+		);
+		expect(systemPart?.content).toContain("[ENVIRONMENT]");
+		expect(systemPart?.content).toContain("cores");
 
 		await runtime.shutdown();
 	});
 
 	test("shutdown reports sensorium step via onProgress", async () => {
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		const steps: string[] = [];
 		await runtime.shutdown((step) => {
 			steps.push(step);
@@ -414,14 +390,14 @@ describe("FridayRuntime — Sensorium integration", () => {
 describe("FridayRuntime — dual-model architecture", () => {
 	test("fastModel returns provider default when no override", async () => {
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.fastModel).toBe(PROVIDER_DEFAULTS.grok.fastModel);
 		await runtime.shutdown();
 	});
 
 	test("fastModel respects config override", async () => {
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider, fastModel: "custom-fast" });
+		await runtime.boot({ injectedModel: createMockModel(), fastModel: "custom-fast" });
 		expect(runtime.fastModel).toBe("custom-fast");
 		await runtime.shutdown();
 	});
@@ -431,7 +407,7 @@ describe("FridayRuntime — dual-model architecture", () => {
 		process.env.FRIDAY_FAST_MODEL = "env-fast-model";
 		try {
 			const runtime = new FridayRuntime();
-			await runtime.boot({ injectedProvider: stubProvider });
+			await runtime.boot({ injectedModel: createMockModel() });
 			expect(runtime.fastModel).toBe("env-fast-model");
 			await runtime.shutdown();
 		} finally {
@@ -462,19 +438,13 @@ describe("FridayRuntime — conversation summarization", () => {
 	});
 
 	test("summary populated on shutdown for sufficient history", async () => {
-		const summarizingProvider: LLMProvider = {
-			name: "summarizer",
-			defaultModel: "sum-model",
-			defaultFastModel: "sum-fast",
-			chat: async (systemPrompt) => {
-				if (systemPrompt.includes("summarizer")) {
-					return textResponse("Discussed various topics with the user.");
-				}
-				return textResponse("response");
-			},
-		};
+		const fastModel = createMockModel({ text: "Discussed various topics with the user." });
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: summarizingProvider, dataDir });
+		await runtime.boot({
+			injectedModel: createMockModel(),
+			injectedFastModel: fastModel,
+			dataDir,
+		});
 		// Need 4+ messages — 2 chat rounds = 4 messages (2 user + 2 assistant)
 		await runtime.process("First question");
 		await runtime.process("Second question");
@@ -489,7 +459,7 @@ describe("FridayRuntime — conversation summarization", () => {
 
 	test("summary skipped for short conversations", async () => {
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider, dataDir });
+		await runtime.boot({ injectedModel: createMockModel(), dataDir });
 		await runtime.process("Quick question");
 		await runtime.shutdown();
 
@@ -527,7 +497,7 @@ describe("FridayRuntime — Forge integration", () => {
 
 		const runtime = new FridayRuntime();
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			forgeDir,
 		});
 		expect(runtime.forgeHealthReport).toBeDefined();
@@ -542,7 +512,7 @@ describe("FridayRuntime — Forge integration", () => {
 
 		const runtime = new FridayRuntime();
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			forgeDir,
 		});
 		expect(runtime.isBooted).toBe(true);
@@ -553,7 +523,7 @@ describe("FridayRuntime — Forge integration", () => {
 
 	test("boots without forgeDir (backwards compatible)", async () => {
 		const runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.forgeHealthReport).toBeUndefined();
 		await runtime.shutdown();
 	});
@@ -561,7 +531,7 @@ describe("FridayRuntime — Forge integration", () => {
 	test("/forge protocol is registered when forgeDir is provided", async () => {
 		const runtime = new FridayRuntime();
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			forgeDir,
 		});
 		const forgeProtocol = runtime.protocols.get("forge");
@@ -592,7 +562,7 @@ describe("FridayRuntime — Genesis", () => {
 		await writeFile(TEST_GENESIS_PATH, "Custom Friday identity");
 		runtime = new FridayRuntime();
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			genesisPath: TEST_GENESIS_PATH,
 		});
 		expect(runtime.isBooted).toBe(true);
@@ -602,7 +572,7 @@ describe("FridayRuntime — Genesis", () => {
 		runtime = new FridayRuntime();
 		await expect(
 			runtime.boot({
-				injectedProvider: stubProvider,
+				injectedModel: createMockModel(),
 				genesisPath: `${TEST_GENESIS_DIR}/nonexistent.md`,
 			}),
 		).rejects.toThrow("GENESIS.md not found");
@@ -610,7 +580,7 @@ describe("FridayRuntime — Genesis", () => {
 
 	test("boots without genesisPath (backwards compatible)", async () => {
 		runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.isBooted).toBe(true);
 	});
 
@@ -621,7 +591,7 @@ describe("FridayRuntime — Genesis", () => {
 		await writeFile(TEST_GENESIS_PATH, "Custom identity");
 		runtime = new FridayRuntime();
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			genesisPath: TEST_GENESIS_PATH,
 		});
 		expect(isProtectedPath(TEST_GENESIS_PATH)).toBe(true);
@@ -632,7 +602,7 @@ describe("FridayRuntime — debug mode", () => {
 	test("passes debug flag to Cortex when enabled", async () => {
 		const runtime = new FridayRuntime();
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			enableSensorium: false,
 			enableVox: false,
 			debug: true,
@@ -648,7 +618,7 @@ describe("FridayRuntime — debug mode", () => {
 	test("does not log debug:enabled when debug is false", async () => {
 		const runtime = new FridayRuntime();
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			enableSensorium: false,
 			enableVox: false,
 		});

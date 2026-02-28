@@ -1,30 +1,7 @@
-import type { LLMProvider, ChatResponse } from "../../src/providers/types.ts";
-import { PROVIDER_DEFAULTS } from "../../src/providers/index.ts";
-
-/** Helper to create a text ChatResponse */
-export function textResponse(text: string): ChatResponse {
-	return { type: "text", text, truncated: false };
-}
-
-export const stubProvider: LLMProvider = {
-	name: "stub",
-	defaultModel: "stub-model",
-	defaultFastModel: "stub-fast-model",
-	chat: async () => textResponse("stub response"),
-};
-
-export const grokStub: LLMProvider = {
-	name: "grok",
-	defaultModel: PROVIDER_DEFAULTS.grok.model,
-	defaultFastModel: PROVIDER_DEFAULTS.grok.fastModel,
-	chat: async () => textResponse("grok response"),
-};
-
 // --- AI SDK v6 mock model ---
 import { MockLanguageModelV3 } from "ai/test";
 import { simulateReadableStream } from "ai";
 import type {
-	LanguageModelV3,
 	LanguageModelV3Usage,
 	LanguageModelV3StreamPart,
 } from "@ai-sdk/provider";
@@ -38,7 +15,7 @@ export interface MockModelOptions {
 	usage?: { inputTokens: number; outputTokens: number };
 }
 
-function buildUsage(opts?: {
+export function buildUsage(opts?: {
 	inputTokens: number;
 	outputTokens: number;
 }): LanguageModelV3Usage {
@@ -61,7 +38,7 @@ function buildUsage(opts?: {
 
 export function createMockModel(
 	options: MockModelOptions = {},
-): LanguageModelV3 {
+): MockLanguageModelV3 {
 	const text = options.text ?? "stub response";
 	const usage = buildUsage(options.usage);
 
@@ -115,5 +92,12 @@ export function createMockModel(
 				chunkDelayInMs: null,
 			}),
 		},
+	});
+}
+
+export function createErrorModel(msg = "API error"): MockLanguageModelV3 {
+	return new MockLanguageModelV3({
+		doGenerate: async () => { throw new Error(msg); },
+		doStream: async () => { throw new Error(msg); },
 	});
 }

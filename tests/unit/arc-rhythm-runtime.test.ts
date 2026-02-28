@@ -1,7 +1,7 @@
 // tests/unit/arc-rhythm-runtime.test.ts
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { FridayRuntime } from "../../src/core/runtime.ts";
-import { stubProvider } from "../helpers/stubs.ts";
+import { createMockModel } from "../helpers/stubs.ts";
 import { rm } from "node:fs/promises";
 
 const TEST_DATA_DIR = "/tmp/friday-test-arc-runtime";
@@ -22,7 +22,7 @@ afterEach(async () => {
 describe("FridayRuntime + Arc Rhythm", () => {
 	test("boots with Arc Rhythm when dataDir is provided", async () => {
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			dataDir: TEST_DATA_DIR,
 			enableSensorium: false,
 		});
@@ -32,7 +32,7 @@ describe("FridayRuntime + Arc Rhythm", () => {
 
 	test("Arc Rhythm protocol responds to /arc list", async () => {
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			dataDir: TEST_DATA_DIR,
 			enableSensorium: false,
 		});
@@ -43,7 +43,7 @@ describe("FridayRuntime + Arc Rhythm", () => {
 
 	test("manage_rhythm tool is registered on Cortex", async () => {
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			dataDir: TEST_DATA_DIR,
 			enableSensorium: false,
 		});
@@ -54,7 +54,7 @@ describe("FridayRuntime + Arc Rhythm", () => {
 
 	test("shutdown stops Arc Rhythm gracefully", async () => {
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			dataDir: TEST_DATA_DIR,
 			enableSensorium: false,
 		});
@@ -64,7 +64,7 @@ describe("FridayRuntime + Arc Rhythm", () => {
 
 	test("boots without Arc Rhythm when dataDir is not provided", async () => {
 		await runtime.boot({
-			injectedProvider: stubProvider,
+			injectedModel: createMockModel(),
 			enableSensorium: false,
 		});
 		expect(runtime.isBooted).toBe(true);

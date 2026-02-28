@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach } from "bun:test";
 import { createFridayServer } from "../../src/server/index.ts";
-import { stubProvider } from "../helpers/stubs.ts";
+import { createMockModel } from "../helpers/stubs.ts";
 import type { FridayRuntime } from "../../src/core/runtime.ts";
 
 describe("createFridayServer", () => {
@@ -17,7 +17,7 @@ describe("createFridayServer", () => {
 	test("starts HTTP server on given port", async () => {
 		const result = await createFridayServer({
 			port: 0,
-			runtimeConfig: { injectedProvider: stubProvider },
+			runtimeConfig: { injectedModel: createMockModel() },
 		});
 		server = result.server;
 		runtime = result.runtime;
@@ -27,7 +27,7 @@ describe("createFridayServer", () => {
 	test("serves index.html for GET /", async () => {
 		const result = await createFridayServer({
 			port: 0,
-			runtimeConfig: { injectedProvider: stubProvider },
+			runtimeConfig: { injectedModel: createMockModel() },
 		});
 		server = result.server;
 		runtime = result.runtime;
@@ -38,7 +38,7 @@ describe("createFridayServer", () => {
 	test("upgrades WebSocket connections at /ws", async () => {
 		const result = await createFridayServer({
 			port: 0,
-			runtimeConfig: { injectedProvider: stubProvider },
+			runtimeConfig: { injectedModel: createMockModel() },
 		});
 		server = result.server;
 		runtime = result.runtime;
@@ -55,7 +55,7 @@ describe("createFridayServer", () => {
 	test("WebSocket handles chat after identify (singleton is pre-booted)", async () => {
 		const result = await createFridayServer({
 			port: 0,
-			runtimeConfig: { injectedProvider: stubProvider },
+			runtimeConfig: { injectedModel: createMockModel() },
 		});
 		server = result.server;
 		runtime = result.runtime;

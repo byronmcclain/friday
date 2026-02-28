@@ -65,6 +65,16 @@ export class HistoryManager {
 		return [...this.messages];
 	}
 
+	/** Roll back history to a previous length (for error recovery) */
+	truncateTo(length: number): void {
+		if (length < this.messages.length) {
+			this.messages.length = length;
+			this._tokenEstimate = this.messages.reduce(
+				(sum, m) => sum + this.estimateTokens(m), 0,
+			);
+		}
+	}
+
 	/** Calibrate token count with real usage from API */
 	recordUsage(tokens: number): void {
 		this._tokenEstimate = tokens;

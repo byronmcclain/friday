@@ -1,13 +1,22 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { GENESIS_TEMPLATE } from "../../src/core/prompts.ts";
 import { Cortex } from "../../src/core/cortex.ts";
-import type { LLMProvider } from "../../src/providers/types.ts";
 import { PROVIDER_DEFAULTS } from "../../src/providers/index.ts";
 import { SmartsStore } from "../../src/smarts/store.ts";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 import { mkdir, writeFile, rm, unlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { stubProvider, grokStub, textResponse, createMockModel } from "../helpers/stubs.ts";
+import { createMockModel, createErrorModel } from "../helpers/stubs.ts";
+
+/** Extract the system prompt string from a mock model's recorded doStreamCalls */
+function getSystemPrompt(model: ReturnType<typeof createMockModel>): string {
+	const call = model.doStreamCalls[0];
+	if (!call) throw new Error("No doStreamCalls recorded");
+	const systemPart = (call.prompt as Array<{ role: string; content: string }>).find(
+		(p) => p.role === "system",
+	);
+	return systemPart?.content ?? "";
+}
 
 describe("Cortex", () => {
   test("system prompt is defined and non-empty", () => {
@@ -65,13 +74,7 @@ describe("Cortex", () => {
   });
 
   test("chat error rolls back history", async () => {
-    const failingProvider: LLMProvider = {
-      name: "failing",
-      defaultModel: "fail-model",
-      defaultFastModel: "fail-fast",
-      chat: async () => { throw new Error("API error"); },
-    };
-    const cortex = new Cortex({ injectedProvider: failingProvider });
+    const cortex = new Cortex({ injectedModel: createErrorModel() });
     expect(cortex.historyLength).toBe(0);
     try {
       await cortex.chat("hello");
@@ -80,54 +83,15 @@ describe("Cortex", () => {
   });
 
   test("uses genesisPrompt when provided", async () => {
-    let capturedPrompt = "";
-    const capturingProvider: LLMProvider = {
-      name: "capturing",
-      defaultModel: "capture",
-      defaultFastModel: "capture-fast",
-      chat: async (systemPrompt) => {
-        capturedPrompt = systemPrompt;
-        return textResponse("ok");
-      },
-    };
-
+    const model = createMockModel();
     const cortex = new Cortex({
-      injectedProvider: capturingProvider,
+      injectedModel: model,
       genesisPrompt: "You are a custom identity.",
     });
     await cortex.chat("Hello");
-    expect(capturedPrompt).toContain("You are a custom identity.");
-    expect(capturedPrompt).not.toContain("Female Replacement Intelligent Digital Assistant Youth");
-  });
-});
-
-describe("Cortex — truncation warning", () => {
-  test("appends truncation warning when response is truncated", async () => {
-    const truncatingProvider: LLMProvider = {
-      name: "stub",
-      defaultModel: "stub-model",
-      defaultFastModel: "stub-fast",
-      chat: async () => ({ type: "text" as const, text: "partial output", truncated: true }),
-    };
-    const cortex = new Cortex({ injectedProvider: truncatingProvider });
-    const result = await cortex.chat("tell me everything");
-
-    expect(result).toContain("partial output");
-    expect(result).toContain("[Response truncated");
-  });
-
-  test("does not append truncation warning on normal response", async () => {
-    const normalProvider: LLMProvider = {
-      name: "stub",
-      defaultModel: "stub-model",
-      defaultFastModel: "stub-fast",
-      chat: async () => ({ type: "text" as const, text: "full output", truncated: false }),
-    };
-    const cortex = new Cortex({ injectedProvider: normalProvider });
-    const result = await cortex.chat("hello");
-
-    expect(result).toBe("full output");
-    expect(result).not.toContain("[Response truncated");
+    const systemPrompt = getSystemPrompt(model);
+    expect(systemPrompt).toContain("You are a custom identity.");
+    expect(systemPrompt).not.toContain("Female Replacement Intelligent Digital Assistant Youth");
   });
 });
 
@@ -149,22 +113,10 @@ updated: 2026-02-21
 Validate all input.`;
 
 describe("Cortex — SMARTS integration", () => {
-  let capturedPrompt: string;
-  const capturingProvider: LLMProvider = {
-    name: "capturing",
-    defaultModel: "capture-model",
-    defaultFastModel: "capture-fast",
-    chat: async (systemPrompt) => {
-      capturedPrompt = systemPrompt;
-      return textResponse("response with smarts");
-    },
-  };
-
   let smartsStore: SmartsStore;
   let memory: SQLiteMemory;
 
   beforeEach(async () => {
-    capturedPrompt = "";
     await mkdir(TEST_SMARTS_DIR_CORTEX, { recursive: true });
     await writeFile(`${TEST_SMARTS_DIR_CORTEX}/security-basics.md`, SECURITY_SMART_FIXTURE);
     memory = new SQLiteMemory(TEST_DB_CORTEX);
@@ -186,52 +138,49 @@ describe("Cortex — SMARTS integration", () => {
   });
 
   test("enriches system prompt with relevant SMARTS", async () => {
-    const cortex = new Cortex({
-      injectedProvider: capturingProvider,
-      smartsStore,
-    });
+    const model = createMockModel();
+    const cortex = new Cortex({ injectedModel: model, smartsStore });
     await cortex.chat("How do I prevent XSS attacks?");
-    expect(capturedPrompt).toContain("Active Knowledge");
-    expect(capturedPrompt).toContain("Security Basics");
+    const systemPrompt = getSystemPrompt(model);
+    expect(systemPrompt).toContain("Active Knowledge");
+    expect(systemPrompt).toContain("Security Basics");
   });
 
   test("includes base GENESIS_TEMPLATE in enriched prompt", async () => {
-    const cortex = new Cortex({
-      injectedProvider: capturingProvider,
-      smartsStore,
-    });
+    const model = createMockModel();
+    const cortex = new Cortex({ injectedModel: model, smartsStore });
     await cortex.chat("How do I prevent XSS attacks?");
-    expect(capturedPrompt).toContain("You are Friday");
+    const systemPrompt = getSystemPrompt(model);
+    expect(systemPrompt).toContain("You are Friday");
   });
 
   test("works without smartsStore (backwards compatible)", async () => {
-    const cortex = new Cortex({ injectedProvider: capturingProvider });
+    const model = createMockModel();
+    const cortex = new Cortex({ injectedModel: model });
     await cortex.chat("Hello");
-    expect(capturedPrompt).toContain(GENESIS_TEMPLATE);
-    expect(capturedPrompt).not.toContain("Active Knowledge");
-    // Without sensorium, falls back to a standalone Current Time section
-    expect(capturedPrompt).toContain("## Current Time");
+    const systemPrompt = getSystemPrompt(model);
+    expect(systemPrompt).toContain(GENESIS_TEMPLATE);
+    expect(systemPrompt).not.toContain("Active Knowledge");
+    expect(systemPrompt).toContain("## Current Time");
   });
 
   test("pinned SMARTS are always included", async () => {
-    const cortex = new Cortex({
-      injectedProvider: capturingProvider,
-      smartsStore,
-    });
+    const model = createMockModel();
+    const cortex = new Cortex({ injectedModel: model, smartsStore });
     cortex.pinSmart("security-basics");
     await cortex.chat("Tell me about Bun");
-    expect(capturedPrompt).toContain("Security Basics");
+    const systemPrompt = getSystemPrompt(model);
+    expect(systemPrompt).toContain("Security Basics");
   });
 
   test("unpinSmart removes a pin", async () => {
-    const cortex = new Cortex({
-      injectedProvider: capturingProvider,
-      smartsStore,
-    });
+    const model = createMockModel();
+    const cortex = new Cortex({ injectedModel: model, smartsStore });
     cortex.pinSmart("security-basics");
     cortex.unpinSmart("security-basics");
     await cortex.chat("Tell me about cooking");
-    expect(capturedPrompt).not.toContain("Security Basics");
+    const systemPrompt = getSystemPrompt(model);
+    expect(systemPrompt).not.toContain("Security Basics");
   });
 });
 
@@ -253,43 +202,20 @@ describe("Cortex — Sensorium integration", () => {
     });
     await sensorium.poll();
 
-    let capturedPrompt = "";
-    const capturingProvider: LLMProvider = {
-      name: "capturing",
-      defaultModel: "capture",
-      defaultFastModel: "capture-fast",
-      chat: async (systemPrompt) => {
-        capturedPrompt = systemPrompt;
-        return textResponse("ok");
-      },
-    };
-
-    const cortex = new Cortex({
-      injectedProvider: capturingProvider,
-      sensorium,
-    });
+    const model = createMockModel();
+    const cortex = new Cortex({ injectedModel: model, sensorium });
     await cortex.chat("Hello");
-
-    expect(capturedPrompt).toContain("[ENVIRONMENT]");
-    expect(capturedPrompt).toContain("cores");
+    const systemPrompt = getSystemPrompt(model);
+    expect(systemPrompt).toContain("[ENVIRONMENT]");
+    expect(systemPrompt).toContain("cores");
   });
 
   test("works without sensorium (backwards compatible)", async () => {
-    let capturedPrompt = "";
-    const capturingProvider: LLMProvider = {
-      name: "capturing",
-      defaultModel: "capture",
-      defaultFastModel: "capture-fast",
-      chat: async (systemPrompt) => {
-        capturedPrompt = systemPrompt;
-        return textResponse("ok");
-      },
-    };
-
-    const cortex = new Cortex({ injectedProvider: capturingProvider });
+    const model = createMockModel();
+    const cortex = new Cortex({ injectedModel: model });
     await cortex.chat("Hello");
-
-    expect(capturedPrompt).not.toContain("[ENVIRONMENT]");
+    const systemPrompt = getSystemPrompt(model);
+    expect(systemPrompt).not.toContain("[ENVIRONMENT]");
   });
 });
 
@@ -307,7 +233,7 @@ describe("Cortex — debug inference logging", () => {
     await Bun.write(RESPONSE_LOG, "STALE RESPONSE");
 
     const cortex = new Cortex({
-      injectedProvider: stubProvider,
+      injectedModel: createMockModel(),
       debug: true,
       projectRoot: "/tmp/test",
     });
@@ -321,7 +247,7 @@ describe("Cortex — debug inference logging", () => {
 
   test("does NOT write logs when debug is false", async () => {
     const cortex = new Cortex({
-      injectedProvider: stubProvider,
+      injectedModel: createMockModel(),
       debug: false,
       projectRoot: "/tmp/test",
     });
@@ -333,7 +259,7 @@ describe("Cortex — debug inference logging", () => {
 
   test("does NOT write logs when debug is true but no projectRoot", async () => {
     const cortex = new Cortex({
-      injectedProvider: stubProvider,
+      injectedModel: createMockModel(),
       debug: true,
     });
     await cortex.chat("Hello");
@@ -342,39 +268,12 @@ describe("Cortex — debug inference logging", () => {
     expect(existsSync(RESPONSE_LOG)).toBe(false);
   });
 
-  test("passes debug options to provider chat() call", async () => {
-    let capturedOptions: unknown;
-    const capturingProvider: LLMProvider = {
-      name: "capturing",
-      defaultModel: "capture",
-      defaultFastModel: "capture-fast",
-      chat: async (_sys, _msgs, opts) => {
-        capturedOptions = opts;
-        return textResponse("ok");
-      },
-    };
-
-    const cortex = new Cortex({
-      injectedProvider: capturingProvider,
-      debug: true,
-      projectRoot: "/tmp/test",
-    });
-    await cortex.chat("Hello");
-
-    expect(capturedOptions).toBeDefined();
-    const opts = capturedOptions as { debug?: { payloadPath: string; responsePath: string; round: number } };
-    expect(opts.debug).toBeDefined();
-    expect(opts.debug!.payloadPath).toBe("/tmp/test/last-inference-payload.log");
-    expect(opts.debug!.responsePath).toBe("/tmp/test/last-inference-response.log");
-    expect(opts.debug!.round).toBe(1);
-  });
-
   test("retains debug:system-prompt audit entry", async () => {
     const { AuditLogger } = await import("../../src/audit/logger.ts");
     const audit = new AuditLogger();
 
     const cortex = new Cortex({
-      injectedProvider: stubProvider,
+      injectedModel: createMockModel(),
       debug: true,
       projectRoot: "/tmp/test",
       audit,
@@ -383,28 +282,5 @@ describe("Cortex — debug inference logging", () => {
 
     const entries = audit.entries({ action: "debug:system-prompt" });
     expect(entries).toHaveLength(1);
-  });
-
-  test("does not pass debug to provider when debug is false", async () => {
-    let capturedOptions: unknown;
-    const capturingProvider: LLMProvider = {
-      name: "capturing",
-      defaultModel: "capture",
-      defaultFastModel: "capture-fast",
-      chat: async (_sys, _msgs, opts) => {
-        capturedOptions = opts;
-        return textResponse("ok");
-      },
-    };
-
-    const cortex = new Cortex({
-      injectedProvider: capturingProvider,
-      debug: false,
-      projectRoot: "/tmp/test",
-    });
-    await cortex.chat("Hello");
-
-    const opts = capturedOptions as { debug?: unknown };
-    expect(opts.debug).toBeUndefined();
   });
 });

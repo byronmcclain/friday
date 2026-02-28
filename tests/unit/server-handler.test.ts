@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { WebSocketHandler } from "../../src/server/handler.ts";
 import { ClientRegistry } from "../../src/server/client-registry.ts";
 import { FridayRuntime } from "../../src/core/runtime.ts";
-import { stubProvider } from "../helpers/stubs.ts";
+import { createMockModel } from "../helpers/stubs.ts";
 import type { ServerMessage } from "../../src/server/protocol.ts";
 
 describe("WebSocketHandler", () => {
@@ -17,7 +17,7 @@ describe("WebSocketHandler", () => {
 
 	beforeEach(async () => {
 		runtime = new FridayRuntime();
-		await runtime.boot({ injectedProvider: stubProvider });
+		await runtime.boot({ injectedModel: createMockModel() });
 		registry = new ClientRegistry();
 		handler = new WebSocketHandler(runtime, registry, "test-client");
 		sent = [];

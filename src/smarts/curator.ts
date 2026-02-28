@@ -1,16 +1,8 @@
 import type { SmartsStore } from "./store.ts";
-import type { LLMProvider } from "../providers/types.ts";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { generateText } from "ai";
 import { type ConversationMessage, getTextContent } from "../core/types.ts";
 import { withTimeout } from "../utils/timeout.ts";
-
-/** Type guard: LanguageModelV3 has specificationVersion, LLMProvider does not */
-function isLanguageModel(
-	value: LanguageModelV3 | LLMProvider,
-): value is LanguageModelV3 {
-	return "specificationVersion" in value;
-}
 
 const MIN_MESSAGES_FOR_EXTRACTION = 4;
 
@@ -122,24 +114,13 @@ interface ExtractedSmart {
 }
 
 export class SmartsCurator {
-	private languageModel: LanguageModelV3 | null;
-	private provider: LLMProvider | null;
 	private model: string;
 
 	constructor(
 		private store: SmartsStore,
-		modelOrProvider: LanguageModelV3 | LLMProvider,
-		fastModel?: string,
+		private languageModel: LanguageModelV3,
 	) {
-		if (isLanguageModel(modelOrProvider)) {
-			this.languageModel = modelOrProvider;
-			this.provider = null;
-			this.model = modelOrProvider.modelId;
-		} else {
-			this.languageModel = null;
-			this.provider = modelOrProvider;
-			this.model = fastModel ?? modelOrProvider.defaultFastModel;
-		}
+		this.model = languageModel.modelId;
 	}
 
 	async extractFromConversation(messages: ConversationMessage[]): Promise<void> {
@@ -153,33 +134,16 @@ export class SmartsCurator {
 			const existingNames = this.store.all().map((e) => e.name);
 			const prompt = buildExtractionPrompt(existingNames);
 
-			let response: string;
-
-			if (this.languageModel) {
-				// AI SDK path
-				const result = await withTimeout(
-					generateText({
-						model: this.languageModel,
-						prompt: `${prompt}\n\n${conversationText}`,
-						maxOutputTokens: 4096,
-					}),
-					30_000,
-					"SMARTS knowledge extraction",
-				);
-				response = result.text;
-			} else {
-				// Legacy LLMProvider path
-				const chatResponse = await withTimeout(
-					this.provider!.chat(
-						prompt,
-						[{ role: "user", content: conversationText }],
-						{ model: this.model, maxTokens: 4096 },
-					),
-					30_000,
-					"SMARTS knowledge extraction",
-				);
-				response = chatResponse.type === "text" ? chatResponse.text : "";
-			}
+			const result = await withTimeout(
+				generateText({
+					model: this.languageModel,
+					prompt: `${prompt}\n\n${conversationText}`,
+					maxOutputTokens: 4096,
+				}),
+				30_000,
+				"SMARTS knowledge extraction",
+			);
+			const response = result.text;
 
 			const extracted = this.parseResponse(response);
 			const filtered = extracted.filter((smart) => !isVolatile(smart.content));

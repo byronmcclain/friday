@@ -3,9 +3,6 @@ import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { xai } from "@ai-sdk/xai";
 import { anthropic } from "@ai-sdk/anthropic";
 
-// Legacy types — kept for dual-path test compatibility
-export type { LLMProvider, ChatOptions, ChatResponse, ToolCallRequest, ToolDefinition } from "./types.ts";
-
 export const DEFAULT_PROVIDER: ProviderName = "grok";
 
 export const PROVIDER_DEFAULTS: Record<ProviderName, { model: string; fastModel: string }> = {

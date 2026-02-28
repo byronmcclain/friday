@@ -127,7 +127,6 @@ src/
 ├── providers/             # AI SDK model factory (createModel), Zod schema converter
 │   ├── index.ts           # createModel(), PROVIDER_DEFAULTS, DEFAULT_PROVIDER
 │   ├── schemas.ts         # toZodSchema() — converts FridayTool parameters to Zod for AI SDK
-│   ├── types.ts           # Legacy LLMProvider interface (retained for test dual-path compat)
 │   └── debug-log.ts       # appendInferenceLog() — shared debug logging for providers
 ├── config/                # Runtime configuration loading — future
 └── utils/                 # Shared utilities — future
@@ -140,7 +139,7 @@ web/                       # React web UI (Vite + Tailwind)
 smarts/                    # Runtime-generated knowledge files (gitignored, user-specific)
 forge/                     # Friday-authored modules (gitignored, AI-generated)
 tests/
-├── helpers/               # Shared test stubs (createMockModel, stubProvider)
+├── helpers/               # Shared test stubs (createMockModel, createErrorModel)
 ├── unit/                  # Unit tests (bun:test)
 └── integration/           # Integration tests — future
 ```
@@ -148,7 +147,7 @@ tests/
 ### Key Design Patterns
 
 - **FridayRuntime** (`src/core/runtime.ts`) is the composition root. It boots all subsystems in order: SignalBus, ClearanceManager, AuditLogger, NotificationManager, ProtocolRegistry, DirectiveStore/Engine, Memory, SmartsStore, Sensorium, Genesis, Vox, Cortex, Recall Tool, Arc Rhythm, then discovers and loads Modules.
-- **Cortex** (`src/core/cortex.ts`) is Friday's LLM brain. Uses AI SDK `streamText()` with `stopWhen: stepCountIs(N)` for automatic tool loop execution. Exposes `chat()` (blocking) and `chatStream()` (streaming `ChatStream` with `textStream`, `fullText`, `usage`). `HistoryManager` handles token-budget conversation history with compaction. Tools registered via `registerTool()` are converted to AI SDK tools via `toZodSchema()`. When a SmartsStore is provided, Cortex enriches the system prompt with pinned and FTS5-matched knowledge per message. A legacy `injectedProvider` path is retained for test backward compatibility.
+- **Cortex** (`src/core/cortex.ts`) is Friday's LLM brain. Uses AI SDK `streamText()` with `stopWhen: stepCountIs(N)` for automatic tool loop execution. Exposes `chat()` (blocking, with error rollback) and `chatStream()` (streaming `ChatStream` with `textStream`, `fullText`, `usage`). `HistoryManager` handles token-budget conversation history with compaction. Tools registered via `registerTool()` are converted to AI SDK tools via `toZodSchema()`. When a SmartsStore is provided, Cortex enriches the system prompt with pinned and FTS5-matched knowledge per message.
 - **SMARTS** (`src/smarts/`) is Friday's dynamic knowledge system. Markdown files with YAML frontmatter in `smarts/` are indexed into FTS5, queried per-message to enrich prompts, and new knowledge is extracted from conversations on shutdown via SmartsCurator. The `/smart` protocol provides manual control (list, show, search, reload).
 - **SignalBus** (`src/core/events.ts`) is the reactive nervous system. Typed signals (file:changed, test:failed, etc.) flow through here, triggering directives and module behavior.
 - **Protocols** bypass LLM reasoning entirely — `/command` input is routed directly to a protocol handler via the ProtocolRegistry, while everything else flows through Cortex.
@@ -173,10 +172,10 @@ tests/
 
 ## Testing
 
-- 959 tests across 89 files (as of 2026-02-27)
-- New tests use `injectedModel: createMockModel()` (AI SDK `MockLanguageModelV3` from `ai/test`)
-- Legacy tests use `injectedProvider` (stub `LLMProvider`) for backward compat — being migrated
-- Shared test stubs live in `tests/helpers/stubs.ts` — prefer `createMockModel` for new tests, `stubProvider`/`grokStub` for legacy
+- 949 tests across 94 files (as of 2026-02-28)
+- Tests use `injectedModel: createMockModel()` (AI SDK `MockLanguageModelV3` from `ai/test` with call capture via `.doStreamCalls`/`.doGenerateCalls`)
+- Use `createErrorModel()` for models that throw on `doGenerate`/`doStream`
+- Shared test stubs live in `tests/helpers/stubs.ts`
 - SQLite tests must clean up WAL files: unlink `db`, `db-wal`, and `db-shm` in afterEach
 - `bun:sqlite` transactions: `db.transaction(() => { ... })()` — must invoke the returned function
 - `node:fs/promises` `appendFile` is an accepted exception where Bun has no native append API
