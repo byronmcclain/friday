@@ -8,6 +8,9 @@ import { writeSync } from "node:fs";
 import { FridayRuntime } from "../../core/runtime.ts";
 import { resolveGenesisPath } from "../../core/genesis.ts";
 import type { ProviderName } from "../../core/types.ts";
+import type { RuntimeBridge } from "../../core/bridges/types.ts";
+import { LocalBridge } from "../../core/bridges/local.ts";
+import { SocketBridge } from "../../core/bridges/socket.ts";
 import { TuiChannel } from "./channels/tui-channel.ts";
 import { appReducer, initialState, isExitWord, createMessage } from "./state.ts";
 import { PALETTE } from "./theme.ts";
@@ -52,6 +55,7 @@ interface FridayAppProps {
 		fastModel?: string;
 		fresh?: boolean;
 		debug?: boolean;
+		socketPath?: string;
 	};
 	renderer: Awaited<ReturnType<typeof createCliRenderer>>;
 }
@@ -59,6 +63,7 @@ interface FridayAppProps {
 function FridayApp({ options, renderer }: FridayAppProps) {
 	const [state, dispatch] = useReducer(appReducer, initialState);
 	const runtimeRef = useRef<FridayRuntime | null>(null);
+	const bridgeRef = useRef<RuntimeBridge | null>(null);
 	const commandsRef = useRef<TypeaheadEntry[]>([]);
 	const processingRef = useRef(false);
 	const logoDataRef = useRef<LogoData | null>(null);
@@ -112,8 +117,6 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 	// Boot runtime on mount
 	useEffect(() => {
 		let cancelled = false;
-		const runtime = new FridayRuntime();
-		runtimeRef.current = runtime;
 
 		(async () => {
 			// Process logo during splash phase, sized to fit the terminal.
@@ -134,75 +137,121 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 				dispatch({ type: "set-phase", phase: "booting" });
 			}
 
-			dispatch({
-				type: "add-message",
-				message: createMessage("system", "Booting Friday..."),
-			});
-			pushLog("info", "runtime", "Booting Friday...");
-			try {
-				await runtime.boot(bootConfig());
+			if (options.socketPath) {
+				// Singleton mode — connect to existing runtime via socket
+				dispatch({
+					type: "add-message",
+					message: createMessage("system", "Connecting to singleton runtime..."),
+				});
+				pushLog("info", "runtime", "Connecting to singleton runtime...");
+				try {
+					const socketBridge = new SocketBridge(options.socketPath);
+					await socketBridge.connect();
+					bridgeRef.current = socketBridge;
 
-				if (cancelled) return;
+					if (cancelled) return;
 
-				// Wire audit log callback to LogStore (after boot so _audit exists)
-				runtime.audit.onLog = (entry: AuditEntry) => {
-					pushLog(
-						entry.success ? "success" : "error",
-						"audit",
-						entry.action,
-						entry.detail,
-					);
-				};
-
-				// Wire TuiChannel for toast notifications
-				const notifications = runtime.notifications;
-				if (notifications) {
-					notifications.addChannel(
-						new TuiChannel((level, text) => {
-							if (level === "alert") {
-								toast.error(text);
-							} else {
-								toast(text);
-							}
-						}),
-					);
+					dispatch({
+						type: "set-welcome",
+						info: { provider: options.provider, model: options.model ?? "singleton" },
+					});
+					dispatch({
+						type: "add-message",
+						message: createMessage("system", "Connected to singleton runtime."),
+					});
+					if (cancelled) return;
+					setBootComplete(true);
+					pushLog("success", "runtime", "Connected to singleton runtime.");
+				} catch (error) {
+					if (cancelled) return;
+					const msg =
+						error instanceof Error
+							? error.message
+							: "Unknown connection error";
+					dispatch({
+						type: "add-message",
+						message: createMessage("system", `Connection failed: ${msg}`),
+					});
+					pushLog("error", "runtime", `Connection failed: ${msg}`);
 				}
+			} else {
+				// Local mode — boot a full FridayRuntime
+				const runtime = new FridayRuntime();
+				runtimeRef.current = runtime;
 
-				// Build command list for typeahead
-				commandsRef.current = runtime.protocols.list().map((p) => ({
-					name: p.name,
-					description: p.description,
-					aliases: p.aliases,
-				}));
-
-				const providerLabel = runtime.cortex.providerName;
-				const modelLabel = runtime.cortex.modelName;
-				const toolCount = runtime.cortex.availableTools.length;
-				dispatch({
-					type: "set-welcome",
-					info: { provider: providerLabel, model: modelLabel },
-				});
 				dispatch({
 					type: "add-message",
-					message: createMessage(
-						"system",
-						`Friday online. (${providerLabel}: ${modelLabel}, ${toolCount} tools)`,
-					),
+					message: createMessage("system", "Booting Friday..."),
 				});
-				if (cancelled) return;
-				setBootComplete(true);
-				pushLog("success", "runtime", `Friday online. (${providerLabel}: ${modelLabel}, ${toolCount} tools)`);
-			} catch (error) {
-				if (cancelled) return;
-				const msg =
-					error instanceof Error
-						? error.message
-						: "Unknown boot error";
-				dispatch({
-					type: "add-message",
-					message: createMessage("system", `Boot failed: ${msg}`),
-				});
-				pushLog("error", "runtime", `Boot failed: ${msg}`);
+				pushLog("info", "runtime", "Booting Friday...");
+				try {
+					await runtime.boot(bootConfig());
+
+					if (cancelled) return;
+
+					// Wrap in LocalBridge for unified interface
+					bridgeRef.current = new LocalBridge(runtime);
+
+					// Wire audit log callback to LogStore (after boot so _audit exists)
+					runtime.audit.onLog = (entry: AuditEntry) => {
+						pushLog(
+							entry.success ? "success" : "error",
+							"audit",
+							entry.action,
+							entry.detail,
+						);
+					};
+
+					// Wire TuiChannel for toast notifications
+					const notifications = runtime.notifications;
+					if (notifications) {
+						notifications.addChannel(
+							new TuiChannel((level, text) => {
+								if (level === "alert") {
+									toast.error(text);
+								} else {
+									toast(text);
+								}
+							}),
+						);
+					}
+
+					// Build command list for typeahead
+					commandsRef.current = runtime.protocols.list().map((p) => ({
+						name: p.name,
+						description: p.description,
+						aliases: p.aliases,
+					}));
+
+					const providerLabel = runtime.cortex.providerName;
+					const modelLabel = runtime.cortex.modelName;
+					const toolCount = runtime.cortex.availableTools.length;
+					dispatch({
+						type: "set-welcome",
+						info: { provider: providerLabel, model: modelLabel },
+					});
+					dispatch({
+						type: "add-message",
+						message: createMessage(
+							"system",
+							`Friday online. (${providerLabel}: ${modelLabel}, ${toolCount} tools)`,
+						),
+					});
+					if (cancelled) return;
+					setBootComplete(true);
+					pushLog("success", "runtime", `Friday online. (${providerLabel}: ${modelLabel}, ${toolCount} tools)`);
+				} catch (error) {
+					if (cancelled) return;
+					const msg =
+						error instanceof Error
+							? error.message
+							: "Unknown boot error";
+					dispatch({
+						type: "add-message",
+						message: createMessage("system", `Boot failed: ${msg}`),
+					});
+					pushLog("error", "runtime", `Boot failed: ${msg}`);
+				}
 			}
 		})();
 
@@ -229,24 +278,37 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 
 	// Shutdown handler
 	const handleShutdown = useCallback(async () => {
+		if (isShuttingDownRef.current) return;
+		const bridge = bridgeRef.current;
 		const runtime = runtimeRef.current;
-		if (!runtime || isShuttingDownRef.current) return;
+		if (!bridge && !runtime) return;
 		isShuttingDownRef.current = true;
 
 		dispatch({ type: "set-phase", phase: "shutting-down" });
 		try {
-			await runtime.shutdown((_, label) => {
+			if (bridge && !runtime) {
+				// Socket bridge — just disconnect
+				await bridge.shutdown();
 				dispatch({
 					type: "add-message",
-					message: createMessage("system", label),
+					message: createMessage("system", "Disconnected."),
 				});
-				pushLog("info", "runtime", label);
-			});
-			dispatch({
-				type: "add-message",
-				message: createMessage("system", "Shutdown complete."),
-			});
-			pushLog("success", "runtime", "Shutdown complete.");
+				pushLog("success", "runtime", "Disconnected.");
+			} else if (runtime) {
+				// Local bridge — full runtime shutdown with progress labels
+				await runtime.shutdown((_, label) => {
+					dispatch({
+						type: "add-message",
+						message: createMessage("system", label),
+					});
+					pushLog("info", "runtime", label);
+				});
+				dispatch({
+					type: "add-message",
+					message: createMessage("system", "Shutdown complete."),
+				});
+				pushLog("success", "runtime", "Shutdown complete.");
+			}
 		} catch (error) {
 			const msg =
 				error instanceof Error ? error.message : "Unknown error";
@@ -289,8 +351,9 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 	// Handle input submission
 	const handleSubmit = useCallback(
 		async (input: string) => {
+			const bridge = bridgeRef.current;
 			const runtime = runtimeRef.current;
-			if (!runtime || state.phase !== "active" || processingRef.current)
+			if (!bridge || state.phase !== "active" || processingRef.current)
 				return;
 
 			// Exit words trigger shutdown
@@ -307,12 +370,14 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			processingRef.current = true;
 
 			try {
-				// Protocol inputs (starting with /) go through runtime.process()
-				// All other input streams through Cortex directly
-				const isProtocol = input.startsWith("/") && runtime.protocols.isProtocol(input);
+				// Protocol inputs (starting with /) go through bridge.process()
+				// All other input streams through bridge.chat()
+				const isProtocol = runtime
+					? input.startsWith("/") && runtime.protocols.isProtocol(input)
+					: input.startsWith("/");
 
 				if (isProtocol) {
-					const result = await runtime.process(input);
+					const result = await bridge.process(input);
 					dispatch({ type: "set-thinking", value: false });
 					dispatch({
 						type: "add-message",
@@ -320,19 +385,16 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 					});
 				} else {
 					// Streaming path — dispatch chunks as they arrive
-					const stream = await runtime.cortex.chatStream(input);
+					const stream = bridge.chat(input);
 					dispatch({ type: "set-thinking", value: false });
 
-					for await (const chunk of stream.textStream) {
+					for await (const chunk of stream) {
 						dispatch({ type: "chat:chunk", text: chunk });
 					}
-
-					// Wait for full text to ensure history is committed
-					await stream.fullText;
 				}
 
-				// Forge restart check
-				if (runtime.restartRequested) {
+				// Forge restart check (only applies to local runtime)
+				if (runtime?.restartRequested) {
 					dispatch({
 						type: "add-message",
 						message: createMessage(
@@ -352,6 +414,10 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 							...bootConfig(),
 							fresh: false,
 						});
+
+						// Re-wrap in LocalBridge after reboot
+						bridgeRef.current = new LocalBridge(runtime);
+
 						dispatch({
 							type: "add-message",
 							message: createMessage(
@@ -462,13 +528,13 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 				: "Type a message or /command...";
 
 	// Provider info for header
-	const runtime = runtimeRef.current;
-	const provider = runtime?.isBooted
-		? runtime.cortex.providerName
+	const headerRuntime = runtimeRef.current;
+	const provider = headerRuntime?.isBooted
+		? headerRuntime.cortex.providerName
 		: options.provider;
-	const model = runtime?.isBooted
-		? runtime.cortex.modelName
-		: (options.model ?? "...");
+	const model = headerRuntime?.isBooted
+		? headerRuntime.cortex.modelName
+		: (options.model ?? (options.socketPath ? "singleton" : "..."));
 
 	const panelWidth = Math.min(60, Math.floor(renderer.width * 0.3));
 
@@ -512,6 +578,7 @@ export async function launchTui(options: {
 	fastModel?: string;
 	fresh?: boolean;
 	debug?: boolean;
+	socketPath?: string;
 }): Promise<void> {
 	if (!process.stdin.isTTY) {
 		console.error(

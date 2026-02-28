@@ -1,5 +1,9 @@
 import type { Command } from "commander";
 import { DEFAULT_PROVIDER } from "../../providers/index.ts";
+import {
+	checkSingletonSocket,
+	DEFAULT_SOCKET_PATH,
+} from "../../server/socket.ts";
 
 export function chatCommand(program: Command): void {
 	program
@@ -24,6 +28,7 @@ export function chatCommand(program: Command): void {
 		)
 		.action(async function (this: Command, options) {
 			const globalOpts = this.optsWithGlobals();
+			const singletonAvailable = await checkSingletonSocket();
 			const { launchTui } = await import("../tui/app.tsx");
 			await launchTui({
 				provider: options.provider,
@@ -31,6 +36,9 @@ export function chatCommand(program: Command): void {
 				fastModel: options.fastModel,
 				fresh: options.fresh,
 				debug: globalOpts.debug,
+				socketPath: singletonAvailable
+					? DEFAULT_SOCKET_PATH
+					: undefined,
 			});
 		});
 }
