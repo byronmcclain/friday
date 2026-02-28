@@ -6,7 +6,6 @@ export interface Message {
 }
 
 export interface WelcomeInfo {
-	provider: string;
 	model: string;
 }
 

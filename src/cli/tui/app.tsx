@@ -129,15 +129,13 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 
 				if (cancelled) return;
 
-				// Query the server for actual provider/model info
-				let runtimeProvider = "...";
+				// Query the server for actual model info
 				let runtimeModel = "...";
 				try {
 					const info = await socketBridge.identify();
-					runtimeProvider = info.provider;
 					runtimeModel = info.model;
 				} catch {
-					// Identification failed — use fallbacks
+					// Identification failed — use fallback
 				}
 
 				// Fetch available protocols for typeahead
@@ -154,15 +152,15 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 
 				dispatch({
 					type: "set-welcome",
-					info: { provider: runtimeProvider, model: runtimeModel },
+					info: { model: runtimeModel },
 				});
 				dispatch({
 					type: "add-message",
-					message: createMessage("system", `Connected to singleton runtime. (${runtimeProvider}: ${runtimeModel})`),
+					message: createMessage("system", `Connected to singleton runtime. (Grok: ${runtimeModel})`),
 				});
 				if (cancelled) return;
 				setBootComplete(true);
-				pushLog("success", "runtime", `Connected to singleton runtime. (${runtimeProvider}: ${runtimeModel})`);
+				pushLog("success", "runtime", `Connected to singleton runtime. (Grok: ${runtimeModel})`);
 			} catch (error) {
 				if (cancelled) return;
 				const msg =
@@ -347,7 +345,6 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 				? "Shutting down..."
 				: "Type a message or /command...";
 
-	const provider = state.welcomeInfo?.provider ?? "...";
 	const model = state.welcomeInfo?.model ?? "...";
 
 	const panelWidth = Math.min(60, Math.floor(renderer.width * 0.3));
@@ -361,7 +358,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			shouldFill
 			onMouseUp={handleMouseUp}
 		>
-			<Header provider={provider} model={model} />
+			<Header model={model} />
 			<box flexDirection="row" flexGrow={1}>
 				<box flexDirection="column" flexGrow={1}>
 					<ChatArea

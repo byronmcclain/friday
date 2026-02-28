@@ -70,7 +70,7 @@ export function ChatArea({ messages, isThinking, isStreaming, welcomeInfo }: Cha
 			}}
 		>
 			{!hasUserMessage && welcomeInfo && (
-				<Welcome provider={welcomeInfo.provider} model={welcomeInfo.model} />
+				<Welcome model={welcomeInfo.model} />
 			)}
 			{elements}
 			{isThinking && <ThinkingIndicator />}

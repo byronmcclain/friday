@@ -1,11 +1,10 @@
 import { PALETTE, BOLD, DIM } from "../theme.ts";
 
 interface WelcomeProps {
-	provider: string;
 	model: string;
 }
 
-export function Welcome({ provider, model }: WelcomeProps) {
+export function Welcome({ model }: WelcomeProps) {
 	return (
 		<box
 			border
@@ -22,7 +21,7 @@ export function Welcome({ provider, model }: WelcomeProps) {
 				{"Welcome back, boss."}
 			</text>
 			<text fg={PALETTE.textMuted}>
-				{`Provider: ${provider}  ·  Model: ${model}`}
+				{`Model: ${model}`}
 			</text>
 			<text fg={PALETTE.textMuted} attributes={DIM}>
 				{"Type a message or /command to get started."}

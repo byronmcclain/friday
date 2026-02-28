@@ -42,11 +42,10 @@ function ShimmerTitle() {
 }
 
 interface HeaderProps {
-	provider: string;
 	model: string;
 }
 
-export function Header({ provider, model }: HeaderProps) {
+export function Header({ model }: HeaderProps) {
 	return (
 		<box
 			flexDirection="column"
@@ -62,7 +61,7 @@ export function Header({ provider, model }: HeaderProps) {
 			<box flexDirection="row" justifyContent="space-between" width="100%">
 				<ShimmerTitle />
 				<text fg={PALETTE.amberDim}>
-					{`${provider}: ${model}`}
+					{`Grok: ${model}`}
 				</text>
 			</box>
 			<text fg={PALETTE.textMuted} attributes={DIM}>
