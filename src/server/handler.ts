@@ -6,6 +6,9 @@ import {
 } from "./protocol.ts";
 import { ClientRegistry } from "./client-registry.ts";
 import { WebSocketNotificationChannel } from "./ws-channel.ts";
+import { VoiceBridge, type VoiceBridgeConfig } from "../core/voice/bridge.ts";
+import { FRIDAY_VOICE_IDENTITY } from "../core/voice/prompt.ts";
+import type { GrokVoice } from "../core/voice/types.ts";
 
 export type SendFn = (msg: ServerMessage) => void;
 
@@ -14,6 +17,8 @@ export class WebSocketHandler {
 	private registry: ClientRegistry;
 	private clientId: string;
 	private defaultSend?: SendFn;
+	private voiceBridge: VoiceBridge | null = null;
+	private assistantTranscriptBuffer = "";
 
 	constructor(runtime: FridayRuntime, registry: ClientRegistry, clientId: string) {
 		this.runtime = runtime;
@@ -60,8 +65,10 @@ export class WebSocketHandler {
 		}
 	}
 
-	handleAudio(_audioData: Buffer): void {
-		// Stub — Phase 4 implements VoiceBridge forwarding
+	handleAudio(audioData: Buffer): void {
+		if (!this.voiceBridge?.isActive) return;
+		const base64 = audioData.toString("base64");
+		this.voiceBridge.appendAudio(base64);
 	}
 
 	pushSensoriumUpdate(send?: SendFn): void {
@@ -256,20 +263,99 @@ export class WebSocketHandler {
 				break;
 			}
 			case "voice:start": {
-				// Phase 4 implements this
-				send({
-					type: "voice:error",
-					code: "NOT_IMPLEMENTED",
-					message: "Voice not yet implemented",
-				});
+				if (this.voiceBridge?.isActive) {
+					send({
+						type: "voice:error",
+						code: "SESSION_IN_USE",
+						message: "Voice session already active",
+					});
+					break;
+				}
+
+				this.assistantTranscriptBuffer = "";
+
+				const voiceConfig: VoiceBridgeConfig = {
+					voice: ((msg as any).voice ?? "Eve") as GrokVoice,
+					sampleRate: 48000,
+					instructions: FRIDAY_VOICE_IDENTITY,
+				};
+
+				this.voiceBridge = new VoiceBridge(
+					this.runtime.cortex,
+					voiceConfig,
+					{
+						onAudioDelta: (base64) =>
+							send({ type: "voice:audio", delta: base64 }),
+						onTranscriptDelta: (delta, done) => {
+							if (!done) {
+								this.assistantTranscriptBuffer += delta;
+							}
+							send({
+								type: "voice:transcript",
+								role: "assistant",
+								delta,
+								done,
+							});
+							if (done) {
+								this.registry.broadcast(
+									{
+										type: "conversation:message",
+										role: "assistant",
+										content: this.assistantTranscriptBuffer,
+										source: "voice",
+									},
+									(c) => c.id !== this.clientId,
+								);
+								this.assistantTranscriptBuffer = "";
+							}
+						},
+						onStateChange: (state) =>
+							send({ type: "voice:state", state }),
+						onUserTranscript: (text) => {
+							send({
+								type: "voice:transcript",
+								role: "user",
+								delta: text,
+								done: true,
+							});
+							this.registry.broadcast(
+								{
+									type: "conversation:message",
+									role: "user",
+									content: text,
+									source: "voice",
+								},
+								(c) => c.id !== this.clientId,
+							);
+						},
+					},
+				);
+
+				try {
+					await this.voiceBridge.start();
+					send({ type: "voice:started", requestId: msg.id });
+				} catch (err) {
+					send({
+						type: "voice:error",
+						code: "START_FAILED",
+						message:
+							err instanceof Error
+								? err.message
+								: "Failed to start voice",
+					});
+				}
 				break;
 			}
 			case "voice:stop": {
+				if (this.voiceBridge) {
+					await this.voiceBridge.stop();
+					this.voiceBridge = null;
+				}
 				send({ type: "voice:stopped", requestId: msg.id });
 				break;
 			}
 			case "voice:mode": {
-				// Phase 4 implements this
+				// Voice mode switching handled by the client-side session
 				break;
 			}
 			case "history:list": {
