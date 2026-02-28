@@ -41,11 +41,14 @@ bun install
 cp .env.example .env
 # Edit .env — add ANTHROPIC_API_KEY or XAI_API_KEY
 
-# Start chatting
+# Start the server
+bun run serve &
+
+# Connect with the TUI
 bun run start chat
 ```
 
-Friday greets you and enters an interactive session. Type natural language to converse, `/command` to invoke a protocol, or `exit` to end the session.
+Friday's server starts first, then the TUI connects to it. Type natural language to converse, `/command` to invoke a protocol, or `exit` to end the session.
 
 ---
 
@@ -428,9 +431,8 @@ flowchart TB
         INPUT --> TA[CommandTypeahead: /command suggestions]
     end
 
-    subgraph Bridge ["Notification Bridge"]
-        NM[NotificationManager] --> TC[TuiChannel]
-        TC --> TOAST["@opentui-ui/toast"]
+    subgraph Bridge ["Notifications"]
+        NM[NotificationManager] -->|"server-side"| WS[WebSocket push]
     end
 ```
 
@@ -474,7 +476,7 @@ flowchart LR
     SOCK <-->|"Unix socket IPC"| TUI["friday chat (singleton mode)"]
 ```
 
-The WebSocket protocol supports: `session:boot`, `session:shutdown`, `chat`, `protocol`, `history:list`, `history:load`, `smarts:list`, `smarts:search`, `voice:start`, `voice:stop`, `voice:mode`, and `session:identify` for client-type registration. The server runs in **singleton mode** — `friday chat` in another terminal auto-detects the running server via `~/.friday/friday.pid` + `~/.friday/friday.sock` and connects via `SocketBridge`.
+The WebSocket protocol supports: `session:boot`, `session:shutdown`, `chat`, `protocol`, `history:list`, `history:load`, `smarts:list`, `smarts:search`, `voice:start`, `voice:stop`, `voice:mode`, and `session:identify` for client-type registration. The server is the **single source of truth** — `friday chat` requires a running server and connects via `SocketBridge` over `~/.friday/friday.sock`. If no server is running, `friday chat` exits with a helpful error.
 
 `bun run serve` · `bun run web:dev`
 
@@ -837,20 +839,16 @@ sequenceDiagram
 ## CLI Usage
 
 ```bash
-# Start interactive chat (default provider: grok)
-bun run start chat
+# Start the server (must be running before chat)
+bun run serve                  # Start Friday server (default port 3000)
+friday serve &                 # Or run in background after `bun link`
 
-# Use a specific provider
-bun run start chat --provider anthropic
+# Connect with the TUI (requires running server)
+bun run start chat             # Connect to running server via TUI
+friday chat                    # Or after `bun link`
 
-# Use a specific model
-bun run start chat --model claude-sonnet-4-20250514
-
-# Override the fast model (used for summarization & knowledge extraction)
-bun run start chat --fast-model grok-4-1-fast-non-reasoning
-
-# Combine flags
-bun run start chat --provider grok --model grok-3
+# Provider/model are configured on the server, not the chat client
+# Use --provider and --model flags on `friday serve` (or env vars)
 
 # Manage Friday's identity prompt
 bun run start genesis init     # Seed GENESIS.md from template
@@ -860,12 +858,8 @@ bun run start genesis update   # Overwrite with latest template
 bun run start genesis check    # Validate file + permissions
 bun run start genesis path     # Print resolved file path
 
-# Debug inference logging
-friday --debug chat            # Log inference payloads and responses
-friday --debug serve           # Debug mode for web server
-
-# Start the web UI server (singleton mode)
-bun run serve
+# Debug inference logging (server-side)
+friday --debug serve           # Debug mode — logs inference payloads and responses
 ```
 
 ### In-Session Commands
@@ -1042,8 +1036,7 @@ src/
 │       ├── log-store.ts   # LogStore — state for TUI debug log panel
 │       ├── log-types.ts   # LogEntry types for structured log display
 │       ├── components/    # Header, ChatArea, InputBar, Message, Splash, Thinking, Welcome, LogPanel
-│       ├── lib/           # ANSI parser, color utils, chafa logo processor
-│       └── channels/      # TuiChannel — notification bridge
+│       └── lib/           # ANSI parser, color utils, chafa logo processor
 ├── core/
 │   ├── cortex.ts          # LLM brain and conversation state
 │   ├── history-manager.ts # Token-budget conversation history with compaction
@@ -1060,7 +1053,6 @@ src/
 │   ├── types.ts           # Core TypeScript interfaces
 │   ├── prompts.ts         # GENESIS_TEMPLATE — seed template for identity prompt
 │   ├── bridges/           # Runtime bridge abstractions for singleton mode
-│   │   ├── local.ts       # LocalBridge — direct in-process runtime access
 │   │   ├── socket.ts      # SocketBridge — Unix socket IPC to running server
 │   │   └── types.ts       # RuntimeBridge interface
 │   └── voice/             # Vox — voice output and realtime conversational voice
@@ -1130,7 +1122,7 @@ web/                       # React web UI (Vite + Tailwind) — voice-focused ar
 │   └── index.css          # Tailwind theme (Friday amber palette)
 tests/
 ├── helpers/               # Shared test stubs (createMockModel, createErrorModel)
-├── unit/                  # 949 tests across 94 files
+├── unit/                  # Unit tests (bun:test)
 └── integration/           # Integration tests — future
 ```
 
@@ -1142,11 +1134,11 @@ tests/
 # Build
 docker build -t friday .
 
-# Run
-docker run -e ANTHROPIC_API_KEY=sk-ant-... friday chat
+# Run (starts the server — default entrypoint)
+docker run -p 3000:3000 -e XAI_API_KEY=xai-... friday
 
-# With Grok
-docker run -e XAI_API_KEY=xai-... friday chat --provider grok
+# With Anthropic provider
+docker run -p 3000:3000 -e ANTHROPIC_API_KEY=sk-ant-... friday serve --provider anthropic
 ```
 
 ---

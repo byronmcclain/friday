@@ -34,9 +34,9 @@ bun run start genesis edit    # Open GENESIS.md in $EDITOR
 bun run start genesis update  # Overwrite GENESIS.md with latest template
 bun run start genesis check   # Validate file exists and permissions
 bun run start genesis path    # Print resolved file path
-friday --debug chat           # Chat with debug inference logging (writes last-inference-payload.log)
-friday --debug serve          # Serve with debug inference logging
-friday --debug                # Default (chat) with debug inference logging
+friday serve &                 # Start server (must be running before chat)
+friday chat                    # Connect to running server via TUI
+friday --debug serve          # Serve with debug inference logging (writes last-inference-payload.log)
 ```
 
 ## Architecture
@@ -56,8 +56,7 @@ src/
 │       ├── log-store.ts   # LogStore — state store for TUI debug log panel
 │       ├── log-types.ts   # LogEntry types for structured log display
 │       ├── components/    # UI components (Header, ChatArea, InputBar, Message, Splash, LogPanel, etc.)
-│       ├── lib/           # ANSI parser, color utils, chafa logo processor
-│       └── channels/      # TuiChannel — notification bridge into TUI toasts
+│       └── lib/           # ANSI parser, color utils, chafa logo processor
 ├── core/
 │   ├── cortex.ts          # Cortex — LLM brain, streamText() with AI SDK, tool registration
 │   ├── history-manager.ts # HistoryManager — token-budget conversation history with compaction
@@ -74,9 +73,8 @@ src/
 │   ├── prompts.ts         # GENESIS_TEMPLATE — seed template for Friday's identity prompt
 │   ├── secrets.ts         # SecretStore — AES-256-GCM encrypted storage (OS keychain + fallback)
 │   ├── bridges/           # Runtime bridge abstractions for singleton mode
-│   │   ├── local.ts       # LocalBridge — direct in-process runtime access
 │   │   ├── socket.ts      # SocketBridge — Unix socket IPC to running server
-│   │   └── types.ts       # RuntimeBridge interface — abstraction over local/socket access
+│   │   └── types.ts       # RuntimeBridge interface — abstraction for socket access
 │   └── voice/             # Vox — voice output subsystem (TTS via Grok Voice Agent API)
 │       ├── types.ts        # VoiceMode, GrokVoice, VoxConfig, VoxOptions, VOX_DEFAULTS
 │       ├── audio.ts        # pcmToWav, detectPlayer, playAudio, cleanupTempFile
@@ -183,7 +181,7 @@ tests/
 | **Recall (Deja Vu)** | `src/core/recall-tool.ts` | `search` (FTS5 summaries) → `recall` (full transcript). Registered in Cortex at boot. |
 | **Arc Rhythm** | `src/arc-rhythm/` | 60s scheduler tick. Auto-pause after 5 failures. Shares Memory's SQLite via `memory.database`. |
 | **The Forge** | `src/modules/forge/` | Self-improvement. Failed modules don't crash boot. Filesystem module + Forge are core-protected. |
-| **Bridges** | `src/core/bridges/` | Singleton mode IPC. `LocalBridge` (in-process) / `SocketBridge` (Unix socket to server). |
+| **Bridges** | `src/core/bridges/` | Singleton mode IPC. `SocketBridge` (Unix socket to server). `friday chat` requires a running `friday serve`. |
 | **SessionHub** | `src/server/session-hub.ts` | Session lifecycle for singleton. Hydrates clients on connect, saves on last disconnect, reconnect guard. Unified ClientRegistry across transports. |
 | **Server** | `src/server/` | HTTP + WebSocket + Unix socket. SessionHub coordinates session lifecycle. ttyd for terminal-in-browser. |
 
@@ -199,7 +197,7 @@ tests/
 - **Commands** registered via Commander.js in `src/cli/index.ts`, one file per command under `src/cli/commands/`
 - **Gmail**: send/reply tools require `"email-send"` clearance. OAuth tokens encrypted via `SecretStore` (AES-256-GCM).
 - **Debug logging**: `--debug` writes `last-inference-payload.log` + `last-inference-response.log` — cleared per `Cortex.chat()`, round-appended. Config chain: CLI → `RuntimeConfig.debug` → `CortexConfig.debug`.
-- **Singleton mode**: `friday serve` writes PID + socket files; `friday chat` auto-detects and connects via `SocketBridge`
+- **Singleton mode**: `friday serve` writes PID + socket files; `friday chat` requires a running server and connects via `SocketBridge` (no local runtime fallback — exits with error if no server is running)
 - **SessionHub**: Owns client lifecycle in server mode. Both WebSocket and Unix socket transports register/unregister via hub. History hydrated on connect via `conversation:message` with `source: "replay"`. Saves conversation + clears history on last client disconnect. Reconnect guard prevents clearing if a new client connects during save.
 - **Protected paths**: `isProtectedPath()` in `src/modules/filesystem/containment.ts` — blocks writes to Genesis and core modules
 
@@ -212,7 +210,7 @@ tests/
 - SQLite tests must clean up WAL files: unlink `db`, `db-wal`, and `db-shm` in afterEach
 - `bun:sqlite` transactions: `db.transaction(() => { ... })()` — must invoke the returned function
 - `node:fs/promises` `appendFile` is an accepted exception where Bun has no native append API
-- TUI tests (`tui-*.test.ts`) cover ANSI parser, color utils, logo processor, state reducer, theme, and notification channel
+- TUI tests (`tui-*.test.ts`) cover ANSI parser, color utils, logo processor, state reducer, and theme
 - `AuditEntry` interface requires `action`, `source`, `detail`, `success` fields — not `target` or `message`
 - Arc Rhythm tests use in-memory SQLite via `new Database(":memory:")` — no WAL cleanup needed
 

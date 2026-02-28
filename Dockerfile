@@ -9,6 +9,7 @@ RUN bun install --frozen-lockfile --production
 COPY src/ ./src/
 COPY tsconfig.json ./
 
-# Run
+# Run — defaults to `serve` (friday chat requires a running server)
 ENV NODE_ENV=production
 ENTRYPOINT ["bun", "run", "src/main.ts"]
+CMD ["serve"]
