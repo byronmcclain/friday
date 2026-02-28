@@ -192,7 +192,6 @@ export class FridaySocketServer {
         break;
       }
       case "session:shutdown": {
-        void this.hub.unregisterClient(clientId);
         send({ type: "session:closed", requestId: msg.id });
         break;
       }

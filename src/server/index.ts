@@ -33,7 +33,11 @@ export async function createFridayServer(config: FridayServerConfig) {
 		...config.runtimeConfig,
 	});
 
-	const hub = new SessionHub({ runtime });
+	const hub = new SessionHub({
+		runtime,
+		summarizer: runtime.summarizer,
+		curator: runtime.curator,
+	});
 	const pushIntervals = new Map<string, ReturnType<typeof setInterval>>();
 
 	const server = Bun.serve<WSData>({
