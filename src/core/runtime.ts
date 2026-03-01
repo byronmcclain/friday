@@ -513,6 +513,18 @@ export class FridayRuntime {
 			if (!protocol) {
 				return { output: `Unknown protocol: ${parsed.name}`, source: "protocol" };
 			}
+			if (protocol.clearance.length > 0) {
+				const check = this._clearance.checkAll(protocol.clearance);
+				if (!check.granted) {
+					this._audit.log({
+						action: "protocol:blocked",
+						source: protocol.name,
+						detail: check.reason ?? `Clearance denied for protocol: ${protocol.name}`,
+						success: false,
+					});
+					return { output: check.reason ?? `Clearance denied for protocol: ${protocol.name}`, source: "protocol" };
+				}
+			}
 			const result = await protocol.execute(
 				{ rawArgs: parsed.rawArgs },
 				{
