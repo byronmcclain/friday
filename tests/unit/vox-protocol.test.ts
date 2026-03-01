@@ -75,4 +75,17 @@ describe("/voice protocol", () => {
 		expect(result.success).toBe(false);
 		expect(result.summary).toContain("Unknown subcommand");
 	});
+
+	test("/voice flat switches to flat mode", async () => {
+		const result = await protocol.execute({ rawArgs: "flat" }, stubContext);
+		expect(result.success).toBe(true);
+		expect(vox.mode).toBe("flat");
+		expect(result.summary).toContain("Flat");
+	});
+
+	test("/voice status includes emotion engine status", async () => {
+		const result = await protocol.execute({ rawArgs: "status" }, stubContext);
+		expect(result.success).toBe(true);
+		expect(result.summary).toContain("Emotion engine");
+	});
 });

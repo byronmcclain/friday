@@ -5,7 +5,7 @@ import type { VoiceMode } from "./types.ts";
 export function createVoiceProtocol(vox: Vox): FridayProtocol {
 	return {
 		name: "voice",
-		description: "Control Friday's voice output: on, off, whisper, test, status",
+		description: "Control Friday's voice output: on, off, whisper, flat, test, status",
 		aliases: ["vox", "speak"],
 		parameters: [],
 		clearance: [],
@@ -27,12 +27,14 @@ export function createVoiceProtocol(vox: Vox): FridayProtocol {
 					return handleSetMode(vox, "off");
 				case "whisper":
 					return handleSetMode(vox, "whisper");
+				case "flat":
+					return handleSetMode(vox, "flat");
 				case "test":
 					return handleTest(vox);
 				default:
 					return {
 						success: false,
-						summary: `Unknown subcommand: "${subcommand}". Available: on, off, whisper, test, status`,
+						summary: `Unknown subcommand: "${subcommand}". Available: on, off, whisper, flat, test, status`,
 					};
 			}
 		},
@@ -46,14 +48,20 @@ function handleStatus(vox: Vox): ProtocolResult {
 		`Voice name: ${s.voice}`,
 		`Connected: ${s.connected ? "yes" : "no"}`,
 		`API key: ${s.apiKeyAvailable ? "set" : "not set"}`,
+		`Emotion engine: ${s.emotionEngine ? "active" : "not wired"}`,
 	];
 	return { success: true, summary: lines.join("\n") };
 }
 
 function handleSetMode(vox: Vox, mode: VoiceMode): ProtocolResult {
 	vox.setMode(mode);
-	const label = mode === "off" ? "Voice off." : mode === "on" ? "Voice on." : "Whisper mode.";
-	return { success: true, summary: label };
+	const labels: Record<VoiceMode, string> = {
+		off: "Voice off.",
+		on: "Voice on.",
+		whisper: "Whisper mode.",
+		flat: "Flat mode — literal TTS, no emotional rewrite.",
+	};
+	return { success: true, summary: labels[mode] };
 }
 
 async function handleTest(vox: Vox): Promise<ProtocolResult> {
