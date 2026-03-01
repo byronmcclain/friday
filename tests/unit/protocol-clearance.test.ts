@@ -74,8 +74,9 @@ describe("Protocol clearance enforcement", () => {
 		await runtime.process("/audited");
 		const entries = runtime.audit.entries({ action: "protocol:blocked" });
 		expect(entries.length).toBeGreaterThanOrEqual(1);
-		expect(entries[0].source).toBe("audited");
-		expect(entries[0].success).toBe(false);
+		const first = entries[0]!;
+		expect(first.source).toBe("audited");
+		expect(first.success).toBe(false);
 	});
 });
 
