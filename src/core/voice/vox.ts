@@ -134,10 +134,11 @@ export class Vox {
 
 		let spokenText = text;
 		let emotionProfile: EmotionProfile | undefined;
+		const activeMode = this._mode as Exclude<VoiceMode, "off">;
 
 		// Emotional rewrite for on/whisper modes when engine is available
 		if (
-			this._mode !== "flat" &&
+			(activeMode === "on" || activeMode === "whisper") &&
 			this._fastModel &&
 			this._getRecentHistory
 		) {
@@ -146,7 +147,7 @@ export class Vox {
 				const result = await emotionalRewrite(
 					text,
 					history,
-					this._mode as "on" | "whisper",
+					activeMode,
 					this._fastModel,
 				);
 				spokenText = result.text;
@@ -156,11 +157,7 @@ export class Vox {
 			}
 		}
 
-		const prompt = buildTtsPrompt(
-			spokenText,
-			this._mode as Exclude<VoiceMode, "off">,
-			emotionProfile,
-		);
+		const prompt = buildTtsPrompt(spokenText, activeMode, emotionProfile);
 
 		try {
 			if (!this._ws || !this._connected) {

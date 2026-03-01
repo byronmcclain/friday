@@ -1,6 +1,6 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { streamText, tool as aiTool, stepCountIs } from "ai";
-import type { FridayConfig, ConversationMessage } from "./types.ts";
+import { type FridayConfig, type ConversationMessage, getTextContent } from "./types.ts";
 import { GENESIS_TEMPLATE } from "./prompts.ts";
 import { createModel, GROK_DEFAULTS } from "../providers/index.ts";
 import type { FridayTool } from "../modules/types.ts";
@@ -230,12 +230,9 @@ export class Cortex {
 	}
 
 	getRecentHistory(n: number): string[] {
-		const messages = this.historyManager.getHistory();
-		const recent = messages.slice(-n);
-		return recent.map((m) => {
+		return this.getHistory().slice(-n).map((m) => {
 			const role = m.role === "user" ? "User" : "Assistant";
-			const content = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
-			return `${role}: ${content}`;
+			return `${role}: ${getTextContent(m.content)}`;
 		});
 	}
 

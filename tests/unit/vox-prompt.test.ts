@@ -4,8 +4,7 @@ import {
 	buildTtsPrompt,
 	FRIDAY_VOICE_IDENTITY,
 } from "../../src/core/voice/prompt.ts";
-import type { VoiceMode } from "../../src/core/voice/types.ts";
-import type { EmotionProfile } from "../../src/core/voice/types.ts";
+import type { VoiceMode, EmotionProfile } from "../../src/core/voice/types.ts";
 
 describe("classifyContent", () => {
 	test("detects markdown tables", () => {
