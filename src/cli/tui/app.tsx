@@ -373,6 +373,8 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 						placeholder={placeholder}
 						onSubmit={handleSubmit}
 						onExit={handleShutdown}
+						isThinking={state.isThinking}
+						isStreaming={state.isStreaming}
 					/>
 				</box>
 				{state.logPanelVisible && (
