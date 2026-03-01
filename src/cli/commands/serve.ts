@@ -48,11 +48,18 @@ export function serveCommand(program: Command): void {
 				command: ["friday", "chat"],
 			});
 
+			const lines = [
+				chalk.hex("#F0A030").bold("F.R.I.D.A.Y."),
+				chalk.hex("#8B6914")("Female Replacement Intelligent Digital Assistant Youth"),
+				"",
+				chalk.hex("#8B6914")(`http://localhost:${result.server.port}`),
+				chalk.hex("#8B6914")("IPC socket: ~/.friday/friday.sock"),
+			];
+			if (ttydProc) {
+				lines.push(chalk.hex("#8B6914")("Terminal: http://localhost:7681/terminal/"));
+			}
 			console.log(
-				boxen(
-					`${chalk.hex("#F0A030").bold("F.R.I.D.A.Y. Web UI")}\n${chalk.hex("#8B6914")(`http://localhost:${result.server.port}`)}\n${chalk.hex("#8B6914")("IPC socket: ~/.friday/friday.sock")}${ttydProc ? `\n${chalk.hex("#8B6914")("Terminal: http://localhost:7681/terminal/")}` : ""}`,
-					{ padding: 1, borderColor: "#C07020", borderStyle: "round" },
-				),
+				boxen(lines.join("\n"), { padding: 1, borderColor: "#C07020", borderStyle: "round" }),
 			);
 
 			let shuttingDown = false;
@@ -67,17 +74,26 @@ export function serveCommand(program: Command): void {
 				}, 15_000);
 				forceExit.unref();
 
+				const step = (msg: string) => console.log(chalk.hex("#8B6914")(`  \u2192 ${msg}`));
+
 				try {
-					console.log(chalk.hex("#8B6914")("\nShutting down server..."));
+					// Hide ^C echo: clear current line, then print on a fresh line
+				process.stdout.write("\r\x1b[2K");
+				console.log(chalk.hex("#F0A030").bold("\nShutting down..."));
 					if (ttydProc) {
+						step("Stopping terminal server");
 						ttydProc.kill();
 					}
+					step("Closing IPC socket");
 					await socketServer.stop();
+					step("Saving active session");
 					await result.hub.saveIfActive();
 					if (result.runtime.isBooted) {
-						await result.runtime.shutdown();
+						await result.runtime.shutdown((_s, label) => step(label));
 					}
+					step("Stopping HTTP server");
 					result.server.stop(true);
+					console.log(chalk.hex("#F0A030").bold("Friday offline."));
 				} catch (err) {
 					console.warn(chalk.yellow("Shutdown error:"), err instanceof Error ? err.message : err);
 				} finally {
