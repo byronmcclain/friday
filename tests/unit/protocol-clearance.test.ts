@@ -71,9 +71,7 @@ describe("Protocol clearance enforcement", () => {
 			execute: async () => ({ success: true, summary: "should not run" }),
 		} satisfies FridayProtocol);
 		await runtime.process("/audited");
-		const entries = runtime.audit.entries.filter(
-			(e) => e.action === "protocol:blocked",
-		);
+		const entries = runtime.audit.entries({ action: "protocol:blocked" });
 		expect(entries.length).toBeGreaterThanOrEqual(1);
 		expect(entries[0].source).toBe("audited");
 		expect(entries[0].success).toBe(false);

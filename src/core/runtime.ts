@@ -120,6 +120,14 @@ export class FridayRuntime {
 		return this._audit;
 	}
 
+	get clearance(): ClearanceManager {
+		return this._clearance;
+	}
+
+	get directives(): DirectiveStore {
+		return this._directives;
+	}
+
 	get smarts(): SmartsStore | undefined {
 		return this._smarts;
 	}
