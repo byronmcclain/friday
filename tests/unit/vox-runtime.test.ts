@@ -68,4 +68,16 @@ describe("Runtime + Vox", () => {
 		await runtime.shutdown();
 		expect(vox.mode).toBe("off");
 	});
+
+	test("wires emotion engine to Vox when both exist", async () => {
+		await runtime.boot({
+			injectedModel: createMockModel(),
+			injectedFastModel: createMockModel(),
+			dataDir: TEST_DATA_DIR,
+			enableSensorium: false,
+		});
+
+		expect(runtime.vox).toBeDefined();
+		expect(runtime.vox!.hasEmotionEngine).toBe(true);
+	});
 });

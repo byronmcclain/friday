@@ -412,6 +412,14 @@ export class FridayRuntime {
 			}
 			this._summarizer = new ConversationSummarizer(subsystemModel);
 
+			// Wire emotion engine into Vox for dynamic voice
+			if (this._vox && this._cortex) {
+				this._vox.setEmotionEngine(
+					subsystemModel,
+					() => this._cortex!.getRecentHistory(5),
+				);
+			}
+
 			if (this._memory && !config.fresh) {
 				const recent = await this._memory.getConversationHistory(1);
 				if (recent.length > 0) {
