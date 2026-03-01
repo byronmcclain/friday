@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { PALETTE, BOLD } from "../theme.ts";
+import type { ToolInfo } from "../state.ts";
 
 const BRAILLE_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏";
 
 interface ThinkingProps {
-	currentTool?: { name: string; args: Record<string, unknown> } | null;
+	currentTool?: ToolInfo | null;
 }
 
-function formatToolSummary(name: string, args: Record<string, unknown>): string {
+export function formatToolSummary(name: string, args: Record<string, unknown>): string {
 	for (const v of Object.values(args)) {
 		if (typeof v === "string" && v.length > 0) {
 			const display = v.length > 50 ? v.slice(0, 47) + "..." : v;
@@ -44,5 +45,3 @@ export function ThinkingIndicator({ currentTool }: ThinkingProps) {
 		</box>
 	);
 }
-
-export { formatToolSummary };

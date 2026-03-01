@@ -9,6 +9,11 @@ export interface WelcomeInfo {
 	model: string;
 }
 
+export interface ToolInfo {
+	name: string;
+	args: Record<string, unknown>;
+}
+
 export interface AppState {
 	phase: "splash" | "booting" | "active" | "shutting-down";
 	messages: Message[];
@@ -16,7 +21,7 @@ export interface AppState {
 	isStreaming: boolean;
 	welcomeInfo?: WelcomeInfo;
 	logPanelVisible: boolean;
-	currentTool: { name: string; args: Record<string, unknown> } | null;
+	currentTool: ToolInfo | null;
 }
 
 export type AppAction =
@@ -64,7 +69,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 			return {
 				...state,
 				isThinking: action.value,
-				...(action.value ? {} : { currentTool: null }),
+				currentTool: action.value ? state.currentTool : null,
 			};
 		case "set-phase":
 			return { ...state, phase: action.phase };

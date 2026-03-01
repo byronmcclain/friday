@@ -280,7 +280,7 @@ export class Cortex {
 						detail: `Tool invoked by LLM`,
 						success: true,
 					});
-					await this.signals?.emit("tool:executing", name, { args });
+					this.signals?.emit("tool:executing", name, { args });
 					try {
 						const result = await fridayTool.execute(args, {
 							workingDirectory: process.cwd(),

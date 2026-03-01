@@ -9,6 +9,7 @@ import { WebSocketNotificationChannel } from "./ws-channel.ts";
 import { VoiceBridge, type VoiceBridgeConfig } from "../core/voice/bridge.ts";
 import { FRIDAY_VOICE_IDENTITY } from "../core/voice/prompt.ts";
 import type { GrokVoice } from "../core/voice/types.ts";
+import type { SignalHandler } from "../core/events.ts";
 
 export type SendFn = (msg: ServerMessage) => void;
 
@@ -22,7 +23,7 @@ export class WebSocketHandler {
 	private defaultSend?: SendFn;
 	private voiceBridge: VoiceBridge | null = null;
 	private assistantTranscriptBuffer = "";
-	private toolSignalHandler: ((signal: import("../core/events.ts").Signal) => void) | null = null;
+	private toolSignalHandler: SignalHandler | null = null;
 
 	constructor(runtime: FridayRuntime, hub: SessionHub, clientId: string) {
 		this.runtime = runtime;

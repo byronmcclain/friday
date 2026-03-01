@@ -3,7 +3,7 @@ import { PALETTE } from "../theme.ts";
 import { Message } from "./message.tsx";
 import { ThinkingIndicator } from "./thinking.tsx";
 import { Welcome } from "./welcome.tsx";
-import type { Message as MessageType, WelcomeInfo } from "../state.ts";
+import type { Message as MessageType, WelcomeInfo, ToolInfo } from "../state.ts";
 
 function TurnSeparator() {
 	return (
@@ -20,7 +20,7 @@ interface ChatAreaProps {
 	isThinking: boolean;
 	isStreaming: boolean;
 	welcomeInfo?: WelcomeInfo;
-	currentTool?: { name: string; args: Record<string, unknown> } | null;
+	currentTool?: ToolInfo | null;
 }
 
 export function ChatArea({ messages, isThinking, isStreaming, welcomeInfo, currentTool }: ChatAreaProps) {
