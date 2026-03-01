@@ -2,6 +2,7 @@ import { unlink, writeFile } from "node:fs/promises";
 import type { FridayRuntime } from "../core/runtime.ts";
 import { parseClientMessage, type ServerMessage } from "./protocol.ts";
 import type { SessionHub } from "./session-hub.ts";
+import type { SignalHandler } from "../core/events.ts";
 
 const DEFAULT_SOCKET_PATH = `${process.env.HOME}/.friday/friday.sock`;
 const DEFAULT_PID_PATH = `${process.env.HOME}/.friday/friday.pid`;
@@ -13,6 +14,7 @@ export class FridaySocketServer {
   private pidPath: string;
   private server: ReturnType<typeof Bun.listen> | null = null;
   private socketClients = new Map<unknown, string>();
+  private toolSignalHandler: SignalHandler | null = null;
 
   constructor(
     runtime: FridayRuntime,
@@ -45,6 +47,20 @@ export class FridaySocketServer {
         timestamp: entry.timestamp.toISOString(),
       });
     };
+
+    // Forward tool:executing signals to connected clients for TUI thinking indicator
+    if (this.runtime.signals) {
+      this.toolSignalHandler = (signal) => {
+        if (this.hub.clientCount === 0) return;
+        this.hub.broadcast({
+          type: "signal",
+          name: signal.name,
+          source: signal.source,
+          data: signal.data,
+        });
+      };
+      this.runtime.signals.on("tool:executing", this.toolSignalHandler);
+    }
 
     this.server = Bun.listen({
       unix: this.socketPath,
@@ -86,6 +102,10 @@ export class FridaySocketServer {
 
   async stop(): Promise<void> {
     this.runtime.audit.onLog = undefined;
+    if (this.toolSignalHandler && this.runtime.signals) {
+      this.runtime.signals.off("tool:executing", this.toolSignalHandler);
+      this.toolSignalHandler = null;
+    }
     if (this.server) {
       this.server.stop();
       this.server = null;
