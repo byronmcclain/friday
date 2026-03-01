@@ -107,4 +107,47 @@ describe("SocketBridge", () => {
 		expect(auditReceived).toHaveLength(1);
 		expect(auditReceived[0].success).toBe(false);
 	});
+
+	test("fires onToolExecuting for tool:executing signal messages", () => {
+		const bridge = new SocketBridge("/tmp/nonexistent.sock");
+		const received: { name: string; args: Record<string, unknown> }[] = [];
+		bridge.onToolExecuting = (name, args) => received.push({ name, args });
+
+		(bridge as any).handleServerMessage({
+			type: "signal",
+			name: "tool:executing",
+			source: "fs.read",
+			data: { args: { path: "/tmp/test.txt" } },
+		});
+
+		expect(received).toHaveLength(1);
+		expect(received[0]!.name).toBe("fs.read");
+		expect(received[0]!.args).toEqual({ path: "/tmp/test.txt" });
+	});
+
+	test("does not throw when onToolExecuting is not set", () => {
+		const bridge = new SocketBridge("/tmp/nonexistent.sock");
+
+		(bridge as any).handleServerMessage({
+			type: "signal",
+			name: "tool:executing",
+			source: "git.status",
+			data: { args: {} },
+		});
+	});
+
+	test("ignores non-tool:executing signal messages", () => {
+		const bridge = new SocketBridge("/tmp/nonexistent.sock");
+		const received: any[] = [];
+		bridge.onToolExecuting = (name, args) => received.push({ name, args });
+
+		(bridge as any).handleServerMessage({
+			type: "signal",
+			name: "file:changed",
+			source: "watcher",
+			data: { path: "/tmp/foo" },
+		});
+
+		expect(received).toHaveLength(0);
+	});
 });

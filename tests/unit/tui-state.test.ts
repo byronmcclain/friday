@@ -196,3 +196,73 @@ describe("logPanelVisible", () => {
 		expect(state.logPanelVisible).toBe(true);
 	});
 });
+
+describe("currentTool", () => {
+	test("initialState has currentTool null", () => {
+		expect(initialState.currentTool).toBeNull();
+	});
+
+	test("tool:executing sets currentTool", () => {
+		const state = appReducer(initialState, {
+			type: "tool:executing",
+			name: "fs.read",
+			args: { path: "/tmp/test.txt" },
+		});
+		expect(state.currentTool).toEqual({ name: "fs.read", args: { path: "/tmp/test.txt" } });
+	});
+
+	test("tool:executing replaces previous tool (latest only)", () => {
+		let state = appReducer(initialState, {
+			type: "tool:executing",
+			name: "fs.read",
+			args: { path: "/tmp/a.txt" },
+		});
+		state = appReducer(state, {
+			type: "tool:executing",
+			name: "git.status",
+			args: {},
+		});
+		expect(state.currentTool).toEqual({ name: "git.status", args: {} });
+	});
+
+	test("chat:chunk clears currentTool", () => {
+		let state = appReducer(initialState, {
+			type: "tool:executing",
+			name: "fs.read",
+			args: { path: "/tmp/test.txt" },
+		});
+		expect(state.currentTool).not.toBeNull();
+		state = appReducer(state, { type: "chat:chunk", text: "Hello" });
+		expect(state.currentTool).toBeNull();
+	});
+
+	test("set-thinking false clears currentTool", () => {
+		let state = appReducer(initialState, {
+			type: "tool:executing",
+			name: "fs.read",
+			args: { path: "/tmp/test.txt" },
+		});
+		expect(state.currentTool).not.toBeNull();
+		state = appReducer(state, { type: "set-thinking", value: false });
+		expect(state.currentTool).toBeNull();
+	});
+
+	test("set-thinking true does not affect currentTool", () => {
+		const state = appReducer(initialState, { type: "set-thinking", value: true });
+		expect(state.currentTool).toBeNull();
+	});
+
+	test("tool:executing does not affect other state fields", () => {
+		const msg = createMessage("user", "Hello");
+		let state = appReducer(initialState, { type: "add-message", message: msg });
+		state = appReducer(state, { type: "set-thinking", value: true });
+		state = appReducer(state, {
+			type: "tool:executing",
+			name: "fs.read",
+			args: { path: "/tmp/test.txt" },
+		});
+		expect(state.messages).toHaveLength(1);
+		expect(state.isThinking).toBe(true);
+		expect(state.currentTool).not.toBeNull();
+	});
+});

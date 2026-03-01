@@ -22,6 +22,7 @@ export class WebSocketHandler {
 	private defaultSend?: SendFn;
 	private voiceBridge: VoiceBridge | null = null;
 	private assistantTranscriptBuffer = "";
+	private toolSignalHandler: ((signal: import("../core/events.ts").Signal) => void) | null = null;
 
 	constructor(runtime: FridayRuntime, hub: SessionHub, clientId: string) {
 		this.runtime = runtime;
@@ -73,6 +74,11 @@ export class WebSocketHandler {
 		// Remove per-client notification channel on disconnect
 		if (this.runtime.notifications) {
 			this.runtime.notifications.removeChannel(this.channelName);
+		}
+		// Unsubscribe tool signal handler
+		if (this.toolSignalHandler && this.runtime.signals) {
+			this.runtime.signals.off("tool:executing", this.toolSignalHandler);
+			this.toolSignalHandler = null;
 		}
 	}
 
@@ -137,6 +143,19 @@ export class WebSocketHandler {
 			const channel = new WebSocketNotificationChannel(send);
 			channel.name = this.channelName;
 			this.runtime.notifications.addChannel(channel);
+		}
+
+		// Forward tool:executing signals to this client for TUI thinking indicator
+		if (this.runtime.signals) {
+			this.toolSignalHandler = (signal) => {
+				send({
+					type: "signal",
+					name: signal.name,
+					source: signal.source,
+					data: signal.data,
+				});
+			};
+			this.runtime.signals.on("tool:executing", this.toolSignalHandler);
 		}
 
 		send({

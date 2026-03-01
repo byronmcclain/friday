@@ -10,6 +10,7 @@ export type SignalName =
   | "session:start"
   | "session:end"
   | "error:unhandled"
+  | "tool:executing"
   | `custom:${string}`;
 
 export interface Signal {

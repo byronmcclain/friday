@@ -16,6 +16,7 @@ export interface AppState {
 	isStreaming: boolean;
 	welcomeInfo?: WelcomeInfo;
 	logPanelVisible: boolean;
+	currentTool: { name: string; args: Record<string, unknown> } | null;
 }
 
 export type AppAction =
@@ -26,7 +27,8 @@ export type AppAction =
 	| { type: "set-phase"; phase: AppState["phase"] }
 	| { type: "set-welcome"; info: WelcomeInfo }
 	| { type: "clear-messages" }
-	| { type: "toggle-log-panel" };
+	| { type: "toggle-log-panel" }
+	| { type: "tool:executing"; name: string; args: Record<string, unknown> };
 
 export const initialState: AppState = {
 	phase: "splash",
@@ -34,6 +36,7 @@ export const initialState: AppState = {
 	isThinking: false,
 	isStreaming: false,
 	logPanelVisible: false,
+	currentTool: null,
 };
 
 export function appReducer(state: AppState, action: AppAction): AppState {
@@ -53,12 +56,16 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 					timestamp: new Date(),
 				});
 			}
-			return { ...state, messages: msgs, isThinking: false, isStreaming: true };
+			return { ...state, messages: msgs, isThinking: false, isStreaming: true, currentTool: null };
 		}
 		case "chat:done":
 			return { ...state, isStreaming: false };
 		case "set-thinking":
-			return { ...state, isThinking: action.value };
+			return {
+				...state,
+				isThinking: action.value,
+				...(action.value ? {} : { currentTool: null }),
+			};
 		case "set-phase":
 			return { ...state, phase: action.phase };
 		case "set-welcome":
@@ -67,6 +74,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 			return { ...state, messages: [] };
 		case "toggle-log-panel":
 			return { ...state, logPanelVisible: !state.logPanelVisible };
+		case "tool:executing":
+			return { ...state, currentTool: { name: action.name, args: action.args } };
 	}
 }
 

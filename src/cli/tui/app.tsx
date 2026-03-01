@@ -134,6 +134,12 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 					pushLog(level, entry.source, entry.action, entry.detail);
 				};
 
+				// Wire tool-executing signals from the server into the TUI state
+				socketBridge.onToolExecuting = (name, args) => {
+					if (cancelled) return;
+					dispatch({ type: "tool:executing", name, args });
+				};
+
 				if (cancelled) return;
 
 				// Query the server for actual model info
@@ -373,6 +379,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 						isThinking={state.isThinking}
 						isStreaming={state.isStreaming}
 						welcomeInfo={state.welcomeInfo}
+						currentTool={state.currentTool}
 					/>
 					<InputBar
 						commands={commandsRef.current}

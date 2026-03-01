@@ -3,6 +3,7 @@ import { Cortex } from "../../src/core/cortex.ts";
 import type { FridayTool } from "../../src/modules/types.ts";
 import { ClearanceManager } from "../../src/core/clearance.ts";
 import { createMockModel, createErrorModel } from "../helpers/stubs.ts";
+import { SignalBus } from "../../src/core/events.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -182,5 +183,32 @@ describe("Cortex — tool integration (AI SDK path)", () => {
 		expect(call.tools!.length).toBeGreaterThan(0);
 		const toolNames = call.tools!.map((t: { name: string }) => t.name);
 		expect(toolNames).toContain("test-tool");
+	});
+
+	test("emits tool:executing signal before tool execution", async () => {
+		const signals = new SignalBus();
+		const emitted: { name: string; source: string; data?: Record<string, unknown> }[] = [];
+		signals.on("tool:executing", (signal) => {
+			emitted.push({ name: signal.name, source: signal.source, data: signal.data });
+		});
+
+		const tool = mockTool({
+			name: "fs.read",
+			execute: async (args) => ({ success: true, output: `read: ${args.input}` }),
+		});
+
+		// MockLanguageModelV3's streamText does not invoke tool execute callbacks
+		// (known limitation — see comment above). Instead, directly invoke the
+		// AI SDK tool wrapper that Cortex builds, which is where the signal lives.
+		const cortex = new Cortex({ injectedModel: createMockModel(), signals });
+		cortex.registerTool(tool);
+
+		const aiTools = (cortex as any).buildAiTools();
+		await aiTools["fs.read"].execute({ input: "/tmp/test.txt" });
+
+		expect(emitted).toHaveLength(1);
+		expect(emitted[0]!.name).toBe("tool:executing");
+		expect(emitted[0]!.source).toBe("fs.read");
+		expect(emitted[0]!.data?.args).toEqual({ input: "/tmp/test.txt" });
 	});
 });

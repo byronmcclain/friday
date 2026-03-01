@@ -20,9 +20,10 @@ interface ChatAreaProps {
 	isThinking: boolean;
 	isStreaming: boolean;
 	welcomeInfo?: WelcomeInfo;
+	currentTool?: { name: string; args: Record<string, unknown> } | null;
 }
 
-export function ChatArea({ messages, isThinking, isStreaming, welcomeInfo }: ChatAreaProps) {
+export function ChatArea({ messages, isThinking, isStreaming, welcomeInfo, currentTool }: ChatAreaProps) {
 	const hasUserMessage = messages.some((m) => m.role === "user");
 
 	// Build elements with turn separators between conversation turns
@@ -73,7 +74,7 @@ export function ChatArea({ messages, isThinking, isStreaming, welcomeInfo }: Cha
 				<Welcome model={welcomeInfo.model} />
 			)}
 			{elements}
-			{isThinking && <ThinkingIndicator />}
+			{isThinking && <ThinkingIndicator currentTool={currentTool} />}
 		</scrollbox>
 	);
 }
