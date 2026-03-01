@@ -3,7 +3,29 @@ import type { NotificationManager } from "../notifications.ts";
 import type { ClearanceManager } from "../clearance.ts";
 import type { AuditLogger } from "../../audit/logger.ts";
 
-export type VoiceMode = "off" | "on" | "whisper";
+export type VoiceMode = "off" | "on" | "whisper" | "flat";
+
+export type EmotionMood =
+	| "neutral"
+	| "warm"
+	| "excited"
+	| "concerned"
+	| "amused"
+	| "serious"
+	| "frustrated"
+	| "proud";
+
+export type EmotionIntensity = "subtle" | "moderate" | "strong";
+
+export interface EmotionProfile {
+	mood: EmotionMood;
+	intensity: EmotionIntensity;
+}
+
+export interface EmotionalRewriteResult {
+	text: string;
+	emotion: EmotionProfile;
+}
 
 export type GrokVoice = "Ara" | "Eve" | "Rex" | "Sal" | "Leo";
 
