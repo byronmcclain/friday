@@ -203,6 +203,18 @@ export class FridayRuntime {
 					case "protocol": {
 						const protocol = this._protocols.get(action.protocol);
 						if (!protocol) break;
+						if (protocol.clearance.length > 0) {
+							const pCheck = this._clearance.checkAll(protocol.clearance);
+							if (!pCheck.granted) {
+								this._audit.log({
+									action: "protocol:blocked",
+									source: protocol.name,
+									detail: pCheck.reason ?? `Clearance denied for protocol: ${protocol.name}`,
+									success: false,
+								});
+								break;
+							}
+						}
 						await protocol.execute(
 							action.args ?? { rawArgs: "" },
 							{
@@ -229,6 +241,18 @@ export class FridayRuntime {
 							(t) => t.name === action.tool,
 						);
 						if (!tool) break;
+						if (tool.clearance.length > 0) {
+							const tCheck = this._clearance.checkAll(tool.clearance);
+							if (!tCheck.granted) {
+								this._audit.log({
+									action: "tool:blocked",
+									source: tool.name,
+									detail: tCheck.reason ?? `Clearance denied for tool: ${tool.name}`,
+									success: false,
+								});
+								break;
+							}
+						}
 						await tool.execute(action.args ?? {}, {
 							workingDirectory: process.cwd(),
 							audit: this._audit,
