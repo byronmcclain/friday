@@ -77,3 +77,38 @@ describe("Cortex + Vox integration", () => {
 		expect(elapsed).toBeLessThan(200); // Should not wait for speak
 	});
 });
+
+describe("getRecentHistory", () => {
+	test("returns last N messages as role-prefixed strings", async () => {
+		const cortex = new Cortex({
+			injectedModel: createMockModel({ text: "response one" }),
+		});
+
+		await cortex.chat("Hello");
+		await cortex.chat("How are you?");
+
+		const history = cortex.getRecentHistory(4);
+		expect(history.length).toBe(4);
+		expect(history[0]).toMatch(/^User: Hello$/);
+		expect(history[1]).toMatch(/^Assistant: /);
+	});
+
+	test("returns all messages when N exceeds history length", async () => {
+		const cortex = new Cortex({
+			injectedModel: createMockModel(),
+		});
+
+		await cortex.chat("Hi");
+		const history = cortex.getRecentHistory(100);
+		expect(history.length).toBe(2); // user + assistant
+	});
+
+	test("returns empty array when no history", () => {
+		const cortex = new Cortex({
+			injectedModel: createMockModel(),
+		});
+
+		const history = cortex.getRecentHistory(5);
+		expect(history).toEqual([]);
+	});
+});

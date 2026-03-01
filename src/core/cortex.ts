@@ -229,6 +229,16 @@ export class Cortex {
 		}));
 	}
 
+	getRecentHistory(n: number): string[] {
+		const messages = this.historyManager.getHistory();
+		const recent = messages.slice(-n);
+		return recent.map((m) => {
+			const role = m.role === "user" ? "User" : "Assistant";
+			const content = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
+			return `${role}: ${content}`;
+		});
+	}
+
 	// ── AI SDK tool builder ──────────────────────────────────────
 
 	private buildAiTools(): Record<
