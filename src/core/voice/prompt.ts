@@ -1,4 +1,4 @@
-import type { VoiceMode } from "./types.ts";
+import type { VoiceMode, EmotionProfile, EmotionMood, EmotionIntensity } from "./types.ts";
 
 export const FRIDAY_VOICE_IDENTITY = `
 You are FRIDAY — Female Replacement Intelligent Digital Assistant Youth.
@@ -51,6 +51,7 @@ const MODE_CONTEXT: Record<Exclude<VoiceMode, "off">, string> = {
 	on: "Speak clearly and naturally at normal pace. You are FRIDAY delivering information to the Boss.",
 	whisper:
 		"You are whispering. Keep it very brief — two sentences maximum. Only the essential point. Your tone is quiet, intimate, like leaning in to murmur something to the Boss so only he hears. Be concise above all else.",
+	flat: "Speak clearly and naturally at normal pace. Read the text faithfully without adding emotional color.",
 };
 
 const CONTENT_HINTS: Array<{ test: (text: string) => boolean; hint: string }> = [
@@ -79,6 +80,26 @@ const CONTENT_HINTS: Array<{ test: (text: string) => boolean; hint: string }> = 
 	},
 ];
 
+const EMOTION_DELIVERY: Record<EmotionMood, string> = {
+	neutral: "Speak in your natural calm, composed tone.",
+	warm: "Let warmth come through — you're pleased, your tone is gentle and supportive.",
+	excited:
+		"You're genuinely excited. Let the energy lift your voice — quicker pace, brighter tone.",
+	concerned:
+		"There's concern in your voice. Slower, more careful delivery. You care about this.",
+	amused: "You're amused. A hint of a smile in your voice — don't suppress it.",
+	serious: "This is serious. Drop the wit, deliver with weight and clarity.",
+	frustrated:
+		"You're a bit frustrated — clipped, direct, with an edge. Not angry, just... done.",
+	proud: "You're proud of this. Let quiet satisfaction come through — you're impressed.",
+};
+
+const INTENSITY_MODIFIER: Record<EmotionIntensity, string> = {
+	subtle: "Keep it understated — the emotion is there but barely perceptible.",
+	moderate: "Let the emotion come through naturally, as you would in conversation.",
+	strong: "Don't hold back — this is a moment that warrants a real emotional response.",
+};
+
 /**
  * Classify content and return a combined hint string for the TTS prompt.
  * Returns empty string if no special content detected.
@@ -91,11 +112,22 @@ export function classifyContent(text: string): string {
 /**
  * Build the full TTS system prompt for a given utterance and mode.
  */
-export function buildTtsPrompt(content: string, mode: Exclude<VoiceMode, "off">): string {
+export function buildTtsPrompt(
+	content: string,
+	mode: Exclude<VoiceMode, "off">,
+	emotion?: EmotionProfile,
+): string {
 	const parts: string[] = [FRIDAY_VOICE_IDENTITY];
 
 	// Mode context
 	parts.push(`\nMODE:\n${MODE_CONTEXT[mode]}`);
+
+	// Emotional delivery (when provided and not flat mode)
+	if (emotion && mode !== "flat") {
+		parts.push(
+			`\nEMOTIONAL DELIVERY:\n${EMOTION_DELIVERY[emotion.mood]}\n${INTENSITY_MODIFIER[emotion.intensity]}`,
+		);
+	}
 
 	// Content hints
 	const hints = classifyContent(content);

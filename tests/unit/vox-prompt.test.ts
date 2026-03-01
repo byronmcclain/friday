@@ -5,6 +5,7 @@ import {
 	FRIDAY_VOICE_IDENTITY,
 } from "../../src/core/voice/prompt.ts";
 import type { VoiceMode } from "../../src/core/voice/types.ts";
+import type { EmotionProfile } from "../../src/core/voice/types.ts";
 
 describe("classifyContent", () => {
 	test("detects markdown tables", () => {
@@ -94,5 +95,53 @@ describe("buildTtsPrompt", () => {
 
 	test("FRIDAY_VOICE_IDENTITY is exported and non-empty", () => {
 		expect(FRIDAY_VOICE_IDENTITY.length).toBeGreaterThan(100);
+	});
+});
+
+describe("buildTtsPrompt with emotion", () => {
+	test("includes EMOTIONAL DELIVERY when emotion provided", () => {
+		const emotion: EmotionProfile = { mood: "excited", intensity: "strong" };
+		const prompt = buildTtsPrompt("Great news!", "on", emotion);
+		expect(prompt).toContain("EMOTIONAL DELIVERY");
+		expect(prompt).toContain("genuinely excited");
+		expect(prompt).toContain("Don't hold back");
+	});
+
+	test("no EMOTIONAL DELIVERY when emotion omitted", () => {
+		const prompt = buildTtsPrompt("Hello", "on");
+		expect(prompt).not.toContain("EMOTIONAL DELIVERY");
+	});
+
+	test("warm mood with subtle intensity", () => {
+		const emotion: EmotionProfile = { mood: "warm", intensity: "subtle" };
+		const prompt = buildTtsPrompt("Nice work.", "on", emotion);
+		expect(prompt).toContain("warmth");
+		expect(prompt).toContain("understated");
+	});
+
+	test("concerned mood with moderate intensity", () => {
+		const emotion: EmotionProfile = { mood: "concerned", intensity: "moderate" };
+		const prompt = buildTtsPrompt("Tests failed.", "on", emotion);
+		expect(prompt).toContain("concern");
+		expect(prompt).toContain("naturally");
+	});
+
+	test("frustrated mood delivery", () => {
+		const emotion: EmotionProfile = { mood: "frustrated", intensity: "strong" };
+		const prompt = buildTtsPrompt("Still broken.", "on", emotion);
+		expect(prompt).toContain("frustrated");
+	});
+
+	test("emotion works with whisper mode", () => {
+		const emotion: EmotionProfile = { mood: "amused", intensity: "moderate" };
+		const prompt = buildTtsPrompt("Funny.", "whisper", emotion);
+		expect(prompt).toContain("whispering");
+		expect(prompt).toContain("amused");
+	});
+
+	test("emotion works with flat mode (no emotion injected)", () => {
+		const prompt = buildTtsPrompt("Data.", "flat");
+		expect(prompt).not.toContain("EMOTIONAL DELIVERY");
+		expect(prompt).toContain("FRIDAY");
 	});
 });
