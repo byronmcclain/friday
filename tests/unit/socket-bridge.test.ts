@@ -53,4 +53,58 @@ describe("SocketBridge", () => {
 			source: "chat",
 		});
 	});
+
+	test("fires onAuditEntry for audit:entry events", () => {
+		const bridge = new SocketBridge("/tmp/nonexistent.sock");
+		const received: any[] = [];
+		bridge.onAuditEntry = (entry) => received.push(entry);
+
+		(bridge as any).handleServerMessage({
+			type: "audit:entry",
+			action: "tool:git.pull",
+			source: "git.pull",
+			detail: "Pulled from origin/main",
+			success: true,
+			timestamp: "2026-03-01T12:00:00.000Z",
+		});
+
+		expect(received).toHaveLength(1);
+		expect(received[0].action).toBe("tool:git.pull");
+		expect(received[0].source).toBe("git.pull");
+		expect(received[0].detail).toBe("Pulled from origin/main");
+		expect(received[0].success).toBe(true);
+		expect(received[0].timestamp).toBe("2026-03-01T12:00:00.000Z");
+	});
+
+	test("does not throw when onAuditEntry is not set", () => {
+		const bridge = new SocketBridge("/tmp/nonexistent.sock");
+
+		(bridge as any).handleServerMessage({
+			type: "audit:entry",
+			action: "runtime:boot",
+			source: "runtime",
+			detail: "Friday online",
+			success: true,
+			timestamp: "2026-03-01T12:00:00.000Z",
+		});
+	});
+
+	test("audit:entry does not interfere with request-reply messages", () => {
+		const bridge = new SocketBridge("/tmp/nonexistent.sock");
+		const auditReceived: any[] = [];
+		bridge.onAuditEntry = (entry) => auditReceived.push(entry);
+
+		// An audit entry should not be treated as a request-reply
+		(bridge as any).handleServerMessage({
+			type: "audit:entry",
+			action: "protocol:blocked",
+			source: "test",
+			detail: "denied",
+			success: false,
+			timestamp: "2026-03-01T12:00:00.000Z",
+		});
+
+		expect(auditReceived).toHaveLength(1);
+		expect(auditReceived[0].success).toBe(false);
+	});
 });

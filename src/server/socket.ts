@@ -33,7 +33,19 @@ export class FridaySocketServer {
     // Write PID file
     await writeFile(this.pidPath, String(process.pid));
 
-    // Start Unix socket server
+    // Broadcast audit entries to all connected clients via hub
+    this.runtime.audit.onLog = (entry) => {
+      if (this.hub.clientCount === 0) return;
+      this.hub.broadcast({
+        type: "audit:entry",
+        action: entry.action,
+        source: entry.source,
+        detail: entry.detail,
+        success: entry.success,
+        timestamp: entry.timestamp.toISOString(),
+      });
+    };
+
     this.server = Bun.listen({
       unix: this.socketPath,
       socket: {
@@ -73,6 +85,7 @@ export class FridaySocketServer {
   }
 
   async stop(): Promise<void> {
+    this.runtime.audit.onLog = undefined;
     if (this.server) {
       this.server.stop();
       this.server = null;

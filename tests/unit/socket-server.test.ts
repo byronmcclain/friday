@@ -1,5 +1,6 @@
 import { describe, test, expect, afterEach } from "bun:test";
 import { unlink } from "node:fs/promises";
+import { AuditLogger } from "../../src/audit/logger.ts";
 import { FridaySocketServer } from "../../src/server/socket.ts";
 import { SessionHub } from "../../src/server/session-hub.ts";
 
@@ -28,7 +29,7 @@ afterEach(async () => {
 
 describe("FridaySocketServer", () => {
 	test("creates socket file on start", async () => {
-		const mockRuntime = { isBooted: true, cortex: { modelName: "test" } } as any;
+		const mockRuntime = { isBooted: true, cortex: { modelName: "test" }, audit: new AuditLogger() } as any;
 		const hub = createMockHub();
 		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
 		await server.start();
@@ -42,7 +43,7 @@ describe("FridaySocketServer", () => {
 	});
 
 	test("cleans up on stop", async () => {
-		const mockRuntime = { isBooted: true, cortex: { modelName: "test" } } as any;
+		const mockRuntime = { isBooted: true, cortex: { modelName: "test" }, audit: new AuditLogger() } as any;
 		const hub = createMockHub();
 		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
 		await server.start();
@@ -57,6 +58,7 @@ describe("FridaySocketServer", () => {
 			isBooted: true,
 			cortex: { modelName: "test" },
 			protocols: { isProtocol: () => false },
+			audit: new AuditLogger(),
 		} as any;
 		const hub = createMockHub();
 		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
@@ -86,6 +88,7 @@ describe("FridaySocketServer", () => {
 			isBooted: true,
 			cortex: { modelName: "test" },
 			protocols: { isProtocol: () => false },
+			audit: new AuditLogger(),
 		} as any;
 		const hub = createMockHub();
 		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
@@ -101,5 +104,65 @@ describe("FridaySocketServer", () => {
 
 		socket.end();
 		await server.stop();
+	});
+
+	test("broadcasts audit entries via hub", async () => {
+		const audit = new AuditLogger();
+		const mockRuntime = {
+			isBooted: true,
+			cortex: { modelName: "test" },
+			audit,
+		} as any;
+		const broadcasted: any[] = [];
+		const hub = { ...createMockHub(), clientCount: 1, broadcast: (msg: any) => broadcasted.push(msg) } as any;
+		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
+		await server.start();
+
+		audit.log({ action: "tool:test", source: "test", detail: "test detail", success: true });
+
+		expect(broadcasted).toHaveLength(1);
+		expect(broadcasted[0].type).toBe("audit:entry");
+		expect(broadcasted[0].action).toBe("tool:test");
+		expect(broadcasted[0].source).toBe("test");
+		expect(broadcasted[0].detail).toBe("test detail");
+		expect(broadcasted[0].success).toBe(true);
+		expect(broadcasted[0].timestamp).toBeDefined();
+
+		await server.stop();
+	});
+
+	test("skips audit broadcast when no clients connected", async () => {
+		const audit = new AuditLogger();
+		const mockRuntime = {
+			isBooted: true,
+			cortex: { modelName: "test" },
+			audit,
+		} as any;
+		const broadcasted: any[] = [];
+		const hub = { ...createMockHub(), clientCount: 0, broadcast: (msg: any) => broadcasted.push(msg) } as any;
+		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
+		await server.start();
+
+		audit.log({ action: "tool:test", source: "test", detail: "skipped", success: true });
+
+		expect(broadcasted).toHaveLength(0);
+
+		await server.stop();
+	});
+
+	test("clears audit onLog callback on stop", async () => {
+		const audit = new AuditLogger();
+		const mockRuntime = {
+			isBooted: true,
+			cortex: { modelName: "test" },
+			audit,
+		} as any;
+		const hub = createMockHub();
+		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
+		await server.start();
+		expect(audit.onLog).toBeDefined();
+
+		await server.stop();
+		expect(audit.onLog).toBeUndefined();
 	});
 });

@@ -274,6 +274,12 @@ export class Cortex {
 							);
 						}
 					}
+					this.audit?.log({
+						action: "tool:called",
+						source: name,
+						detail: `Tool invoked by LLM`,
+						success: true,
+					});
 					try {
 						const result = await fridayTool.execute(args, {
 							workingDirectory: process.cwd(),
@@ -298,6 +304,12 @@ export class Cortex {
 					} catch (err) {
 						const msg =
 							err instanceof Error ? err.message : String(err);
+						this.audit?.log({
+							action: "tool:error",
+							source: name,
+							detail: msg,
+							success: false,
+						});
 						return `Tool execution error: ${msg}`;
 					}
 				},

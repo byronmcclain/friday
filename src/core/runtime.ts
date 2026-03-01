@@ -573,6 +573,12 @@ export class FridayRuntime {
 					tools: new Map(),
 				},
 			);
+			this._audit.log({
+				action: "protocol:dispatched",
+				source: parsed.name,
+				detail: `/${parsed.name}${parsed.rawArgs ? ` ${parsed.rawArgs}` : ""}`,
+				success: true,
+			});
 			return { output: result.summary, source: "protocol" };
 		}
 

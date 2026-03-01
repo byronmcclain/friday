@@ -101,17 +101,15 @@ export class Vox {
 		if (this._clearance) {
 			const check = this._clearance.check("audio-output");
 			if (!check.granted) {
-				this._audit?.log({
-					action: "vox:blocked",
-					source: "vox",
-					detail: check.reason ?? "Clearance denied for audio output",
-					success: false,
-				});
+				this.logAudit("vox:blocked", check.reason ?? "Clearance denied for audio output", false);
 				return;
 			}
 		}
 		if (!this.apiKeyAvailable) return;
 		if (!text.trim()) return;
+
+		const textPreview = text.length > 80 ? `${text.slice(0, 80)}...` : text;
+		this.logAudit("vox:speak", `Speaking (${this._mode} mode): ${textPreview}`, true);
 
 		// Check player availability on first call
 		if (this._playerAvailable === null) {
@@ -152,6 +150,7 @@ export class Vox {
 				);
 				spokenText = result.text;
 				emotionProfile = result.emotion;
+				this.logAudit("vox:rewrite", `Emotional rewrite applied (mood: ${emotionProfile?.mood ?? "neutral"}, intensity: ${emotionProfile?.intensity ?? "n/a"})`, true);
 			} catch {
 				// Fallback: use original text, no emotion
 			}
@@ -217,6 +216,7 @@ export class Vox {
 			});
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : String(err);
+			this.logAudit("vox:error", `Speak failed: ${msg}`, false);
 			void this._signals.emit("custom:vox-error", "vox", { error: msg });
 		}
 	}
@@ -287,6 +287,7 @@ export class Vox {
 				clearTimeout(timeout);
 				this._ws = ws;
 				this._connected = true;
+				this.logAudit("vox:ws-connect", `WebSocket connected (voice: ${this._config.defaultVoice})`, true);
 
 				// Initial session config
 				ws.send(
@@ -323,6 +324,7 @@ export class Vox {
 			ws.addEventListener("close", () => {
 				this._connected = false;
 				this._ws = null;
+				this.logAudit("vox:ws-disconnect", "WebSocket disconnected", true);
 				if (this._speaking && this._speakResolve) {
 					this._speakResolve();
 					this._speakResolve = null;
@@ -353,6 +355,7 @@ export class Vox {
 				this._speaking = false;
 				const chunks = this._audioChunks;
 				this._audioChunks = [];
+				this.logAudit("vox:tts-complete", `TTS audio received (${chunks.length} chunks)`, true);
 				const resolve = this._speakResolve;
 				this._speakResolve = null;
 
@@ -382,6 +385,7 @@ export class Vox {
 								void cleanupTempFile(this._activeTmpFile);
 								this._activeTmpFile = null;
 							}
+							this.logAudit("vox:playback", `Audio playback complete (${chunks.length} chunks)`, true);
 							void this._signals.emit("custom:vox-spoke", "vox", {
 								length: chunks.length,
 							});
@@ -389,6 +393,7 @@ export class Vox {
 						.catch((err) => {
 							this._activeProc = null;
 							const msg = err instanceof Error ? err.message : String(err);
+							this.logAudit("vox:error", `Playback failed: ${msg}`, false);
 							void this._signals.emit("custom:vox-error", "vox", { error: msg });
 						});
 				}
@@ -399,6 +404,7 @@ export class Vox {
 
 			case "error": {
 				const msg = data.error?.message ?? "Grok voice error";
+				this.logAudit("vox:error", `TTS API error: ${msg}`, false);
 				void this._signals.emit("custom:vox-error", "vox", { error: msg });
 				if (this._speaking) {
 					this._speaking = false;
@@ -425,6 +431,10 @@ export class Vox {
 			this._ws = null;
 			this._connected = false;
 		}
+	}
+
+	private logAudit(action: string, detail: string, success: boolean): void {
+		this._audit?.log({ action, source: "vox", detail, success });
 	}
 
 	private resetIdleTimer(): void {

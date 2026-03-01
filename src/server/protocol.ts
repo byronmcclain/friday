@@ -66,7 +66,8 @@ export type ServerMessage =
 	| { type: "voice:started"; requestId: string }
 	| { type: "voice:stopped"; requestId: string }
 	| { type: "voice:error"; code: string; message: string }
-	| { type: "conversation:message"; role: "user" | "assistant"; content: string; source: "voice" | "chat" | "tui" | "replay" };
+	| { type: "conversation:message"; role: "user" | "assistant"; content: string; source: "voice" | "chat" | "tui" | "replay" }
+	| { type: "audit:entry"; action: string; source: string; detail: string; success: boolean; timestamp: string };
 
 // ─── Validators ─────────────────────────────────────────────────
 

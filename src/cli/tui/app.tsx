@@ -127,6 +127,13 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 					});
 				};
 
+				// Wire audit log entries from the server into the TUI log panel
+				socketBridge.onAuditEntry = (entry) => {
+					if (cancelled) return;
+					const level: LogEntry["level"] = entry.success ? "info" : "warning";
+					pushLog(level, entry.source, entry.action, entry.detail);
+				};
+
 				if (cancelled) return;
 
 				// Query the server for actual model info

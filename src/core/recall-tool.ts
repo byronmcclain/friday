@@ -43,15 +43,15 @@ export function createRecallTool(memory: SQLiteMemory): FridayTool {
 
 		async execute(
 			args: Record<string, unknown>,
-			_context: ToolContext,
+			context: ToolContext,
 		): Promise<ToolResult> {
 			const mode = (args.mode as string) ?? "search";
 
 			if (mode === "recall") {
-				return handleRecall(memory, args);
+				return handleRecall(memory, args, context);
 			}
 			if (mode === "search") {
-				return handleSearch(memory, args);
+				return handleSearch(memory, args, context);
 			}
 			return { success: false, output: `Unknown mode: "${mode}". Use "search" or "recall".` };
 		},
@@ -61,6 +61,7 @@ export function createRecallTool(memory: SQLiteMemory): FridayTool {
 async function handleSearch(
 	memory: SQLiteMemory,
 	args: Record<string, unknown>,
+	context: ToolContext,
 ): Promise<ToolResult> {
 	const query = args.query as string;
 	if (!query?.trim()) {
@@ -69,6 +70,13 @@ async function handleSearch(
 
 	const limit = Math.min(20, Math.max(1, (args.limit as number) ?? 5));
 	const results = await memory.searchConversations(query, limit);
+
+	context.audit.log({
+		action: "tool:recall.search",
+		source: "recall_memory",
+		detail: `Search "${query}" → ${results.length} result(s)`,
+		success: true,
+	});
 
 	if (results.length === 0) {
 		return {
@@ -93,6 +101,7 @@ async function handleSearch(
 async function handleRecall(
 	memory: SQLiteMemory,
 	args: Record<string, unknown>,
+	context: ToolContext,
 ): Promise<ToolResult> {
 	const sessionId = args.sessionId as string;
 	if (!sessionId?.trim()) {
@@ -101,8 +110,21 @@ async function handleRecall(
 
 	const session = await memory.getConversationById(sessionId);
 	if (!session) {
+		context.audit.log({
+			action: "tool:recall.recall",
+			source: "recall_memory",
+			detail: `Recall session ${sessionId} → not found`,
+			success: false,
+		});
 		return { success: false, output: `No conversation found with ID: ${sessionId}` };
 	}
+
+	context.audit.log({
+		action: "tool:recall.recall",
+		source: "recall_memory",
+		detail: `Recalled session ${sessionId} (${session.messages.length} messages)`,
+		success: true,
+	});
 
 	const date = session.startedAt.toISOString().replace("T", " ").slice(0, 16);
 	const header = `Conversation ${sessionId} (${date}, ${session.provider}/${session.model}, ${session.messages.length} messages)`;
