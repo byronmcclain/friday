@@ -1,6 +1,7 @@
 import type { SignalBus } from "../events.ts";
 import type { NotificationManager } from "../notifications.ts";
 import type { ClearanceManager } from "../clearance.ts";
+import type { AuditLogger } from "../../audit/logger.ts";
 
 export type VoiceMode = "off" | "on" | "whisper";
 
@@ -19,6 +20,7 @@ export interface VoxOptions {
 	signals: SignalBus;
 	notifications: NotificationManager;
 	clearance?: ClearanceManager;
+	audit?: AuditLogger;
 }
 
 export const VOX_WS_URL = "wss://api.x.ai/v1/realtime";

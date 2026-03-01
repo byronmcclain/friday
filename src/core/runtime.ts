@@ -347,6 +347,7 @@ export class FridayRuntime {
 					signals: this._signals,
 					notifications: this._notifications,
 					clearance: this._clearance,
+					audit: this._audit,
 				});
 				this._notifications.addChannel(new VoiceChannel(this._vox));
 				this._protocols.register(createVoiceProtocol(this._vox));

@@ -43,6 +43,12 @@ export class RhythmExecutor {
 		if (rhythm.clearance.length > 0) {
 			const check = this.clearance.checkAll(rhythm.clearance);
 			if (!check.granted) {
+				this.audit.log({
+					action: "rhythm:blocked",
+					source: rhythm.name,
+					detail: check.reason ?? `Clearance denied for rhythm: ${rhythm.name}`,
+					success: false,
+				});
 				return {
 					status: "failure",
 					error: `Clearance denied: ${check.reason ?? "insufficient permissions"}`,

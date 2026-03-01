@@ -91,6 +91,10 @@ describe("Cortex — tool integration (AI SDK path)", () => {
 		expect(result).toBeDefined();
 	});
 
+	// Note: Cortex tool:blocked audit logging is verified by code review.
+	// MockLanguageModelV3's streamText does not invoke tool execute callbacks,
+	// so the audit log in buildAiTools() cannot be exercised in unit tests.
+
 	test("tool execution error is caught and returned as string", async () => {
 		const failingTool = mockTool({
 			name: "failing-tool",

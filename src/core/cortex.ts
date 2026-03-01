@@ -243,12 +243,24 @@ export class Cortex {
 				execute: async (args: Record<string, unknown>) => {
 					if (fridayTool.clearance.length > 0) {
 						if (!this.clearance) {
+							this.audit?.log({
+								action: "tool:blocked",
+								source: name,
+								detail: `Clearance denied for tool: ${name} (clearance manager not configured)`,
+								success: false,
+							});
 							return `Clearance denied for tool: ${name} (clearance manager not configured)`;
 						}
 						const check = this.clearance.checkAll(
 							fridayTool.clearance,
 						);
 						if (!check.granted) {
+							this.audit?.log({
+								action: "tool:blocked",
+								source: name,
+								detail: check.reason ?? `Clearance denied for tool: ${name}`,
+								success: false,
+							});
 							return (
 								check.reason ??
 								`Clearance denied for tool: ${name}`

@@ -2,6 +2,8 @@ import { describe, test, expect, beforeEach } from "bun:test";
 import { Vox } from "../../src/core/voice/vox.ts";
 import { SignalBus } from "../../src/core/events.ts";
 import { NotificationManager } from "../../src/core/notifications.ts";
+import { ClearanceManager } from "../../src/core/clearance.ts";
+import { AuditLogger } from "../../src/audit/logger.ts";
 import { VOX_DEFAULTS } from "../../src/core/voice/types.ts";
 
 describe("Vox", () => {
@@ -107,6 +109,44 @@ describe("Vox", () => {
 			vox.setMode("whisper");
 			const status = vox.status();
 			expect(status.mode).toBe("whisper");
+		});
+	});
+
+	describe("clearance audit", () => {
+		test("logs vox:blocked audit entry when audio-output clearance denied", async () => {
+			const clearance = new ClearanceManager([]);
+			const audit = new AuditLogger();
+			const gatedVox = new Vox({
+				config: VOX_DEFAULTS,
+				signals,
+				notifications,
+				clearance,
+				audit,
+			});
+			gatedVox.setMode("on");
+			await gatedVox.speak("Should be blocked");
+			const entries = audit.entries({ action: "vox:blocked" });
+			expect(entries.length).toBe(1);
+			const entry = entries[0]!;
+			expect(entry.source).toBe("vox");
+			expect(entry.success).toBe(false);
+		});
+
+		test("does not log audit when clearance is granted", async () => {
+			const clearance = new ClearanceManager(["audio-output"]);
+			const audit = new AuditLogger();
+			const gatedVox = new Vox({
+				config: VOX_DEFAULTS,
+				signals,
+				notifications,
+				clearance,
+				audit,
+			});
+			gatedVox.setMode("on");
+			// speak will proceed past clearance but fail on API key — that's fine
+			await gatedVox.speak("Should pass clearance");
+			const entries = audit.entries({ action: "vox:blocked" });
+			expect(entries.length).toBe(0);
 		});
 	});
 });

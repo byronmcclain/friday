@@ -95,6 +95,21 @@ describe("RhythmExecutor", () => {
 		expect(result.error).toContain("Clearance denied");
 	});
 
+	test("logs rhythm:blocked audit entry when clearance denied", async () => {
+		const restrictedClearance = new ClearanceManager([]);
+		const restrictedAudit = new AuditLogger();
+		const restrictedExecutor = new RhythmExecutor({
+			cortex, protocols, clearance: restrictedClearance, audit: restrictedAudit,
+		});
+		const rhythm = makeRhythm({ name: "Blocked Beat", clearance: ["system"] });
+		await restrictedExecutor.execute(rhythm);
+		const entries = restrictedAudit.entries({ action: "rhythm:blocked" });
+		expect(entries.length).toBe(1);
+		const entry = entries[0]!;
+		expect(entry.source).toBe("Blocked Beat");
+		expect(entry.success).toBe(false);
+	});
+
 	test("returns failure when tool is not found", async () => {
 		const rhythm = makeRhythm({
 			action: { type: "tool", tool: "nonexistent_tool" },

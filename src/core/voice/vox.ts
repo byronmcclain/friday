@@ -1,5 +1,6 @@
 import type { SignalBus } from "../events.ts";
 import type { ClearanceManager } from "../clearance.ts";
+import type { AuditLogger } from "../../audit/logger.ts";
 import { type VoiceMode, type GrokVoice, type VoxConfig, type VoxOptions, VOX_WS_URL } from "./types.ts";
 import { buildTtsPrompt } from "./prompt.ts";
 import { pcmToWav, playAudio, cleanupTempFile, detectPlayer } from "./audio.ts";
@@ -23,6 +24,7 @@ export class Vox {
 	private _config: VoxConfig;
 	private _signals: SignalBus;
 	private _clearance?: ClearanceManager;
+	private _audit?: AuditLogger;
 	private _ws: WebSocket | null = null;
 	private _connected = false;
 	private _idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -38,6 +40,7 @@ export class Vox {
 		this._config = options.config;
 		this._signals = options.signals;
 		this._clearance = options.clearance;
+		this._audit = options.audit;
 	}
 
 	get mode(): VoiceMode {
@@ -77,7 +80,18 @@ export class Vox {
 	 */
 	async speak(text: string): Promise<void> {
 		if (this._mode === "off") return;
-		if (this._clearance && !this._clearance.check("audio-output").granted) return;
+		if (this._clearance) {
+			const check = this._clearance.check("audio-output");
+			if (!check.granted) {
+				this._audit?.log({
+					action: "vox:blocked",
+					source: "vox",
+					detail: check.reason ?? "Clearance denied for audio output",
+					success: false,
+				});
+				return;
+			}
+		}
 		if (!this.apiKeyAvailable) return;
 		if (!text.trim()) return;
 
