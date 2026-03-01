@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import { Vox } from "../../src/core/voice/vox.ts";
+import { createMockModel } from "../helpers/stubs.ts";
 import { SignalBus } from "../../src/core/events.ts";
 import { NotificationManager } from "../../src/core/notifications.ts";
 import { ClearanceManager } from "../../src/core/clearance.ts";
@@ -148,5 +149,72 @@ describe("Vox", () => {
 			const entries = audit.entries({ action: "vox:blocked" });
 			expect(entries.length).toBe(0);
 		});
+	});
+});
+
+describe("emotion engine", () => {
+	let signals: SignalBus;
+	let notifications: NotificationManager;
+	let vox: Vox;
+
+	beforeEach(() => {
+		signals = new SignalBus();
+		notifications = new NotificationManager();
+		vox = new Vox({
+			config: VOX_DEFAULTS,
+			signals,
+			notifications,
+		});
+	});
+
+	test("setEmotionEngine stores model and history callback", () => {
+		const model = createMockModel();
+		vox.setEmotionEngine(model, () => []);
+		expect(vox.hasEmotionEngine).toBe(true);
+	});
+
+	test("hasEmotionEngine is false by default", () => {
+		expect(vox.hasEmotionEngine).toBe(false);
+	});
+
+	test("status includes emotionEngine field", () => {
+		expect(vox.status().emotionEngine).toBe(false);
+		const model = createMockModel();
+		vox.setEmotionEngine(model, () => []);
+		expect(vox.status().emotionEngine).toBe(true);
+	});
+});
+
+describe("flat mode", () => {
+	let signals: SignalBus;
+	let notifications: NotificationManager;
+	let vox: Vox;
+
+	beforeEach(() => {
+		signals = new SignalBus();
+		notifications = new NotificationManager();
+		vox = new Vox({
+			config: VOX_DEFAULTS,
+			signals,
+			notifications,
+		});
+	});
+
+	test("setMode accepts flat", () => {
+		vox.setMode("flat");
+		expect(vox.mode).toBe("flat");
+	});
+
+	test("speak in flat mode does not call emotion engine", async () => {
+		const model = createMockModel();
+		let emotionCalled = false;
+		vox.setEmotionEngine(model, () => {
+			emotionCalled = true;
+			return [];
+		});
+		vox.setMode("flat");
+		// speak will bail early (no API key) but should not call emotion engine
+		await vox.speak("Hello");
+		expect(emotionCalled).toBe(false);
 	});
 });

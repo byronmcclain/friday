@@ -1,9 +1,11 @@
 import type { SignalBus } from "../events.ts";
 import type { ClearanceManager } from "../clearance.ts";
 import type { AuditLogger } from "../../audit/logger.ts";
-import { type VoiceMode, type GrokVoice, type VoxConfig, type VoxOptions, VOX_WS_URL } from "./types.ts";
+import { type VoiceMode, type GrokVoice, type VoxConfig, type VoxOptions, type EmotionProfile, VOX_WS_URL } from "./types.ts";
 import { buildTtsPrompt } from "./prompt.ts";
 import { pcmToWav, playAudio, cleanupTempFile, detectPlayer } from "./audio.ts";
+import type { LanguageModelV3 } from "@ai-sdk/provider";
+import { emotionalRewrite } from "./emotion.ts";
 
 // FUTURE: Full duplex voice conversation
 // This WebSocket connection currently operates in TTS-only mode (text → speech).
@@ -17,6 +19,7 @@ interface VoxStatus {
 	connected: boolean;
 	voice: GrokVoice;
 	apiKeyAvailable: boolean;
+	emotionEngine: boolean;
 }
 
 export class Vox {
@@ -35,6 +38,8 @@ export class Vox {
 	private _audioChunks: Buffer[] = [];
 	private _speakResolve: (() => void) | null = null;
 	private _playerAvailable: boolean | null = null; // null = unchecked
+	private _fastModel?: LanguageModelV3;
+	private _getRecentHistory?: () => string[];
 
 	constructor(options: VoxOptions) {
 		this._config = options.config;
@@ -55,6 +60,18 @@ export class Vox {
 		return Boolean(process.env.XAI_API_KEY);
 	}
 
+	get hasEmotionEngine(): boolean {
+		return Boolean(this._fastModel && this._getRecentHistory);
+	}
+
+	setEmotionEngine(
+		fastModel: LanguageModelV3,
+		getRecentHistory: () => string[],
+	): void {
+		this._fastModel = fastModel;
+		this._getRecentHistory = getRecentHistory;
+	}
+
 	setMode(mode: VoiceMode): void {
 		const from = this._mode;
 		if (from === mode) return;
@@ -71,6 +88,7 @@ export class Vox {
 			connected: this._connected,
 			voice: this._config.defaultVoice,
 			apiKeyAvailable: this.apiKeyAvailable,
+			emotionEngine: this.hasEmotionEngine,
 		};
 	}
 
@@ -114,7 +132,35 @@ export class Vox {
 		this.cancelPlayback();
 		this.resetIdleTimer();
 
-		const prompt = buildTtsPrompt(text, this._mode as Exclude<VoiceMode, "off">);
+		let spokenText = text;
+		let emotionProfile: EmotionProfile | undefined;
+
+		// Emotional rewrite for on/whisper modes when engine is available
+		if (
+			this._mode !== "flat" &&
+			this._fastModel &&
+			this._getRecentHistory
+		) {
+			try {
+				const history = this._getRecentHistory();
+				const result = await emotionalRewrite(
+					text,
+					history,
+					this._mode as "on" | "whisper",
+					this._fastModel,
+				);
+				spokenText = result.text;
+				emotionProfile = result.emotion;
+			} catch {
+				// Fallback: use original text, no emotion
+			}
+		}
+
+		const prompt = buildTtsPrompt(
+			spokenText,
+			this._mode as Exclude<VoiceMode, "off">,
+			emotionProfile,
+		);
 
 		try {
 			if (!this._ws || !this._connected) {
@@ -139,7 +185,7 @@ export class Vox {
 					item: {
 						type: "message",
 						role: "user",
-						content: [{ type: "input_text", text }],
+						content: [{ type: "input_text", text: spokenText }],
 					},
 				}),
 			);
