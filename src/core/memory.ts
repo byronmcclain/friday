@@ -293,11 +293,9 @@ export class SQLiteMemory {
   }
 
   async search(namespace: string, query: string, limit = 5): Promise<SemanticResult[]> {
-    const sanitized = query.replace(/['"*(){}[\]?:^~!@#$%&\\./+-]/g, " ").trim();
-    if (!sanitized) return [];
-    const terms = sanitized.split(/\s+/).filter(Boolean);
+    const terms = query.split(/\s+/).filter((t) => /\w/.test(t));
     if (terms.length === 0) return [];
-    const ftsQuery = terms.map((t) => `${t}*`).join(" OR ");
+    const ftsQuery = terms.map((t) => `"${t.replace(/"/g, '""')}"*`).join(" OR ");
 
     try {
       const rows = this.db
