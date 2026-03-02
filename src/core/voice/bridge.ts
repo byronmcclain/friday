@@ -2,6 +2,7 @@ import type { Cortex } from "../cortex.ts";
 import { type GrokVoice, VOX_WS_URL } from "./types.ts";
 import { buildTtsPrompt } from "./prompt.ts";
 import type { SignalBus, SignalHandler } from "../events.ts";
+import { NarrationPicker, ACK_PHRASES, getToolNarration, GENERIC_NARRATIONS } from "./narration.ts";
 
 export type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "error";
 
@@ -27,6 +28,14 @@ export class VoiceBridge {
   private active = false;
   private _generation = 0;
   private userTranscriptBuffer = "";
+  private ttsQueue: string[] = [];
+  private _responseInFlight = false;
+  private ackPicker = new NarrationPicker(ACK_PHRASES);
+  private toolPickers = new Map<string, NarrationPicker>();
+  private genericNarrationPicker = new NarrationPicker(GENERIC_NARRATIONS);
+  private toolSignalHandler: SignalHandler | null = null;
+  private cortexStartTime = 0;
+  private lastNarrationTime = 0;
 
   constructor(
     cortex: Cortex,
@@ -126,6 +135,9 @@ export class VoiceBridge {
 
   async stop(): Promise<void> {
     this.active = false;
+    this.unsubscribeToolSignals();
+    this.ttsQueue.length = 0;
+    this._responseInFlight = false;
     if (this.grokWs) {
       try { this.grokWs.close(); } catch {}
       this.grokWs = null;
@@ -195,7 +207,11 @@ export class VoiceBridge {
       }
 
       case "response.done": {
-        this.callbacks.onStateChange("idle");
+        this._responseInFlight = false;
+        this.flushQueue();
+        if (this.ttsQueue.length === 0) {
+          this.callbacks.onStateChange("idle");
+        }
         break;
       }
 
@@ -206,19 +222,110 @@ export class VoiceBridge {
     }
   }
 
+  private enqueueTts(text: string): void {
+    this.ttsQueue.push(text);
+    this.flushQueue();
+  }
+
+  private flushQueue(): void {
+    if (this._responseInFlight || this.ttsQueue.length === 0) return;
+    if (!this.grokWs || this.grokWs.readyState !== 1) return;
+
+    const text = this.ttsQueue.shift()!;
+    this._responseInFlight = true;
+    this.sendToGrokTts(text);
+  }
+
+  private isSentenceBoundary(buffer: string): boolean {
+    if (buffer.length > 200) return true;
+    return /[.!?\n]\s*$/.test(buffer);
+  }
+
   private async processThroughCortex(transcript: string): Promise<void> {
     try {
       this.callbacks.onStateChange("thinking");
+      this.cortexStartTime = Date.now();
+      this.lastNarrationTime = 0;
 
+      // 1. Immediate ack
+      this.enqueueTts(this.ackPicker.next());
+
+      // Wait for ack to be sent
+      await this.waitForQueueDrain();
+
+      // 2. Subscribe to tool signals for narration
+      this.subscribeToolSignals();
+
+      // 3. Stream cortex response
       const stream = await this.cortex.chatStream(transcript);
-      const fullText = await stream.fullText;
+      let buffer = "";
 
-      if (!fullText.trim() || !this.active) return;
+      for await (const chunk of stream.textStream) {
+        if (!this.active) break;
+        buffer += chunk;
+        if (this.isSentenceBoundary(buffer)) {
+          this.enqueueTts(buffer.trim());
+          buffer = "";
+        }
+      }
 
-      this.sendToGrokTts(fullText);
+      // Flush remaining buffer
+      if (buffer.trim() && this.active) {
+        this.enqueueTts(buffer.trim());
+      }
+
+      // Ensure history is recorded
+      await stream.fullText;
+
+      // Wait for all TTS to finish
+      await this.waitForQueueDrain();
     } catch {
-      this.callbacks.onStateChange("error");
+      // Speak error phrase
+      this.enqueueTts("Something went wrong on my end — sorry about that.");
+      await this.waitForQueueDrain();
+    } finally {
+      this.unsubscribeToolSignals();
     }
+  }
+
+  private subscribeToolSignals(): void {
+    if (!this.config.signals || this.toolSignalHandler) return;
+
+    this.toolSignalHandler = (signal) => {
+      const elapsed = Date.now() - this.cortexStartTime;
+      const sinceLast = Date.now() - this.lastNarrationTime;
+      // Only narrate after 2s of processing and at least 5s between narrations
+      if (elapsed > 2000 && sinceLast > 5000) {
+        this.lastNarrationTime = Date.now();
+        const narration = getToolNarration(signal.source, this.toolPickers, this.genericNarrationPicker);
+        this.enqueueTts(narration);
+      }
+    };
+
+    this.config.signals.on("tool:executing", this.toolSignalHandler);
+  }
+
+  private unsubscribeToolSignals(): void {
+    if (this.config.signals && this.toolSignalHandler) {
+      this.config.signals.off("tool:executing", this.toolSignalHandler);
+      this.toolSignalHandler = null;
+    }
+  }
+
+  private waitForQueueDrain(): Promise<void> {
+    if (this.ttsQueue.length === 0 && !this._responseInFlight) {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      const check = () => {
+        if ((this.ttsQueue.length === 0 && !this._responseInFlight) || !this.active) {
+          resolve();
+        } else {
+          setTimeout(check, 50);
+        }
+      };
+      setTimeout(check, 50);
+    });
   }
 
   private sendToGrokTts(text: string): void {
