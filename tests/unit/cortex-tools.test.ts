@@ -1,38 +1,8 @@
 import { describe, test, expect } from "bun:test";
 import { Cortex } from "../../src/core/cortex.ts";
-import type { FridayTool } from "../../src/modules/types.ts";
 import { ClearanceManager } from "../../src/core/clearance.ts";
-import { createMockModel, createErrorModel } from "../helpers/stubs.ts";
+import { createMockModel, createErrorModel, mockTool } from "../helpers/stubs.ts";
 import { SignalBus } from "../../src/core/events.ts";
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function mockTool(overrides: Partial<FridayTool> = {}): FridayTool {
-	return {
-		name: "test-tool",
-		description: "A test tool",
-		parameters: [
-			{
-				name: "input",
-				type: "string",
-				description: "test input",
-				required: true,
-			},
-		],
-		clearance: [],
-		execute: async (args) => ({
-			success: true,
-			output: `result: ${args.input}`,
-		}),
-		...overrides,
-	};
-}
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe("Cortex — tool integration (AI SDK path)", () => {
 	test("chat without tools returns text", async () => {

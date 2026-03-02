@@ -52,7 +52,9 @@ export class Cortex {
 	private _debug: boolean;
 	private debugPayloadPath?: string;
 	private debugResponsePath?: string;
-	private textWorker: TextWorker;
+	private readonly textWorker: TextWorker;
+	private _cachedDefs: ReturnType<typeof buildToolDefinitions> | null = null;
+	private _cachedExecutor: ReturnType<typeof createToolExecutor> | null = null;
 
 	constructor(config: CortexConfig = {}) {
 		this._modelName = config.model ?? GROK_DEFAULTS.model;
@@ -92,6 +94,8 @@ export class Cortex {
 
 	registerTool(tool: FridayTool): void {
 		this.tools.set(tool.name, tool);
+		this._cachedDefs = null;
+		this._cachedExecutor = null;
 	}
 
 	pinSmart(name: string): void {
@@ -116,8 +120,10 @@ export class Cortex {
 			});
 			if (this.debugPayloadPath && this.debugResponsePath) {
 				try {
-					await Bun.write(this.debugPayloadPath, "");
-					await Bun.write(this.debugResponsePath, "");
+					await Promise.all([
+						Bun.write(this.debugPayloadPath, ""),
+						Bun.write(this.debugResponsePath, ""),
+					]);
 				} catch {
 					this.audit?.log({
 						action: "debug:inference-write-failed",
@@ -129,9 +135,9 @@ export class Cortex {
 			}
 		}
 
-		// Build portable request
-		const defs = buildToolDefinitions(this.tools);
-		const executor = createToolExecutor({
+		// Cached tool infrastructure — rebuilt only when tools change
+		const defs = this._cachedDefs ??= buildToolDefinitions(this.tools);
+		const executor = this._cachedExecutor ??= createToolExecutor({
 			tools: this.tools,
 			clearance: this.clearance,
 			audit: this.audit,

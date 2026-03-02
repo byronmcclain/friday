@@ -4,27 +4,7 @@ import type { FridayTool } from "../../src/modules/types.ts";
 import { ClearanceManager } from "../../src/core/clearance.ts";
 import { AuditLogger } from "../../src/audit/logger.ts";
 import { SignalBus } from "../../src/core/events.ts";
-
-function mockTool(overrides: Partial<FridayTool> = {}): FridayTool {
-	return {
-		name: "test-tool",
-		description: "A test tool",
-		parameters: [
-			{
-				name: "input",
-				type: "string",
-				description: "test input",
-				required: true,
-			},
-		],
-		clearance: [],
-		execute: async (args) => ({
-			success: true,
-			output: `result: ${args.input}`,
-		}),
-		...overrides,
-	};
-}
+import { mockTool } from "../helpers/stubs.ts";
 
 describe("buildToolDefinitions", () => {
 	test("empty tools map returns empty array", () => {

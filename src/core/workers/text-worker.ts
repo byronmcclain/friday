@@ -3,6 +3,15 @@ import { streamText, tool as aiTool, stepCountIs } from "ai";
 import { toZodSchema } from "../../providers/schemas.ts";
 import type { WorkerRequest, WorkerResult, ToolEvent, CortexWorker } from "./types.ts";
 
+/** Empty async iterable — TextWorker delegates tool event signaling to createToolExecutor */
+const EMPTY_TOOL_EVENTS: AsyncIterable<ToolEvent> = {
+	[Symbol.asyncIterator]() {
+		return {
+			async next() { return { done: true, value: undefined }; },
+		};
+	},
+};
+
 /**
  * TextWorker — AI SDK streamText() agent loop.
  *
@@ -11,7 +20,7 @@ import type { WorkerRequest, WorkerResult, ToolEvent, CortexWorker } from "./typ
  * and returns the standard WorkerResult.
  */
 export class TextWorker implements CortexWorker {
-	constructor(private model: LanguageModelV3) {}
+	constructor(private readonly model: LanguageModelV3) {}
 
 	process(request: WorkerRequest): WorkerResult {
 		// Build AI SDK tools from portable definitions
@@ -44,21 +53,10 @@ export class TextWorker implements CortexWorker {
 			}),
 		).catch(() => ({ inputTokens: undefined, outputTokens: undefined }));
 
-		// TextWorker does not emit ToolEvents directly — tool execution
-		// signals are emitted by the shared executor (createToolExecutor).
-		// An empty async iterable satisfies the interface.
-		const toolEvents: AsyncIterable<ToolEvent> = {
-			[Symbol.asyncIterator]() {
-				return {
-					async next() { return { done: true, value: undefined }; },
-				};
-			},
-		};
-
 		return {
 			textStream: result.textStream,
 			audioStream: undefined,
-			toolEvents,
+			toolEvents: EMPTY_TOOL_EVENTS,
 			fullText,
 			usage,
 		};

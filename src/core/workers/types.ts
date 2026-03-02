@@ -1,7 +1,7 @@
 import type { ModelMessage } from "ai";
-import type { ToolDefinition } from "../tool-bridge.ts";
 
 export type { ToolDefinition } from "../tool-bridge.ts";
+export type { TokenUsage } from "../stream-types.ts";
 
 /** Tool execution event — emitted during agent loop */
 export interface ToolEvent {
@@ -11,17 +11,11 @@ export interface ToolEvent {
 	result?: string;
 }
 
-/** Token usage from a worker invocation */
-export interface TokenUsage {
-	inputTokens: number | undefined;
-	outputTokens: number | undefined;
-}
-
 /** What Cortex hands to a Worker */
 export interface WorkerRequest {
 	systemPrompt: string;
 	messages: ModelMessage[];
-	tools: ToolDefinition[];
+	tools: import("../tool-bridge.ts").ToolDefinition[];
 	executeTool: (name: string, args: Record<string, unknown>) => Promise<string>;
 	maxToolIterations: number;
 	maxOutputTokens: number;
@@ -33,7 +27,7 @@ export interface WorkerResult {
 	audioStream?: AsyncIterable<string>;
 	toolEvents: AsyncIterable<ToolEvent>;
 	fullText: PromiseLike<string>;
-	usage: PromiseLike<TokenUsage>;
+	usage: PromiseLike<import("../stream-types.ts").TokenUsage>;
 }
 
 /** The contract all workers implement */
