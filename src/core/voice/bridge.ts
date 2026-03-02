@@ -1,6 +1,7 @@
 import type { Cortex } from "../cortex.ts";
 import { type GrokVoice, VOX_WS_URL } from "./types.ts";
 import { buildTtsPrompt } from "./prompt.ts";
+import type { SignalBus, SignalHandler } from "../events.ts";
 
 export type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "error";
 
@@ -8,6 +9,7 @@ export interface VoiceBridgeConfig {
   voice: GrokVoice;
   sampleRate: number;
   instructions: string;
+  signals?: SignalBus;
 }
 
 export interface VoiceBridgeCallbacks {

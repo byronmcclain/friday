@@ -312,6 +312,7 @@ export class WebSocketHandler {
 					voice,
 					sampleRate: 48000,
 					instructions: FRIDAY_VOICE_IDENTITY,
+					signals: this.runtime.signals,
 				};
 
 				this.voiceBridge = new VoiceBridge(
