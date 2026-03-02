@@ -81,6 +81,7 @@ src/
 │       ├── prompt.ts       # classifyContent, buildTtsPrompt, FRIDAY_VOICE_IDENTITY
 │       ├── vox.ts          # Vox class — WebSocket lifecycle, modes, speak/cancel, idle eviction
 │       ├── bridge.ts       # VoiceBridge — Grok realtime API WebSocket for conversational voice
+│       ├── narration.ts    # NarrationPicker, ACK_PHRASES, TOOL_NARRATIONS — voice personality phrases
 │       ├── channel.ts      # VoiceChannel — notification bridge (NotificationChannel impl)
 │       ├── emotion.ts      # emotionalRewrite() — conversation-aware emotional TTS rewriting
 │       └── protocol.ts     # /voice protocol (on, off, whisper, flat, test, status)
@@ -178,7 +179,7 @@ tests/
 | **Sensorium** | `src/sensorium/` | Dual-cadence polling (30s/5min). Hysteresis alerts. CPU needs delta between two tick samples. |
 | **Genesis** | `src/core/genesis.ts` | Identity prompt at `~/.friday/GENESIS.md`. Protected path (`chmod 600`). Seed template: `GENESIS_TEMPLATE` in `prompts.ts`. |
 | **Vox** | `src/core/voice/vox.ts` | Fire-and-forget TTS. 60s idle WebSocket eviction. 4 modes: off/on/whisper/flat. Emotional rewrite via fast model. |
-| **VoiceBridge** | `src/core/voice/bridge.ts` | Realtime conversational voice via Grok Realtime API. Separate from Vox's TTS. |
+| **VoiceBridge** | `src/core/voice/bridge.ts` | Sequential TTS queue gated by `response.done`. Streams Cortex text to Grok TTS sentence-by-sentence. Quick ack + tool narration via SignalBus. |
 | **Recall (Deja Vu)** | `src/core/recall-tool.ts` | `search` (FTS5 summaries) → `recall` (full transcript). Registered in Cortex at boot. |
 | **Arc Rhythm** | `src/arc-rhythm/` | 60s scheduler tick. Auto-pause after 5 failures. Shares Memory's SQLite via `memory.database`. |
 | **The Forge** | `src/modules/forge/` | Self-improvement. Failed modules don't crash boot. Filesystem module + Forge are core-protected. |
@@ -201,6 +202,7 @@ tests/
 - **Singleton mode**: `friday serve` writes PID + socket files; `friday chat` requires a running server and connects via `SocketBridge` (no local runtime fallback — exits with error if no server is running)
 - **SessionHub**: Owns client lifecycle in server mode. Both WebSocket and Unix socket transports register/unregister via hub. History hydrated on connect via `conversation:message` with `source: "replay"`. Saves conversation + clears history on last client disconnect. Reconnect guard prevents clearing if a new client connects during save.
 - **Protected paths**: `isProtectedPath()` in `src/modules/filesystem/containment.ts` — blocks writes to Genesis and core modules
+- **Voice narration**: VoiceBridge uses a sequential TTS queue (FIFO) gated by Grok's `response.done`. Acks are hardcoded phrases (no LLM call). Tool narrations fire after 2s delay with 5s debounce.
 
 ## Testing
 
