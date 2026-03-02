@@ -37,6 +37,47 @@ export interface ToolExecutorConfig {
 	toolMemory?: ScopedMemory;
 }
 
+/** Grok realtime API function tool definition */
+export interface GrokToolDefinition {
+	type: "function";
+	name: string;
+	description: string;
+	parameters: {
+		type: "object";
+		properties: Record<string, { type: string; description: string }>;
+		required: string[];
+	};
+}
+
+/** Convert portable ToolDefinitions to Grok realtime API function format */
+export function toGrokTools(defs: ToolDefinition[]): GrokToolDefinition[] {
+	return defs.map((def) => {
+		const properties: Record<string, { type: string; description: string }> = {};
+		const required: string[] = [];
+
+		for (const param of def.parameters) {
+			properties[param.name] = {
+				type: param.type,
+				description: param.description,
+			};
+			if (param.required) {
+				required.push(param.name);
+			}
+		}
+
+		return {
+			type: "function" as const,
+			name: def.name,
+			description: def.description,
+			parameters: {
+				type: "object" as const,
+				properties,
+				required,
+			},
+		};
+	});
+}
+
 /**
  * Create a tool executor callback that wraps clearance checks,
  * audit logging, signal emission, and error handling.

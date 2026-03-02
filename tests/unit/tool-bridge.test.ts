@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { buildToolDefinitions, createToolExecutor } from "../../src/core/tool-bridge.ts";
+import { buildToolDefinitions, createToolExecutor, toGrokTools } from "../../src/core/tool-bridge.ts";
 import type { FridayTool } from "../../src/modules/types.ts";
 import { ClearanceManager } from "../../src/core/clearance.ts";
 import { AuditLogger } from "../../src/audit/logger.ts";
@@ -156,5 +156,80 @@ describe("createToolExecutor", () => {
 		await executor("test-tool", { input: "x" });
 
 		expect(entries.some((e) => e.action === "tool:error")).toBe(true);
+	});
+});
+
+describe("toGrokTools", () => {
+	test("empty definitions returns empty array", () => {
+		expect(toGrokTools([])).toEqual([]);
+	});
+
+	test("converts single tool to Grok function format", () => {
+		const defs = [{
+			name: "git.status",
+			description: "Get git status",
+			parameters: [
+				{ name: "path", type: "string" as const, description: "repo path", required: true },
+			],
+		}];
+		const result = toGrokTools(defs);
+		expect(result).toHaveLength(1);
+		expect(result[0]!.type).toBe("function");
+		expect(result[0]!.name).toBe("git.status");
+		expect(result[0]!.description).toBe("Get git status");
+		expect(result[0]!.parameters.type).toBe("object");
+		expect(result[0]!.parameters.properties.path).toEqual({
+			type: "string",
+			description: "repo path",
+		});
+		expect(result[0]!.parameters.required).toEqual(["path"]);
+	});
+
+	test("optional parameters are not in required array", () => {
+		const defs = [{
+			name: "test",
+			description: "Test",
+			parameters: [
+				{ name: "a", type: "string" as const, description: "required", required: true },
+				{ name: "b", type: "number" as const, description: "optional", required: false },
+			],
+		}];
+		const result = toGrokTools(defs);
+		expect(result[0]!.parameters.required).toEqual(["a"]);
+		expect(result[0]!.parameters.properties.b).toEqual({
+			type: "number",
+			description: "optional",
+		});
+	});
+
+	test("handles all parameter types", () => {
+		const defs = [{
+			name: "multi",
+			description: "Multi-type",
+			parameters: [
+				{ name: "s", type: "string" as const, description: "str", required: true },
+				{ name: "n", type: "number" as const, description: "num", required: true },
+				{ name: "b", type: "boolean" as const, description: "bool", required: true },
+				{ name: "a", type: "array" as const, description: "arr", required: false },
+				{ name: "o", type: "object" as const, description: "obj", required: false },
+			],
+		}];
+		const result = toGrokTools(defs);
+		expect(result[0]!.parameters.properties.s.type).toBe("string");
+		expect(result[0]!.parameters.properties.n.type).toBe("number");
+		expect(result[0]!.parameters.properties.b.type).toBe("boolean");
+		expect(result[0]!.parameters.properties.a.type).toBe("array");
+		expect(result[0]!.parameters.properties.o.type).toBe("object");
+	});
+
+	test("tool with no parameters has empty properties", () => {
+		const defs = [{
+			name: "simple",
+			description: "No params",
+			parameters: [],
+		}];
+		const result = toGrokTools(defs);
+		expect(result[0]!.parameters.properties).toEqual({});
+		expect(result[0]!.parameters.required).toEqual([]);
 	});
 });
