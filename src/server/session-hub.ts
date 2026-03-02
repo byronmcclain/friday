@@ -18,6 +18,7 @@ export class SessionHub {
 	private sessionId: string | null = null;
 	private sessionStartedAt: Date | null = null;
 	private _saving = false;
+	private _savePromise: Promise<void> | null = null;
 
 	constructor(config: SessionHubConfig) {
 		this.runtime = config.runtime;
@@ -60,8 +61,17 @@ export class SessionHub {
 
 	/** Save active session without clearing. Used before runtime.shutdown() on SIGINT. */
 	async saveIfActive(): Promise<void> {
+		// Wait for any in-flight save triggered by client disconnect before proceeding
+		await this.drain();
 		if (!this.sessionId) return;
 		await this.saveConversation();
+	}
+
+	/** Wait for any in-flight endSession saves to complete. */
+	async drain(): Promise<void> {
+		if (this._savePromise) {
+			await this._savePromise;
+		}
 	}
 
 	private startSession(): void {
@@ -76,7 +86,8 @@ export class SessionHub {
 	private async endSession(): Promise<void> {
 		this._saving = true;
 		try {
-			await this.saveConversation();
+			this._savePromise = this.saveConversation();
+			await this._savePromise;
 			// Only clear if no clients reconnected during save
 			if (this.registry.count === 0) {
 				this.runtime.cortex.clearHistory();
@@ -84,6 +95,7 @@ export class SessionHub {
 				this.sessionStartedAt = null;
 			}
 		} finally {
+			this._savePromise = null;
 			this._saving = false;
 		}
 	}
@@ -94,6 +106,12 @@ export class SessionHub {
 
 		const history = this.runtime.cortex.getHistory();
 		if (history.length === 0) return;
+
+		// Curator extraction is independent of summarization — start it early
+		// and await at the end so both LLM calls overlap.
+		const curatorPromise = this.curator
+			? this.curator.extractFromConversation(history).catch(() => {})
+			: undefined;
 
 		let summary: string | undefined;
 		if (this.summarizer) {
@@ -127,14 +145,7 @@ export class SessionHub {
 			});
 		}
 
-		// Extract knowledge via SmartsCurator
-		if (this.curator) {
-			try {
-				await this.curator.extractFromConversation(history);
-			} catch {
-				// Knowledge extraction failed — non-fatal
-			}
-		}
+		await curatorPromise;
 	}
 
 	private hydrateClient(client: RegisteredClient): void {

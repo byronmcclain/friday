@@ -59,6 +59,11 @@ export interface ProcessResult {
 	source: "protocol" | "cortex";
 }
 
+export type BootStep =
+	| "signals" | "memory" | "smarts" | "sensorium"
+	| "genesis" | "vox" | "cortex" | "arc-rhythm"
+	| "modules" | "ready";
+
 export type ShutdownStep = "arc-rhythm" | "vox" | "sensorium" | "conversation" | "knowledge" | "modules" | "cleanup";
 
 export class FridayRuntime {
@@ -160,7 +165,10 @@ export class FridayRuntime {
 		return this._curator;
 	}
 
-	async boot(config: RuntimeConfig = {}): Promise<void> {
+	async boot(
+		config: RuntimeConfig = {},
+		onProgress?: (step: BootStep, label: string) => void,
+	): Promise<void> {
 		if (this._booting) throw new Error("Boot already in progress");
 		this._booting = true;
 		try {
@@ -193,6 +201,7 @@ export class FridayRuntime {
 				clearance: this._clearance,
 			});
 			this._directiveEngine.start();
+			onProgress?.("signals", "Core systems initialized");
 
 			// Wire directive action dispatch — routes actions to the appropriate subsystem.
 			// This must be set after Cortex/protocols are available, but the handler
@@ -281,6 +290,7 @@ export class FridayRuntime {
 				this._sessionId = crypto.randomUUID();
 				this._sessionStartedAt = new Date();
 				this._protocols.register(createHistoryProtocol(this._memory));
+				onProgress?.("memory", "Memory database opened");
 			}
 
 			// Backfill conversation FTS5 index (one-time migration)
@@ -307,6 +317,7 @@ export class FridayRuntime {
 					this._smartsMemory,
 				);
 				this._protocols.register(createSmartProtocol(this._smarts));
+				onProgress?.("smarts", "SMARTS knowledge indexed");
 			}
 
 			// Resolve dual models: CLI flag > env var > default
@@ -323,6 +334,7 @@ export class FridayRuntime {
 				await this._sensorium.poll();
 				this._sensorium.start();
 				this._protocols.register(createEnvProtocol(this._sensorium));
+				onProgress?.("sensorium", "Sensorium polling started");
 			}
 
 			// Load GENESIS.md — Friday's identity prompt (before Cortex)
@@ -337,6 +349,7 @@ export class FridayRuntime {
 					detail: `Identity loaded from ${config.genesisPath} (${genesisPrompt.length} chars)`,
 					success: true,
 				});
+				onProgress?.("genesis", `Genesis identity loaded (${genesisPrompt.length.toLocaleString()} chars)`);
 			}
 
 			// Vox — voice output (before Cortex so vox ref can be passed in)
@@ -351,6 +364,7 @@ export class FridayRuntime {
 				});
 				this._notifications.addChannel(new VoiceChannel(this._vox));
 				this._protocols.register(createVoiceProtocol(this._vox));
+				onProgress?.("vox", "Vox voice engine ready");
 			}
 
 			this._cortex = new Cortex({
@@ -379,6 +393,7 @@ export class FridayRuntime {
 			if (this._memory) {
 				this._cortex.registerTool(createRecallTool(this._memory));
 			}
+			onProgress?.("cortex", `Cortex online (${reasoningModel})`);
 
 			// Arc Rhythm — after Cortex and recall tool, before modules
 			if (this._memory) {
@@ -401,6 +416,7 @@ export class FridayRuntime {
 				this._protocols.register(createArcProtocol(this._rhythmStore, this._rhythmScheduler));
 				this._cortex.registerTool(createManageRhythmTool(this._rhythmStore));
 				this._rhythmScheduler.start();
+				onProgress?.("arc-rhythm", "Arc Rhythm scheduler started");
 			}
 
 			// Subsystem model for curator/summarizer.
@@ -467,8 +483,15 @@ export class FridayRuntime {
 				}
 			}
 
+			if (this._modules.length > 0) {
+				const toolCount = this._modules.reduce((sum, m) => sum + m.tools.length, 0);
+				const protoCount = this._modules.reduce((sum, m) => sum + m.protocols.length, 0);
+				onProgress?.("modules", `${this._modules.length} modules loaded (${toolCount} tools, ${protoCount} protocols)`);
+			}
+
 			await this._signals.emit("session:start", "runtime");
 			this._booted = true;
+			onProgress?.("ready", "Friday online");
 
 			this._audit.log({
 				action: "runtime:boot",
@@ -587,7 +610,10 @@ export class FridayRuntime {
 		return { output: response, source: "cortex" };
 	}
 
-	async shutdown(onProgress?: (step: ShutdownStep, label: string) => void): Promise<void> {
+	async shutdown(
+		onProgress?: (step: ShutdownStep, label: string) => void,
+		options?: { skipConversationSave?: boolean },
+	): Promise<void> {
 		if (!this._booted) {
 			console.warn("Runtime.shutdown() called but not booted — allowing graceful re-entry");
 			return;
@@ -628,11 +654,22 @@ export class FridayRuntime {
 			console.warn("Sensorium shutdown failed:", err instanceof Error ? err.message : err);
 		}
 
-		try {
-			if (this._memory && this._sessionId && this._sessionStartedAt) {
-				onProgress?.("conversation", "Saving conversation history...");
-				const history = this._cortex.getHistory();
-				if (history.length > 0) {
+		// In server mode, SessionHub owns conversation save + curator extraction.
+		// skipConversationSave prevents the runtime from duplicating that work.
+		if (!options?.skipConversationSave) {
+			const history = this._cortex.getHistory();
+
+			// Curator extraction is independent of summarization — start it early
+			// and await at the end so both LLM calls overlap.
+			const curatorPromise = this._curator
+				? this._curator.extractFromConversation(history).catch((err) => {
+						console.warn("Knowledge extraction failed:", err instanceof Error ? err.message : err);
+					})
+				: undefined;
+
+			try {
+				if (this._memory && this._sessionId && this._sessionStartedAt && history.length > 0) {
+					onProgress?.("conversation", "Saving conversation history...");
 					let summary: string | undefined;
 					if (this._summarizer) {
 						summary = await this._summarizer.summarize(history);
@@ -647,19 +684,14 @@ export class FridayRuntime {
 						summary,
 					});
 				}
+			} catch (err) {
+				console.warn("Conversation save failed:", err instanceof Error ? err.message : err);
 			}
-		} catch (err) {
-			console.warn("Conversation save failed:", err instanceof Error ? err.message : err);
-		}
 
-		try {
-			if (this._curator) {
+			if (curatorPromise) {
 				onProgress?.("knowledge", "Extracting knowledge from conversation...");
-				const history = this._cortex.getHistory();
-				await this._curator.extractFromConversation(history);
+				await curatorPromise;
 			}
-		} catch (err) {
-			console.warn("Knowledge extraction failed:", err instanceof Error ? err.message : err);
 		}
 
 		this._forgeHealthReport = undefined;

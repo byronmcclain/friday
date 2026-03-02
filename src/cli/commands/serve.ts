@@ -24,6 +24,9 @@ export function serveCommand(program: Command): void {
 			}
 
 			const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+			const step = (msg: string) => console.log(chalk.hex("#8B6914")(`  \u2192 ${msg}`));
+			console.log(chalk.hex("#F0A030").bold("\nBooting F.R.I.D.A.Y. ..."));
+
 			const result = await createFridayServer({
 				port,
 				staticDir: resolve(projectRoot, "web/dist"),
@@ -34,12 +37,14 @@ export function serveCommand(program: Command): void {
 					modulesDir: resolve(projectRoot, "src/modules"),
 					debug: globalOpts.debug,
 				},
+				onBootProgress: (_step, label) => step(label),
 			});
 
 			// Start Unix socket server for IPC
 			await mkdir(`${homedir()}/.friday`, { recursive: true });
 			const socketServer = new FridaySocketServer(result.runtime, result.hub);
 			await socketServer.start();
+			step("IPC socket listening");
 
 			// Spawn ttyd for terminal-in-browser
 			const ttydProc = await spawnTtyd({
@@ -47,6 +52,9 @@ export function serveCommand(program: Command): void {
 				basePath: "/terminal",
 				command: ["friday", "chat"],
 			});
+			if (ttydProc) {
+				step("Terminal server started (port 7681)");
+			}
 
 			const lines = [
 				chalk.hex("#F0A030").bold("F.R.I.D.A.Y."),
@@ -74,8 +82,6 @@ export function serveCommand(program: Command): void {
 				}, 15_000);
 				forceExit.unref();
 
-				const step = (msg: string) => console.log(chalk.hex("#8B6914")(`  \u2192 ${msg}`));
-
 				try {
 					// Hide ^C echo: clear current line, then print on a fresh line
 				process.stdout.write("\r\x1b[2K");
@@ -89,7 +95,9 @@ export function serveCommand(program: Command): void {
 					step("Saving active session");
 					await result.hub.saveIfActive();
 					if (result.runtime.isBooted) {
-						await result.runtime.shutdown((_s, label) => step(label));
+						await result.runtime.shutdown((_s, label) => step(label), {
+							skipConversationSave: true,
+						});
 					}
 					step("Stopping HTTP server");
 					result.server.stop(true);

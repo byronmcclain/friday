@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { FridayRuntime, type RuntimeConfig } from "../core/runtime.ts";
+import { FridayRuntime, type RuntimeConfig, type BootStep } from "../core/runtime.ts";
 import { WebSocketHandler, type SendFn } from "./handler.ts";
 import { SessionHub } from "./session-hub.ts";
 import type { ServerMessage } from "./protocol.ts";
@@ -9,6 +9,7 @@ export interface FridayServerConfig {
 	port: number;
 	staticDir?: string;
 	runtimeConfig?: Partial<RuntimeConfig>;
+	onBootProgress?: (step: BootStep, label: string) => void;
 }
 
 interface WSData {
@@ -31,10 +32,10 @@ export async function createFridayServer(config: FridayServerConfig) {
 	// Always boot fresh — SessionHub owns session lifecycle (start/save/clear),
 	// so loading previous history at boot would leak stale conversations to clients.
 	const runtime = new FridayRuntime();
-	await runtime.boot({
-		...config.runtimeConfig,
-		fresh: true,
-	});
+	await runtime.boot(
+		{ ...config.runtimeConfig, fresh: true },
+		config.onBootProgress,
+	);
 
 	const hub = new SessionHub({
 		runtime,

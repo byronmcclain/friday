@@ -4,7 +4,12 @@ import { CommandTypeahead } from "./command-typeahead.tsx";
 import type { TypeaheadEntry } from "../filter-commands.ts";
 import { usePulse } from "../lib/use-pulse.ts";
 import { lerpColor } from "../lib/color-utils.ts";
-import { freemem, totalmem, loadavg, cpus } from "node:os";
+import { freemem, totalmem, platform } from "node:os";
+import {
+	parseVmStatMemory,
+	getCpuTimes,
+	type CpuTimes,
+} from "../../../sensorium/sensors.ts";
 
 interface InputBarProps {
 	commands: TypeaheadEntry[];
@@ -16,7 +21,6 @@ interface InputBarProps {
 	isStreaming: boolean;
 }
 
-const CORE_COUNT = cpus().length;
 const STATS_INTERVAL_MS = 5000;
 const TIME_FORMAT: Intl.DateTimeFormatOptions = {
 	hour12: false,
@@ -26,26 +30,69 @@ const TIME_FORMAT: Intl.DateTimeFormatOptions = {
 };
 
 interface SystemStats {
-	memFree: number;
+	memUsed: number;
 	memTotal: number;
-	loadAvg: number;
+	cpuPercent: number;
 }
 
-function readStats(): SystemStats {
+// Module-level previous CPU sample for tick-delta calculation
+let prevCpuTimes: CpuTimes | undefined;
+
+function readStatsSync(): SystemStats {
+	// Capture initial CPU sample — first reading always shows 0%
+	prevCpuTimes = getCpuTimes();
 	return {
-		memFree: freemem(),
+		memUsed: totalmem() - freemem(),
 		memTotal: totalmem(),
-		loadAvg: loadavg()[0] ?? 0,
+		cpuPercent: 0,
 	};
+}
+
+async function readStatsAsync(): Promise<SystemStats> {
+	// CPU: tick delta between samples (same method as Sensorium)
+	const currentTimes = getCpuTimes();
+	let cpuPercent = 0;
+	if (prevCpuTimes) {
+		const idleDelta = currentTimes.idle - prevCpuTimes.idle;
+		const totalDelta = currentTimes.total - prevCpuTimes.total;
+		if (totalDelta > 0) {
+			cpuPercent = Math.round((1 - idleDelta / totalDelta) * 100);
+		}
+	}
+	prevCpuTimes = currentTimes;
+
+	// Memory: vm_stat on macOS, os.freemem() elsewhere
+	const total = totalmem();
+	let memUsed = total - freemem();
+	if (platform() === "darwin") {
+		try {
+			const result = await Bun.$`vm_stat`.quiet().nothrow();
+			if (result.exitCode === 0) {
+				const parsed = parseVmStatMemory(result.stdout.toString(), total);
+				if (parsed) {
+					memUsed = parsed.used;
+				}
+			}
+		} catch {
+			// vm_stat failed — keep naive value
+		}
+	}
+
+	return { memUsed, memTotal: total, cpuPercent };
 }
 
 function StatusRow() {
 	const [now, setNow] = useState(() => new Date());
-	const [stats, setStats] = useState<SystemStats>(readStats);
+	const [stats, setStats] = useState<SystemStats>(readStatsSync);
 
 	useEffect(() => {
 		const clock = setInterval(() => setNow(new Date()), 1000);
-		const sysStats = setInterval(() => setStats(readStats()), STATS_INTERVAL_MS);
+		// Immediately replace naive initial stats with accurate values
+		void readStatsAsync().then(setStats);
+		const sysStats = setInterval(
+			() => void readStatsAsync().then(setStats),
+			STATS_INTERVAL_MS,
+		);
 		return () => {
 			clearInterval(clock);
 			clearInterval(sysStats);
@@ -53,19 +100,14 @@ function StatusRow() {
 	}, []);
 
 	const time = now.toLocaleTimeString("en-US", TIME_FORMAT);
-	const memUsed = stats.memTotal - stats.memFree;
-	const memUsedGB = (memUsed / 1073741824).toFixed(1);
+	const memUsedGB = (stats.memUsed / 1073741824).toFixed(1);
 	const memTotalGB = (stats.memTotal / 1073741824).toFixed(1);
-	const memPercent = Math.round((memUsed / stats.memTotal) * 100);
-	const cpuPercent = Math.min(
-		100,
-		Math.round((stats.loadAvg / CORE_COUNT) * 100),
-	);
+	const memPercent = Math.round((stats.memUsed / stats.memTotal) * 100);
 
 	const cpuColor =
-		cpuPercent > 80
+		stats.cpuPercent > 80
 			? PALETTE.error
-			: cpuPercent > 50
+			: stats.cpuPercent > 50
 				? PALETTE.warning
 				: PALETTE.textMuted;
 	const memColor =
@@ -91,7 +133,7 @@ function StatusRow() {
 					{"│"}
 				</text>
 				<text fg={cpuColor} attributes={DIM}>
-					{`CPU ${cpuPercent}%`}
+					{`CPU ${stats.cpuPercent}%`}
 				</text>
 				<text fg={PALETTE.borderDim} attributes={DIM}>
 					{"│"}

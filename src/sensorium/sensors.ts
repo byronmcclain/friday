@@ -20,6 +20,46 @@ export interface CpuTimes {
 	total: number;
 }
 
+/**
+ * Parses macOS `vm_stat` output to compute Activity Monitor-style memory usage.
+ * Used = (active + wired + compressed) pages — excludes reclaimable cache
+ * (inactive, purgeable, speculative) that macOS frees on demand.
+ *
+ * Returns null if the output can't be parsed (non-macOS or unexpected format).
+ */
+export function parseVmStatMemory(
+	output: string,
+	totalBytes: number,
+): { used: number; free: number } | null {
+	const pageSizeMatch = output.match(/page size of (\d+) bytes/);
+	if (!pageSizeMatch) return null;
+
+	const pageSize = Number.parseInt(pageSizeMatch[1]!, 10);
+	if (!pageSize || pageSize <= 0) return null;
+
+	const extract = (label: string): number => {
+		const re = new RegExp(`${label}:\\s+(\\d+)\\.`);
+		const m = output.match(re);
+		return m ? Number.parseInt(m[1]!, 10) : 0;
+	};
+
+	const active = extract("Pages active");
+	const wired = extract("Pages wired down");
+	const compressed = extract("Pages stored in compressor");
+	const purgeable = extract("Pages purgeable");
+
+	// Activity Monitor formula: used = active + wired + compressed - purgeable
+	// Purgeable pages are cache that apps flagged as "reclaimable on demand"
+	let used = (active + wired + compressed - purgeable) * pageSize;
+
+	// Guard: if vm_stat pages exceed total memory (shouldn't happen, but be safe)
+	if (used > totalBytes) {
+		used = totalBytes;
+	}
+
+	return { used, free: totalBytes - used };
+}
+
 export function getCpuTimes(): CpuTimes {
 	const cores = cpus();
 	let idle = 0;
@@ -53,8 +93,25 @@ export async function gatherMachine(
 		}
 
 		const total = totalmem();
-		const free = freemem();
 		const load = loadavg() as [number, number, number];
+
+		// On macOS, os.freemem() only counts truly free pages and treats
+		// reclaimable cache (inactive/purgeable/speculative) as "used".
+		// Parse vm_stat for Activity Monitor-accurate memory figures.
+		let memory = { total, used: total - freemem(), free: freemem() };
+		if (platform() === "darwin") {
+			try {
+				const result = await Bun.$`vm_stat`.quiet().nothrow();
+				if (result.exitCode === 0) {
+					const parsed = parseVmStatMemory(result.stdout.toString(), total);
+					if (parsed) {
+						memory = { total, ...parsed };
+					}
+				}
+			} catch {
+				// vm_stat failed — fall back to os.freemem()
+			}
+		}
 
 		return {
 			platform: platform(),
@@ -67,7 +124,7 @@ export async function gatherMachine(
 				model: cores[0]?.model ?? "unknown",
 				usage,
 			},
-			memory: { total, used: total - free, free },
+			memory,
 			loadAvg: load,
 			cpuTimes: currentTimes,
 		};
