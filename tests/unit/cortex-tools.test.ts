@@ -197,14 +197,12 @@ describe("Cortex — tool integration (AI SDK path)", () => {
 			execute: async (args) => ({ success: true, output: `read: ${args.input}` }),
 		});
 
-		// MockLanguageModelV3's streamText does not invoke tool execute callbacks
-		// (known limitation — see comment above). Instead, directly invoke the
-		// AI SDK tool wrapper that Cortex builds, which is where the signal lives.
-		const cortex = new Cortex({ injectedModel: createMockModel(), signals });
-		cortex.registerTool(tool);
+		const tools = new Map([["fs.read", tool]]);
 
-		const aiTools = (cortex as any).buildAiTools();
-		await aiTools["fs.read"].execute({ input: "/tmp/test.txt" });
+		// Test through the shared tool executor (same path used by Cortex internally)
+		const { createToolExecutor } = await import("../../src/core/tool-bridge.ts");
+		const executor = createToolExecutor({ tools, signals });
+		await executor("fs.read", { input: "/tmp/test.txt" });
 
 		expect(emitted).toHaveLength(1);
 		expect(emitted[0]!.name).toBe("tool:executing");

@@ -1,5 +1,4 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
-import { streamText, tool as aiTool, stepCountIs } from "ai";
 import { type FridayConfig, type ConversationMessage, getTextContent } from "./types.ts";
 import { GENESIS_TEMPLATE } from "./prompts.ts";
 import { createModel, GROK_DEFAULTS } from "../providers/index.ts";
@@ -8,13 +7,14 @@ import type { ClearanceManager } from "./clearance.ts";
 import type { SmartsStore } from "../smarts/store.ts";
 import { type Sensorium, formatDateTime } from "../sensorium/sensorium.ts";
 import type { AuditLogger } from "../audit/logger.ts";
-import type { SignalBus, SignalEmitter } from "./events.ts";
+import type { SignalBus } from "./events.ts";
 import type { ScopedMemory } from "./memory.ts";
 import type { Vox } from "./voice/vox.ts";
 import { HistoryManager } from "./history-manager.ts";
 import type { ChatStream } from "./stream-types.ts";
-import { toZodSchema } from "../providers/schemas.ts";
 import { appendInferenceLog } from "../providers/debug-log.ts";
+import { buildToolDefinitions, createToolExecutor } from "./tool-bridge.ts";
+import { TextWorker } from "./workers/text-worker.ts";
 
 export interface CortexConfig extends Partial<FridayConfig> {
 	injectedModel?: LanguageModelV3;
@@ -52,6 +52,7 @@ export class Cortex {
 	private _debug: boolean;
 	private debugPayloadPath?: string;
 	private debugResponsePath?: string;
+	private textWorker: TextWorker;
 
 	constructor(config: CortexConfig = {}) {
 		this._modelName = config.model ?? GROK_DEFAULTS.model;
@@ -74,6 +75,7 @@ export class Cortex {
 			this.debugPayloadPath = `${config.projectRoot}/last-inference-payload.log`;
 			this.debugResponsePath = `${config.projectRoot}/last-inference-response.log`;
 		}
+		this.textWorker = new TextWorker(this.aiModel);
 	}
 
 	get modelName(): string {
@@ -127,18 +129,14 @@ export class Cortex {
 			}
 		}
 
-		const aiTools = this.buildAiTools();
-		const hasTools = Object.keys(aiTools).length > 0;
-
-		const result = streamText({
-			model: this.aiModel,
-			system: systemPrompt,
-			messages: this.historyManager.toMessages(),
-			...(hasTools ? { tools: aiTools } : {}),
-			...(hasTools
-				? { stopWhen: stepCountIs(this.maxToolIterations) }
-				: {}),
-			maxOutputTokens: this.maxTokens,
+		// Build portable request
+		const defs = buildToolDefinitions(this.tools);
+		const executor = createToolExecutor({
+			tools: this.tools,
+			clearance: this.clearance,
+			audit: this.audit,
+			signals: this.signals,
+			toolMemory: this.toolMemory,
 		});
 
 		if (this._debug && this.debugPayloadPath) {
@@ -149,24 +147,24 @@ export class Cortex {
 			});
 		}
 
-		const fullTextPromise = result.text.then(async (text: string) => {
+		// Delegate to TextWorker
+		const workerResult = this.textWorker.process({
+			systemPrompt,
+			messages: this.historyManager.toMessages(),
+			tools: defs,
+			executeTool: executor,
+			maxToolIterations: this.maxToolIterations,
+			maxOutputTokens: this.maxTokens,
+		});
+
+		const fullTextPromise = workerResult.fullText.then(async (text: string) => {
 			this.historyManager.push({ role: "assistant", content: text });
 
-			// Append intermediate messages (tool calls/results) from multi-step execution
-			const response = await result.response;
-
 			if (this._debug && this.debugResponsePath) {
-				appendInferenceLog(this.debugResponsePath, 1, response);
+				appendInferenceLog(this.debugResponsePath, 1, { text });
 			}
 
-			// The response.messages include ALL messages from intermediate steps.
-			// The HistoryManager already has the user message and we just pushed the
-			// final assistant text. The intermediate tool-call/result messages are
-			// internal to the AI SDK's step loop and don't need to be replayed.
-
-			// Record real token usage for calibration — runs for all exchanges,
-			// not just ones with assistant messages.
-			const usage = await result.usage;
+			const usage = await workerResult.usage;
 			if (usage?.inputTokens != null && usage?.outputTokens != null) {
 				this.historyManager.recordUsage(
 					usage.inputTokens + usage.outputTokens,
@@ -179,17 +177,10 @@ export class Cortex {
 			return text;
 		});
 
-		const usagePromise = Promise.resolve(result.usage).then(
-			(u: { inputTokens?: number; outputTokens?: number }) => ({
-				inputTokens: u?.inputTokens,
-				outputTokens: u?.outputTokens,
-			}),
-		).catch(() => ({ inputTokens: undefined, outputTokens: undefined }));
-
 		return {
-			textStream: result.textStream,
+			textStream: workerResult.textStream,
 			fullText: fullTextPromise,
-			usage: usagePromise,
+			usage: workerResult.usage,
 		};
 	}
 
@@ -234,89 +225,6 @@ export class Cortex {
 			const role = m.role === "user" ? "User" : "Assistant";
 			return `${role}: ${getTextContent(m.content)}`;
 		});
-	}
-
-	// ── AI SDK tool builder ──────────────────────────────────────
-
-	private buildAiTools(): Record<
-		string,
-		ReturnType<typeof aiTool<any, any>>
-	> {
-		const tools: Record<string, ReturnType<typeof aiTool<any, any>>> = {};
-		for (const [name, fridayTool] of this.tools) {
-			tools[name] = aiTool({
-				description: fridayTool.description,
-				inputSchema: toZodSchema(fridayTool.parameters),
-				execute: async (args: Record<string, unknown>) => {
-					if (fridayTool.clearance.length > 0) {
-						if (!this.clearance) {
-							this.audit?.log({
-								action: "tool:blocked",
-								source: name,
-								detail: `Clearance denied for tool: ${name} (clearance manager not configured)`,
-								success: false,
-							});
-							return `Clearance denied for tool: ${name} (clearance manager not configured)`;
-						}
-						const check = this.clearance.checkAll(
-							fridayTool.clearance,
-						);
-						if (!check.granted) {
-							this.audit?.log({
-								action: "tool:blocked",
-								source: name,
-								detail: check.reason ?? `Clearance denied for tool: ${name}`,
-								success: false,
-							});
-							return (
-								check.reason ??
-								`Clearance denied for tool: ${name}`
-							);
-						}
-					}
-					this.audit?.log({
-						action: "tool:called",
-						source: name,
-						detail: `Tool invoked by LLM`,
-						success: true,
-					});
-					this.signals?.emit("tool:executing", name, { args });
-					try {
-						const result = await fridayTool.execute(args, {
-							workingDirectory: process.cwd(),
-							audit:
-								this.audit ??
-								({
-									log: () => {},
-								} as unknown as AuditLogger),
-							signal:
-								this.signals ??
-								({
-									emit: async () => {},
-								} as SignalEmitter),
-							memory: this.toolMemory ?? {
-								get: async () => undefined,
-								set: async () => {},
-								delete: async () => {},
-								list: async () => [],
-							},
-						});
-						return result.output;
-					} catch (err) {
-						const msg =
-							err instanceof Error ? err.message : String(err);
-						this.audit?.log({
-							action: "tool:error",
-							source: name,
-							detail: msg,
-							success: false,
-						});
-						return `Tool execution error: ${msg}`;
-					}
-				},
-			});
-		}
-		return tools;
 	}
 
 	// ── System prompt builder ────────────────────────────────────
