@@ -56,7 +56,7 @@ src/
 │       ├── log-store.ts   # LogStore — state store for TUI debug log panel
 │       ├── log-types.ts   # LogEntry types for structured log display
 │       ├── components/    # UI components (Header, ChatArea, InputBar, Message, Splash, LogPanel, etc.)
-│       └── lib/           # ANSI parser, color utils, chafa logo processor
+│       └── lib/           # ANSI parser, color utils, chafa logo processor, usePulse hook
 ├── core/
 │   ├── cortex.ts          # Cortex — LLM brain, streamText() with AI SDK, tool registration
 │   ├── history-manager.ts # HistoryManager — token-budget conversation history with compaction
@@ -76,13 +76,14 @@ src/
 │   │   ├── socket.ts      # SocketBridge — Unix socket IPC to running server
 │   │   └── types.ts       # RuntimeBridge interface — abstraction for socket access
 │   └── voice/             # Vox — voice output subsystem (TTS via Grok Voice Agent API)
-│       ├── types.ts        # VoiceMode, GrokVoice, VoxConfig, VoxOptions, VOX_DEFAULTS
+│       ├── types.ts        # VoiceMode (off/on/whisper/flat), EmotionMood, EmotionProfile, GrokVoice, VoxConfig
 │       ├── audio.ts        # pcmToWav, detectPlayer, playAudio, cleanupTempFile
 │       ├── prompt.ts       # classifyContent, buildTtsPrompt, FRIDAY_VOICE_IDENTITY
 │       ├── vox.ts          # Vox class — WebSocket lifecycle, modes, speak/cancel, idle eviction
 │       ├── bridge.ts       # VoiceBridge — Grok realtime API WebSocket for conversational voice
 │       ├── channel.ts      # VoiceChannel — notification bridge (NotificationChannel impl)
-│       └── protocol.ts     # /voice protocol (on, off, whisper, test, status)
+│       ├── emotion.ts      # emotionalRewrite() — conversation-aware emotional TTS rewriting
+│       └── protocol.ts     # /voice protocol (on, off, whisper, flat, test, status)
 ├── audit/
 │   ├── types.ts           # AuditEntry, AuditFilter interfaces
 │   └── logger.ts          # AuditLogger — action tracking with filtering
@@ -176,7 +177,7 @@ tests/
 | **SMARTS** | `src/smarts/` | FTS5-indexed knowledge. Pinned + FTS5-matched injected per message. Staleness pruning on boot via `sessionId`. |
 | **Sensorium** | `src/sensorium/` | Dual-cadence polling (30s/5min). Hysteresis alerts. CPU needs delta between two tick samples. |
 | **Genesis** | `src/core/genesis.ts` | Identity prompt at `~/.friday/GENESIS.md`. Protected path (`chmod 600`). Seed template: `GENESIS_TEMPLATE` in `prompts.ts`. |
-| **Vox** | `src/core/voice/vox.ts` | Fire-and-forget TTS. 60s idle WebSocket eviction. 3 modes: off/on/whisper. |
+| **Vox** | `src/core/voice/vox.ts` | Fire-and-forget TTS. 60s idle WebSocket eviction. 4 modes: off/on/whisper/flat. Emotional rewrite via fast model. |
 | **VoiceBridge** | `src/core/voice/bridge.ts` | Realtime conversational voice via Grok Realtime API. Separate from Vox's TTS. |
 | **Recall (Deja Vu)** | `src/core/recall-tool.ts` | `search` (FTS5 summaries) → `recall` (full transcript). Registered in Cortex at boot. |
 | **Arc Rhythm** | `src/arc-rhythm/` | 60s scheduler tick. Auto-pause after 5 failures. Shares Memory's SQLite via `memory.database`. |
@@ -203,7 +204,7 @@ tests/
 
 ## Testing
 
-- 964 tests across 96 files (as of 2026-02-28)
+- 1057 tests across 99 files (as of 2026-03-01)
 - Tests use `injectedModel: createMockModel()` (AI SDK `MockLanguageModelV3` from `ai/test` with call capture via `.doStreamCalls`/`.doGenerateCalls`)
 - Use `createErrorModel()` for models that throw on `doGenerate`/`doStream`
 - Shared test stubs live in `tests/helpers/stubs.ts`
@@ -256,7 +257,7 @@ docker run -e XAI_API_KEY=xai-... friday chat
 
 ## Design Documents
 
-All design docs live in `docs/plans/` with naming convention `YYYY-MM-DD-<topic>-design.md` (25 documents as of 2026-02-28). Key ones: `friday-agent-runtime-design`, `cortex-ai-sdk-migration-design`, `vox-voice-output-design`, `voice-web-integration-design`.
+All design docs live in `docs/plans/` with naming convention `YYYY-MM-DD-<topic>-design.md` (31 documents as of 2026-03-01). Key ones: `friday-agent-runtime-design`, `cortex-ai-sdk-migration-design`, `vox-voice-output-design`, `voice-web-integration-design`.
 
 **MCU concept mapping:** Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler, Genesis=identity template, Vox=voice
 

@@ -16,7 +16,7 @@ TUI-first. Module-driven. Built to think, remember, and adapt.
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tests](https://img.shields.io/badge/tests-949%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-1057%20passing-brightgreen)]()
 [![Biome](https://img.shields.io/badge/lint-Biome-60a5fa?logo=biome)](https://biomejs.dev)
 
 <br />
@@ -557,7 +557,7 @@ The conversation table is capped at 500 sessions with oldest-first eviction. Sum
 
 ### 🗣️ Vox — Voice Output
 
-Vox is Friday's **voice** — her mouth. Using the xAI Grok Voice Agent API via persistent WebSocket, she can speak responses aloud. This isn't text-to-speech bolted on as an afterthought — it's an integrated subsystem with content-aware prompting, idle eviction, and three operational modes.
+Vox is Friday's **voice** — her mouth. Using the xAI Grok Voice Agent API via persistent WebSocket, she can speak responses aloud. This isn't text-to-speech bolted on as an afterthought — it's an integrated subsystem with content-aware prompting, idle eviction, emotional rewriting, and four operational modes.
 
 ```mermaid
 flowchart TB
@@ -565,6 +565,7 @@ flowchart TB
         OFF["Off (default)"]
         ON["On — speak all responses"]
         WHISPER["Whisper — reduced volume"]
+        FLAT["Flat — literal TTS, no emotional rewrite"]
     end
 
     subgraph Pipeline ["TTS Pipeline"]
@@ -599,6 +600,7 @@ The **dynamic TTS prompt system** is the key innovation: `classifyContent()` det
 | Fire-and-forget | `vox.speak(text).catch(() => {})` — never blocks Cortex response |
 | Persistent WebSocket | Stays open between utterances, 60s idle eviction |
 | Content classification | Tables, code, lists, URLs get tailored TTS instructions |
+| Emotional rewrite | Fast model rewrites text with mood-appropriate auditory cues ([laugh], [sigh], [pause]) |
 | Platform audio | `afplay` (macOS), `paplay` (Linux), PowerShell (Windows) |
 | VoiceChannel | Bridges NotificationManager into speech |
 | 5 voices | Ara, Eve (default), Rex, Sal, Leo — override with `FRIDAY_VOICE` |
@@ -714,7 +716,7 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 | "I remember when..." | **Deja Vu** | Conversational memory recall — FTS5 search across past sessions |
 | Heartbeat / scheduler | **Arc Rhythm** | Autonomous scheduled task execution — cron-driven, headless |
 | Email identity | **Gmail** | Email via Gmail API — search, read, send, reply with OAuth 2.0 |
-| Friday's voice | **Vox** | Voice output via Grok Voice Agent API — fire-and-forget TTS, content-aware prompts |
+| Friday's voice | **Vox** | Voice output via Grok Voice Agent API — fire-and-forget TTS, content-aware prompts, emotional rewriting |
 
 ---
 
@@ -895,6 +897,7 @@ friday --debug serve           # Debug mode — logs inference payloads and resp
 | `/gmail send` | Compose and send an email |
 | `/gmail labels` | List Gmail labels |
 | `/voice on` / `off` / `whisper` | Set voice output mode |
+| `/voice flat` | Literal TTS — no emotional rewrite |
 | `/voice test` | Speak a test phrase |
 | `/voice status` | Show voice system status |
 | `exit`, `quit`, `bye` | Ends the session |
@@ -1004,7 +1007,7 @@ Bun loads `.env` automatically — no dotenv needed.
 
 ```bash
 bun run dev              # Auto-restart on file changes
-bun test                 # Run all tests (949 tests across 94 files)
+bun test                 # Run all tests (1057 tests across 99 files)
 bun test --watch         # Watch mode
 bun test tests/unit/cortex.test.ts  # Single test file
 bun run lint             # Lint check
@@ -1033,7 +1036,7 @@ src/
 │       ├── log-store.ts   # LogStore — state for TUI debug log panel
 │       ├── log-types.ts   # LogEntry types for structured log display
 │       ├── components/    # Header, ChatArea, InputBar, Message, Splash, Thinking, Welcome, LogPanel
-│       └── lib/           # ANSI parser, color utils, chafa logo processor
+│       └── lib/           # ANSI parser, color utils, chafa logo processor, usePulse hook
 ├── core/
 │   ├── cortex.ts          # LLM brain and conversation state
 │   ├── history-manager.ts # Token-budget conversation history with compaction
@@ -1058,8 +1061,9 @@ src/
 │       ├── audio.ts       # pcmToWav, detectPlayer, playAudio
 │       ├── prompt.ts      # classifyContent, buildTtsPrompt, FRIDAY_VOICE_IDENTITY
 │       ├── channel.ts     # VoiceChannel — notification bridge
-│       ├── protocol.ts    # /voice protocol (on, off, whisper, test, status)
-│       └── types.ts       # VoiceMode, GrokVoice, VoxConfig
+│       ├── emotion.ts     # emotionalRewrite() — conversation-aware TTS rewriting
+│       ├── protocol.ts    # /voice protocol (on, off, whisper, flat, test, status)
+│       └── types.ts       # VoiceMode (off/on/whisper/flat), EmotionMood, EmotionProfile, GrokVoice, VoxConfig
 ├── audit/                 # Action tracking and filtering
 ├── modules/
 │   ├── types.ts           # FridayModule, FridayTool interfaces
@@ -1102,6 +1106,7 @@ src/
 │   ├── index.ts           # Bun.serve() HTTP + WebSocket server
 │   ├── protocol.ts        # Shared message types (ClientMessage, ServerMessage, voice messages)
 │   ├── handler.ts         # WebSocket message routing to FridayRuntime
+│   ├── session-hub.ts     # SessionHub — session lifecycle, hydration, cross-client sync
 │   ├── client-registry.ts # ClientRegistry — multi-client WebSocket tracking
 │   ├── socket.ts          # Unix socket server for singleton IPC (~/.friday/friday.sock)
 │   ├── ttyd.ts            # Terminal-in-browser support (spawns ttyd on port 7681)

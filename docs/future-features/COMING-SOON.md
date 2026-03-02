@@ -32,6 +32,31 @@ The real power is the voice-mode synergy. When Vox is active and BOSS is speakin
 
 Under the hood, a `VisorManager` core subsystem (MCU name: **Visor**) manages an ordered stack of active widgets with max-concurrency limits and TTL-based auto-dismiss. It boots after Vox and before Cortex so both directives and Cortex tools can trigger HUD elements. Both the TUI (OpenTUI `HudOverlay` component) and the Web UI (React `HudLayer` floating cards) subscribe to the same VisorManager events via their respective bridges, keeping rendering fully decoupled from logic. The WebSocket protocol gains `hud:show`, `hud:dismiss`, `hud:update`, and `hud:response` message types.
 
+## FRIDAY Sight — Visual Awareness
+
+Give Friday eyes. Sight is a real-time visual perception subsystem that connects to the laptop or monitor camera, letting Friday see BOSS and the physical world around him. She can recognize faces, read expressions, detect objects, and comment on what she sees — just like the MCU's FRIDAY scanning Tony through the suit's HUD cameras. Walk up to the terminal and she greets you: "Boss looking sharp today! Like the shirt." Hold up a hardware component and ask "What is this?" and she identifies it. Show her a whiteboard sketch and she reads it back as structured notes.
+
+Sight operates in three modes:
+
+- **Ambient** — Passive background awareness. Friday glances periodically (configurable cadence, default every 30s) and incorporates what she sees into her context without narrating every frame. She might notice BOSS walked away and pause a long explanation, or spot that he looks frustrated and soften her tone. The visual context enriches her responses without turning her into a play-by-play commentator.
+- **Attentive** — Active observation on demand. BOSS says "look at this" or "what do you see?" and Friday captures a high-res frame, runs object detection and scene analysis, and describes what she observes. This is the mode for showing her physical things — a circuit board, a book cover, a plant that needs identifying, a piece of mail.
+- **Watch** — Continuous monitoring with event triggers. Friday keeps the camera feed active and fires signals when she detects specific events: BOSS returns to his desk (`sight:presence-detected`), someone else enters the room (`sight:unknown-person`), a package appears on the doorstep (`sight:object-appeared`). Directives can hook these signals for automated responses — "when I sit down, show me my unread emails."
+
+The `/sight` protocol (aliases: `/look`, `/eyes`, `/see`) exposes the interface:
+
+- **status** — Show current mode, camera device, last capture timestamp, and detection confidence thresholds.
+- **look** — Snap a frame and describe what Friday sees. Switches to Attentive mode for one capture.
+- **mode \<ambient|attentive|watch|off\>** — Switch visual awareness mode.
+- **watch \<event\>** — Register a watch trigger (presence, object, gesture, expression).
+- **history** — Show recent visual observations with timestamps.
+- **calibrate** — Run camera detection and lighting check, adjust confidence thresholds.
+
+Under the hood, a `SightManager` core subsystem (MCU name: **Sight**) manages camera access, frame capture, and vision model inference. It boots after Sensorium and before Vox in the startup chain, giving Friday eyes before she gets her voice. Frame capture uses the system camera API — the raw frames are sent to a multimodal vision model (Grok's vision capabilities or a local model) for scene description, object detection, and facial recognition. Results are cached as `SightSnapshot` objects (parallel to Sensorium's `SystemSnapshot`) and injected into the Cortex system prompt via `getVisualContext()`.
+
+The voice synergy is where Sight really shines. When Vox is active and BOSS is having a spoken conversation with Friday, Sight gives her spatial and social awareness that makes the interaction feel genuinely present. She can see BOSS nod in agreement and move on without waiting for a verbal "yes." She can see him hold up an object and describe it without being told to look. Combined with the Visor HUD, Friday can overlay visual annotations — highlight a detected object, draw a bounding box on a whiteboard diagram, or show a live camera feed widget.
+
+Privacy controls are baked in from the start. The `"camera-access"` clearance gates all visual capture — if revoked, Sight degrades gracefully to off mode. A `sight:frame-captured` audit entry logs every capture with a hash (not the image itself) for accountability without surveillance. No frames are persisted to disk by default — visual context is ephemeral, living only in the current session's memory. BOSS can opt into frame archival via a `sight:archive` directive if he wants Friday to remember what she's seen across sessions.
+
 ## Clearance Control Panel
 
 Give BOSS a control panel for managing Friday's clearance permissions — the 12 security gates that determine what Friday is allowed to do. Right now every clearance is hardcoded as granted at boot with no way to restrict, review, or adjust them at runtime. The control panel makes clearances a first-class, user-configurable system backed by persistent SQLite storage.
