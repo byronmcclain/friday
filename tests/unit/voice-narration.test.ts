@@ -71,7 +71,7 @@ describe("TOOL_NARRATIONS", () => {
       "fs.read", "fs.write",
       "bash.exec",
       "recall_memory",
-      "web_fetch",
+      "web.fetch",
       "getEnvironmentStatus",
     ];
     for (const tool of expectedTools) {

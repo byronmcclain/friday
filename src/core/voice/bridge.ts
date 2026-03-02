@@ -6,6 +6,8 @@ import { NarrationPicker, ACK_PHRASES, getToolNarration, GENERIC_NARRATIONS } fr
 
 export type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "error";
 
+const SENTENCE_BOUNDARY_RE = /[.!?\n]\s*$/;
+
 export interface VoiceBridgeConfig {
   voice: GrokVoice;
   sampleRate: number;
@@ -36,6 +38,8 @@ export class VoiceBridge {
   private toolSignalHandler: SignalHandler | null = null;
   private cortexStartTime = 0;
   private lastNarrationTime = 0;
+  private drainResolvers: Array<() => void> = [];
+  private _processingUtterance = false;
 
   constructor(
     cortex: Cortex,
@@ -135,9 +139,11 @@ export class VoiceBridge {
 
   async stop(): Promise<void> {
     this.active = false;
+    this._processingUtterance = false;
     this.unsubscribeToolSignals();
     this.ttsQueue.length = 0;
     this._responseInFlight = false;
+    for (const resolve of this.drainResolvers.splice(0)) resolve();
     if (this.grokWs) {
       try { this.grokWs.close(); } catch {}
       this.grokWs = null;
@@ -211,6 +217,7 @@ export class VoiceBridge {
         this.flushQueue();
         if (this.ttsQueue.length === 0) {
           this.callbacks.onStateChange("idle");
+          for (const resolve of this.drainResolvers.splice(0)) resolve();
         }
         break;
       }
@@ -238,10 +245,12 @@ export class VoiceBridge {
 
   private isSentenceBoundary(buffer: string): boolean {
     if (buffer.length > 200) return true;
-    return /[.!?\n]\s*$/.test(buffer);
+    return SENTENCE_BOUNDARY_RE.test(buffer);
   }
 
   private async processThroughCortex(transcript: string): Promise<void> {
+    if (this._processingUtterance) return;
+    this._processingUtterance = true;
     try {
       this.callbacks.onStateChange("thinking");
       this.cortexStartTime = Date.now();
@@ -284,6 +293,7 @@ export class VoiceBridge {
       this.enqueueTts("Something went wrong on my end — sorry about that.");
       await this.waitForQueueDrain();
     } finally {
+      this._processingUtterance = false;
       this.unsubscribeToolSignals();
     }
   }
@@ -317,14 +327,7 @@ export class VoiceBridge {
       return Promise.resolve();
     }
     return new Promise<void>((resolve) => {
-      const check = () => {
-        if ((this.ttsQueue.length === 0 && !this._responseInFlight) || !this.active) {
-          resolve();
-        } else {
-          setTimeout(check, 50);
-        }
-      };
-      setTimeout(check, 50);
+      this.drainResolvers.push(resolve);
     });
   }
 

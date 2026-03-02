@@ -169,7 +169,7 @@ export const TOOL_NARRATIONS: Record<string, readonly string[]> = {
     "I think I remember something about this — let me look...",
     "Digging through the archives...",
   ],
-  "web_fetch": [
+  "web.fetch": [
     "Fetching that from the web...",
     "Let me grab that...",
     "Reaching out to the internet...",

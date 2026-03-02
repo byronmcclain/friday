@@ -13,6 +13,25 @@ function makeMockCallbacks(): VoiceBridgeCallbacks {
   };
 }
 
+/** Mock Grok WebSocket that auto-fires response.done after each response.create */
+function attachAutoAckWs(bridge: VoiceBridge): string[] {
+  const messages: string[] = [];
+  (bridge as any).grokWs = {
+    send: (d: string) => {
+      messages.push(d);
+      const parsed = JSON.parse(d);
+      if (parsed.type === "response.create") {
+        setTimeout(() => {
+          (bridge as any).handleGrokMessage(JSON.stringify({ type: "response.done" }));
+        }, 0);
+      }
+    },
+    readyState: 1,
+  };
+  (bridge as any).active = true;
+  return messages;
+}
+
 describe("VoiceBridge", () => {
   test("constructs without error", () => {
     const cortex = {} as any;
@@ -162,21 +181,7 @@ describe("VoiceBridge streaming processThroughCortex", () => {
     };
     const callbacks = makeMockCallbacks();
     const bridge = new VoiceBridge(cortex, config, callbacks);
-
-    const messages: string[] = [];
-    (bridge as any).grokWs = {
-      send: (d: string) => {
-        messages.push(d);
-        const parsed = JSON.parse(d);
-        if (parsed.type === "response.create") {
-          setTimeout(() => {
-            (bridge as any).handleGrokMessage(JSON.stringify({ type: "response.done" }));
-          }, 0);
-        }
-      },
-      readyState: 1,
-    };
-    (bridge as any).active = true;
+    const messages = attachAutoAckWs(bridge);
 
     await (bridge as any).processThroughCortex("What is the status?");
 
@@ -201,21 +206,7 @@ describe("VoiceBridge streaming processThroughCortex", () => {
     };
     const callbacks = makeMockCallbacks();
     const bridge = new VoiceBridge(cortex, config, callbacks);
-
-    const messages: string[] = [];
-    (bridge as any).grokWs = {
-      send: (d: string) => {
-        messages.push(d);
-        const parsed = JSON.parse(d);
-        if (parsed.type === "response.create") {
-          setTimeout(() => {
-            (bridge as any).handleGrokMessage(JSON.stringify({ type: "response.done" }));
-          }, 0);
-        }
-      },
-      readyState: 1,
-    };
-    (bridge as any).active = true;
+    const messages = attachAutoAckWs(bridge);
 
     await (bridge as any).processThroughCortex("Tell me something");
 
@@ -239,21 +230,7 @@ describe("VoiceBridge tool narration", () => {
     };
     const callbacks = makeMockCallbacks();
     const bridge = new VoiceBridge(cortex, config, callbacks);
-
-    const messages: string[] = [];
-    (bridge as any).grokWs = {
-      send: (d: string) => {
-        messages.push(d);
-        const parsed = JSON.parse(d);
-        if (parsed.type === "response.create") {
-          setTimeout(() => {
-            (bridge as any).handleGrokMessage(JSON.stringify({ type: "response.done" }));
-          }, 0);
-        }
-      },
-      readyState: 1,
-    };
-    (bridge as any).active = true;
+    const messages = attachAutoAckWs(bridge);
 
     // Set cortexStartTime to 3s ago to simulate delay
     (bridge as any).cortexStartTime = Date.now() - 3000;
