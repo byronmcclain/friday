@@ -1,7 +1,6 @@
 import type { Cortex } from "../cortex.ts";
 import { type GrokVoice, VOX_WS_URL } from "./types.ts";
 import { VoiceWorker } from "../workers/voice-worker.ts";
-import type { VoiceChatStream } from "../stream-types.ts";
 
 export type VoiceState =
 	| "idle"
@@ -14,6 +13,7 @@ export interface VoiceSessionConfig {
 	voice: GrokVoice;
 	sampleRate: number;
 	instructions: string;
+	debug?: boolean;
 }
 
 export interface VoiceSessionCallbacks {
@@ -37,11 +37,9 @@ export class VoiceSessionManager {
 	private callbacks: VoiceSessionCallbacks;
 	private active = false;
 	private _generation = 0;
-	private _initialSetupDone = false;
 	private _processingUtterance = false;
 	private voiceWorker: VoiceWorker | null = null;
-	private activeStream: VoiceChatStream | null = null;
-	private debug = true;
+	private debug: boolean;
 
 	constructor(
 		cortex: Cortex,
@@ -51,6 +49,7 @@ export class VoiceSessionManager {
 		this.cortex = cortex;
 		this.config = config;
 		this.callbacks = callbacks;
+		this.debug = config.debug ?? false;
 	}
 
 	private log(tag: string, ...args: unknown[]): void {
@@ -60,6 +59,12 @@ export class VoiceSessionManager {
 
 	get isActive(): boolean {
 		return this.active;
+	}
+
+	private sendToGrok(payload: string): void {
+		if (this.grokWs && this.grokWs.readyState === 1) {
+			this.grokWs.send(payload);
+		}
 	}
 
 	async start(): Promise<void> {
@@ -125,11 +130,7 @@ export class VoiceSessionManager {
 
 				// Create VoiceWorker with send bound to this WebSocket
 				this.voiceWorker = new VoiceWorker({
-					send: (data) => {
-						if (this.grokWs && this.grokWs.readyState === 1) {
-							this.grokWs.send(data);
-						}
-					},
+					send: (data) => this.sendToGrok(data),
 				});
 
 				this.callbacks.onStateChange("idle");
@@ -174,12 +175,10 @@ export class VoiceSessionManager {
 	async stop(): Promise<void> {
 		this.active = false;
 		this._processingUtterance = false;
-		this._initialSetupDone = false;
 		if (this.voiceWorker) {
 			this.voiceWorker.abort();
 			this.voiceWorker = null;
 		}
-		this.activeStream = null;
 		if (this.grokWs) {
 			try {
 				this.grokWs.close();
@@ -198,11 +197,7 @@ export class VoiceSessionManager {
 		}
 
 		if (data.type !== "response.output_audio.delta") {
-			this.log(
-				"EVENT",
-				data.type,
-				JSON.stringify(data, null, 0).slice(0, 500),
-			);
+			this.log("EVENT", data.type, raw.slice(0, 500));
 		}
 
 		switch (data.type) {
@@ -222,11 +217,7 @@ export class VoiceSessionManager {
 				if (transcript && !this._processingUtterance) {
 					this.callbacks.onUserTranscript(transcript);
 					// Cancel any auto-response (create_response:false is unreliable)
-					if (this.grokWs && this.grokWs.readyState === 1) {
-						this.grokWs.send(
-							JSON.stringify({ type: "response.cancel" }),
-						);
-					}
+					this.sendToGrok(JSON.stringify({ type: "response.cancel" }));
 					await this.processVoiceTurn(transcript);
 				}
 				break;
@@ -235,26 +226,14 @@ export class VoiceSessionManager {
 			// -- Auto-response suppression
 			case "response.created": {
 				if (!this.voiceWorker?.isProcessing) {
-					this.log(
-						"AUTO_RESPONSE",
-						"cancelling unexpected auto-response",
-					);
-					if (this.grokWs && this.grokWs.readyState === 1) {
-						this.grokWs.send(
-							JSON.stringify({ type: "response.cancel" }),
-						);
-					}
+					this.log("AUTO_RESPONSE", "cancelling unexpected auto-response");
+					this.sendToGrok(JSON.stringify({ type: "response.cancel" }));
 				}
 				break;
 			}
 
-			// -- Session lifecycle
-			case "session.updated": {
-				if (!this._initialSetupDone) {
-					this._initialSetupDone = true;
-				}
-				break;
-			}
+			// -- Session lifecycle (no-op events)
+			case "session.updated":
 			case "input_audio_buffer.committed":
 			case "conversation.item.created": {
 				break;
@@ -322,9 +301,6 @@ export class VoiceSessionManager {
 				transcript,
 				this.voiceWorker,
 			);
-			this.activeStream = stream;
-
-			// fullText resolves when the turn is complete
 			await stream.fullText;
 		} catch (err) {
 			this.log(
@@ -334,7 +310,6 @@ export class VoiceSessionManager {
 			this.callbacks.onStateChange("error");
 		} finally {
 			this._processingUtterance = false;
-			this.activeStream = null;
 		}
 	}
 }

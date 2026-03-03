@@ -108,9 +108,7 @@ export class Cortex {
 	}
 
 	async chatStream(userMessage: string): Promise<ChatStream> {
-		await this.historyManager.compact();
-		const systemPrompt = await this.buildSystemPrompt(userMessage);
-		this.historyManager.push({ role: "user", content: userMessage });
+		const { systemPrompt, defs, executor } = await this.prepareTurn(userMessage);
 
 		if (this._debug) {
 			this.audit?.log({
@@ -135,16 +133,6 @@ export class Cortex {
 				}
 			}
 		}
-
-		// Cached tool infrastructure — rebuilt only when tools change
-		const defs = this._cachedDefs ??= buildToolDefinitions(this.tools);
-		const executor = this._cachedExecutor ??= createToolExecutor({
-			tools: this.tools,
-			clearance: this.clearance,
-			audit: this.audit,
-			signals: this.signals,
-			toolMemory: this.toolMemory,
-		});
 
 		if (this._debug && this.debugPayloadPath) {
 			appendInferenceLog(this.debugPayloadPath, 1, {
@@ -195,24 +183,12 @@ export class Cortex {
 		userMessage: string,
 		voiceWorker: VoiceWorker,
 	): Promise<VoiceChatStream> {
-		await this.historyManager.compact();
-		const systemPrompt = await this.buildSystemPrompt(userMessage);
-		this.historyManager.push({ role: "user", content: userMessage });
+		const { systemPrompt, defs, executor } = await this.prepareTurn(userMessage);
 
-		// Cached tool infrastructure — rebuilt only when tools change
-		const defs = (this._cachedDefs ??= buildToolDefinitions(this.tools));
-		const executor = (this._cachedExecutor ??= createToolExecutor({
-			tools: this.tools,
-			clearance: this.clearance,
-			audit: this.audit,
-			signals: this.signals,
-			toolMemory: this.toolMemory,
-		}));
-
-		// Delegate to VoiceWorker
+		// Delegate to VoiceWorker (messages not needed — Grok has its own conversation context)
 		const workerResult = voiceWorker.process({
 			systemPrompt,
-			messages: this.historyManager.toMessages(),
+			messages: [],
 			tools: defs,
 			executeTool: executor,
 			maxToolIterations: this.maxToolIterations,
@@ -255,6 +231,25 @@ export class Cortex {
 			this.historyManager.truncateTo(startLength);
 			throw err;
 		}
+	}
+
+	// ── Turn preparation ────────────────────────────────────────
+
+	private async prepareTurn(userMessage: string) {
+		await this.historyManager.compact();
+		const systemPrompt = await this.buildSystemPrompt(userMessage);
+		this.historyManager.push({ role: "user", content: userMessage });
+
+		const defs = (this._cachedDefs ??= buildToolDefinitions(this.tools));
+		const executor = (this._cachedExecutor ??= createToolExecutor({
+			tools: this.tools,
+			clearance: this.clearance,
+			audit: this.audit,
+			signals: this.signals,
+			toolMemory: this.toolMemory,
+		}));
+
+		return { systemPrompt, defs, executor };
 	}
 
 	// ── History management ───────────────────────────────────────

@@ -40,8 +40,8 @@ export class VoiceWorker implements CortexWorker {
 		this.activeRequest = request;
 		this.toolIterationCount = 0;
 
-		// Create push-based streams
-		this.textPush = createPushIterable<string>();
+		// Create push-based streams (only text needs fullValue collection)
+		this.textPush = createPushIterable<string>({ collect: true });
 		this.audioPush = createPushIterable<string>();
 		this.toolPush = createPushIterable<ToolEvent>();
 
@@ -105,9 +105,16 @@ export class VoiceWorker implements CortexWorker {
 			case "response.function_call_arguments.done": {
 				const toolName = data.name as string;
 				const callId = data.call_id as string;
-				const args = JSON.parse(
-					(data.arguments as string) ?? "{}",
-				) as Record<string, unknown>;
+				let args: Record<string, unknown>;
+				try {
+					args = JSON.parse(
+						(data.arguments as string) ?? "{}",
+					) as Record<string, unknown>;
+				} catch {
+					this.toolPush.push({ type: "error", toolName, result: "Malformed tool arguments" });
+					this.closeTurn();
+					break;
+				}
 
 				this.toolPush.push({ type: "start", toolName, args });
 

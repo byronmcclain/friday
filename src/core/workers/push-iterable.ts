@@ -6,11 +6,14 @@ export interface PushIterable<T> {
 	fullValue: Promise<string>;
 }
 
-export function createPushIterable<T>(): PushIterable<T> {
+export function createPushIterable<T>(options?: {
+	collect?: boolean;
+}): PushIterable<T> {
 	const queue: T[] = [];
 	let resolve: ((result: IteratorResult<T>) => void) | null = null;
 	let reject: ((err: Error) => void) | null = null;
 	let isDone = false;
+	const shouldCollect = options?.collect ?? false;
 	const collected: string[] = [];
 
 	let fullResolve: (value: string) => void;
@@ -25,7 +28,7 @@ export function createPushIterable<T>(): PushIterable<T> {
 	return {
 		push(value: T) {
 			if (isDone) return;
-			if (typeof value === "string") collected.push(value);
+			if (shouldCollect && typeof value === "string") collected.push(value);
 			if (resolve) {
 				const r = resolve;
 				resolve = null;

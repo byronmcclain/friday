@@ -69,13 +69,23 @@ describe("createPushIterable", () => {
 		}
 	});
 
-	test("collects fullValue when done", async () => {
-		const { push, done, fullValue } = createPushIterable<string>();
+	test("collects fullValue when collect: true", async () => {
+		const { push, done, fullValue } = createPushIterable<string>({ collect: true });
 		push("hello ");
 		push("world");
 		done();
 
 		const result = await fullValue;
 		expect(result).toBe("hello world");
+	});
+
+	test("fullValue is empty string when collect not enabled", async () => {
+		const { push, done, fullValue } = createPushIterable<string>();
+		push("hello ");
+		push("world");
+		done();
+
+		const result = await fullValue;
+		expect(result).toBe("");
 	});
 });
