@@ -37,7 +37,7 @@ import { Vox } from "./voice/vox.ts";
 import { VOX_DEFAULTS } from "./voice/types.ts";
 import { VoiceChannel } from "./voice/channel.ts";
 import { createVoiceProtocol } from "./voice/protocol.ts";
-import type { GrokVoice } from "./voice/types.ts";
+import { isGrokVoice, type GrokVoice } from "./voice/types.ts";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
 	modulesDir?: string;
@@ -354,7 +354,8 @@ export class FridayRuntime {
 
 			// Vox — voice output (before Cortex so vox ref can be passed in)
 			if (config.enableVox !== false) {
-				const voice = (process.env.FRIDAY_VOICE as GrokVoice) ?? VOX_DEFAULTS.defaultVoice;
+				const envVoice = process.env.FRIDAY_VOICE;
+			const voice: GrokVoice = envVoice && isGrokVoice(envVoice) ? envVoice : VOX_DEFAULTS.defaultVoice;
 				this._vox = new Vox({
 					config: { ...VOX_DEFAULTS, defaultVoice: voice },
 					signals: this._signals,

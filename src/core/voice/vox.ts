@@ -1,7 +1,8 @@
 import type { SignalBus } from "../events.ts";
 import type { ClearanceManager } from "../clearance.ts";
 import type { AuditLogger } from "../../audit/logger.ts";
-import { type VoiceMode, type GrokVoice, type VoxConfig, type VoxOptions, type EmotionProfile, VOX_WS_URL } from "./types.ts";
+import { type VoiceMode, type GrokVoice, type VoxConfig, type VoxOptions, type EmotionProfile } from "./types.ts";
+import { openGrokWebSocket } from "./ws.ts";
 import { buildTtsPrompt } from "./prompt.ts";
 import { pcmToWav, playAudio, cleanupTempFile, detectPlayer } from "./audio.ts";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
@@ -266,71 +267,47 @@ export class Vox {
 		const apiKey = process.env.XAI_API_KEY;
 		if (!apiKey) throw new Error("XAI_API_KEY not set");
 
-		return new Promise<void>((resolve, reject) => {
-			const ws = new WebSocket(VOX_WS_URL, {
-				headers: {
-					Authorization: `Bearer ${apiKey}`,
-					"Content-Type": "application/json",
-				},
-			} as any);
+		const ws = await openGrokWebSocket(apiKey);
+		this._ws = ws;
+		this._connected = true;
+		this.logAudit("vox:ws-connect", `WebSocket connected (voice: ${this._config.defaultVoice})`, true);
 
-			const timeout = setTimeout(() => {
-				reject(new Error("WebSocket connection timeout"));
-				try {
-					ws.close();
-				} catch {
-					/* ignore */
-				}
-			}, 10000);
-
-			ws.addEventListener("open", () => {
-				clearTimeout(timeout);
-				this._ws = ws;
-				this._connected = true;
-				this.logAudit("vox:ws-connect", `WebSocket connected (voice: ${this._config.defaultVoice})`, true);
-
-				// Initial session config
-				ws.send(
-					JSON.stringify({
-						type: "session.update",
-						session: {
-							voice: this._config.defaultVoice,
-							turn_detection: { type: null },
-							audio: {
-								output: {
-									format: { type: "audio/pcm", rate: this._config.sampleRate },
-								},
-							},
+		// Initial session config
+		ws.send(
+			JSON.stringify({
+				type: "session.update",
+				session: {
+					voice: this._config.defaultVoice,
+					turn_detection: { type: null },
+					audio: {
+						output: {
+							format: { type: "audio/pcm", rate: this._config.sampleRate },
 						},
-					}),
-				);
+					},
+				},
+			}),
+		);
 
-				resolve();
-			});
+		ws.addEventListener("message", (event) => {
+			if (typeof event.data === "string") {
+				this.handleMessage(event.data);
+			}
+		});
 
-			ws.addEventListener("message", (event) => {
-				if (typeof event.data === "string") {
-					this.handleMessage(event.data);
-				}
-			});
+		ws.addEventListener("error", () => {
+			this._connected = false;
+			this._ws = null;
+		});
 
-			ws.addEventListener("error", () => {
-				clearTimeout(timeout);
-				this._connected = false;
-				this._ws = null;
-				reject(new Error("WebSocket connection error"));
-			});
-
-			ws.addEventListener("close", () => {
-				this._connected = false;
-				this._ws = null;
-				this.logAudit("vox:ws-disconnect", "WebSocket disconnected", true);
-				if (this._speaking && this._speakResolve) {
-					this._speakResolve();
-					this._speakResolve = null;
-					this._speaking = false;
-				}
-			});
+		ws.addEventListener("close", () => {
+			this._connected = false;
+			this._ws = null;
+			this.logAudit("vox:ws-disconnect", "WebSocket disconnected", true);
+			if (this._speaking && this._speakResolve) {
+				this._speakResolve();
+				this._speakResolve = null;
+				this._speaking = false;
+			}
 		});
 	}
 

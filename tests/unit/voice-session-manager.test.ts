@@ -48,7 +48,6 @@ function attachMockWs(manager: VoiceSessionManager): string[] {
 	};
 	(manager as any).grokWs = ws;
 	(manager as any).active = true;
-	(manager as any)._initialSetupDone = true;
 	// Create VoiceWorker bound to mock ws so processVoiceTurn can use it
 	(manager as any).voiceWorker = new VoiceWorker({
 		send: (data: string) => ws.send(data),

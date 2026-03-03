@@ -29,6 +29,12 @@ export interface EmotionalRewriteResult {
 
 export type GrokVoice = "Ara" | "Eve" | "Rex" | "Sal" | "Leo";
 
+const GROK_VOICES = new Set<string>(["Ara", "Eve", "Rex", "Sal", "Leo"] satisfies GrokVoice[]);
+
+export function isGrokVoice(v: string): v is GrokVoice {
+	return GROK_VOICES.has(v);
+}
+
 export interface VoxConfig {
 	defaultVoice: GrokVoice;
 	sampleRate: number;

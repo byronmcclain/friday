@@ -8,12 +8,10 @@ import type { SessionHub } from "./session-hub.ts";
 import { WebSocketNotificationChannel } from "./ws-channel.ts";
 import { VoiceSessionManager, type VoiceSessionConfig } from "../core/voice/session-manager.ts";
 import { FRIDAY_VOICE_IDENTITY } from "../core/voice/prompt.ts";
-import type { GrokVoice } from "../core/voice/types.ts";
+import { isGrokVoice, type GrokVoice } from "../core/voice/types.ts";
 import type { SignalHandler } from "../core/events.ts";
 
 export type SendFn = (msg: ServerMessage) => void;
-
-const VALID_VOICES: ReadonlySet<string> = new Set(["Ara", "Eve", "Rex", "Sal", "Leo"]);
 
 export class WebSocketHandler {
 	private runtime: FridayRuntime;
@@ -22,7 +20,6 @@ export class WebSocketHandler {
 	private channelName: string;
 	private defaultSend?: SendFn;
 	private voiceSession: VoiceSessionManager | null = null;
-	private assistantTranscriptBuffer = "";
 	private toolSignalHandler: SignalHandler | null = null;
 
 	constructor(runtime: FridayRuntime, hub: SessionHub, clientId: string) {
@@ -80,6 +77,11 @@ export class WebSocketHandler {
 		if (this.toolSignalHandler && this.runtime.signals) {
 			this.runtime.signals.off("tool:executing", this.toolSignalHandler);
 			this.toolSignalHandler = null;
+		}
+		// Stop voice session to close Grok WebSocket on browser disconnect
+		if (this.voiceSession) {
+			void this.voiceSession.stop();
+			this.voiceSession = null;
 		}
 	}
 
@@ -301,11 +303,9 @@ export class WebSocketHandler {
 					break;
 				}
 
-				this.assistantTranscriptBuffer = "";
-
 				const requestedVoice = msg.voice;
-				const voice: GrokVoice = requestedVoice && VALID_VOICES.has(requestedVoice)
-					? requestedVoice as GrokVoice
+				const voice: GrokVoice = requestedVoice && isGrokVoice(requestedVoice)
+					? requestedVoice
 					: "Eve";
 
 				const sessionConfig: VoiceSessionConfig = {
@@ -321,27 +321,12 @@ export class WebSocketHandler {
 						onAudioDelta: (base64) =>
 							send({ type: "voice:audio", delta: base64 }),
 						onTranscriptDelta: (delta, done) => {
-							if (!done) {
-								this.assistantTranscriptBuffer += delta;
-							}
 							send({
 								type: "voice:transcript",
 								role: "assistant",
 								delta,
 								done,
 							});
-							if (done) {
-								this.hub.broadcast(
-									{
-										type: "conversation:message",
-										role: "assistant",
-										content: this.assistantTranscriptBuffer,
-										source: "voice",
-									},
-									this.clientId,
-								);
-								this.assistantTranscriptBuffer = "";
-							}
 						},
 						onStateChange: (state) =>
 							send({ type: "voice:state", state }),
@@ -356,6 +341,17 @@ export class WebSocketHandler {
 								{
 									type: "conversation:message",
 									role: "user",
+									content: text,
+									source: "voice",
+								},
+								this.clientId,
+							);
+						},
+						onAssistantMessage: (text) => {
+							this.hub.broadcast(
+								{
+									type: "conversation:message",
+									role: "assistant",
 									content: text,
 									source: "voice",
 								},
