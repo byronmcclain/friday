@@ -58,9 +58,15 @@ src/
 │       ├── components/    # UI components (Header, ChatArea, InputBar, Message, Splash, LogPanel, etc.)
 │       └── lib/           # ANSI parser, color utils, chafa logo processor, usePulse hook
 ├── core/
-│   ├── cortex.ts          # Cortex — LLM brain, streamText() with AI SDK, tool registration
+│   ├── cortex.ts          # Cortex — LLM brain, chatStream() + chatStreamVoice() dual-mode
 │   ├── history-manager.ts # HistoryManager — token-budget conversation history with compaction
-│   ├── stream-types.ts    # ChatStream interface — textStream, fullText, usage
+│   ├── stream-types.ts    # ChatStream, VoiceChatStream interfaces
+│   ├── tool-bridge.ts     # Portable tool bridge — buildToolDefinitions, createToolExecutor, toGrokTools
+│   ├── workers/           # CortexWorker implementations
+│   │   ├── types.ts        # CortexWorker interface, WorkerRequest, WorkerResult, ToolEvent
+│   │   ├── text-worker.ts  # TextWorker — AI SDK streamText() agent loop
+│   │   ├── voice-worker.ts # VoiceWorker — Grok realtime WebSocket agent loop
+│   │   └── push-iterable.ts # Push-based AsyncIterable utility
 │   ├── summarizer.ts      # ConversationSummarizer — generates session summaries via generateText()
 │   ├── runtime.ts         # FridayRuntime — boot/shutdown orchestrator, wires all subsystems
 │   ├── events.ts          # SignalBus — typed event system (file:changed, test:failed, etc.)
@@ -80,8 +86,8 @@ src/
 │       ├── audio.ts        # pcmToWav, detectPlayer, playAudio, cleanupTempFile
 │       ├── prompt.ts       # classifyContent, buildTtsPrompt, FRIDAY_VOICE_IDENTITY
 │       ├── vox.ts          # Vox class — WebSocket lifecycle, modes, speak/cancel, idle eviction
-│       ├── bridge.ts       # VoiceBridge — Grok realtime API WebSocket for conversational voice
-│       ├── narration.ts    # NarrationPicker, ACK_PHRASES, TOOL_NARRATIONS — voice personality phrases
+│       ├── session-manager.ts # VoiceSessionManager — thin audio I/O + lifecycle (replaces VoiceBridge)
+│       ├── narration.ts    # NarrationPicker, ACK_PHRASES, TOOL_NARRATIONS — Vox notification TTS phrases
 │       ├── channel.ts      # VoiceChannel — notification bridge (NotificationChannel impl)
 │       ├── emotion.ts      # emotionalRewrite() — conversation-aware emotional TTS rewriting
 │       └── protocol.ts     # /voice protocol (on, off, whisper, flat, test, status)
@@ -169,7 +175,7 @@ tests/
 | Subsystem | Location | Key Constraint |
 |---|---|---|
 | **FridayRuntime** | `src/core/runtime.ts` | Composition root. Boot order is strict dependency chain (see below). |
-| **Cortex** | `src/core/cortex.ts` | LLM brain. `chat()` blocks (with error rollback), `chatStream()` streams. `stopWhen: stepCountIs(N)` for tool loop. Enriches system prompt per message with SMARTS + Sensorium. |
+| **Cortex** | `src/core/cortex.ts` | LLM brain. `chat()` blocks, `chatStream()` streams (TextWorker), `chatStreamVoice()` streams (VoiceWorker). Enriches system prompt per message with SMARTS + Sensorium. |
 | **HistoryManager** | `src/core/history-manager.ts` | Token-budget conversation history. Auto-compacts, keeps min 4 messages. |
 | **SignalBus** | `src/core/events.ts` | Typed events. Error-isolated handlers. `custom:${string}` for custom signals. |
 | **Protocols** | `src/protocols/registry.ts` | `/command` routing. **Bypass LLM entirely** — direct handler dispatch. |
@@ -179,7 +185,8 @@ tests/
 | **Sensorium** | `src/sensorium/` | Dual-cadence polling (30s/5min). Hysteresis alerts. CPU needs delta between two tick samples. |
 | **Genesis** | `src/core/genesis.ts` | Identity prompt at `~/.friday/GENESIS.md`. Protected path (`chmod 600`). Seed template: `GENESIS_TEMPLATE` in `prompts.ts`. |
 | **Vox** | `src/core/voice/vox.ts` | Fire-and-forget TTS. 60s idle WebSocket eviction. 4 modes: off/on/whisper/flat. Emotional rewrite via fast model. |
-| **VoiceBridge** | `src/core/voice/bridge.ts` | Sequential TTS queue gated by `response.done`. Streams Cortex text to Grok TTS sentence-by-sentence. Quick ack + tool narration via SignalBus. |
+| **VoiceWorker** | `src/core/workers/voice-worker.ts` | Grok realtime WebSocket agent loop. Implements CortexWorker — reasoning + tool calling + speech natively. |
+| **VoiceSessionManager** | `src/core/voice/session-manager.ts` | Thin audio I/O + lifecycle. Manages Grok WebSocket, VAD, routes transcripts through `cortex.chatStreamVoice()`. |
 | **Recall (Deja Vu)** | `src/core/recall-tool.ts` | `search` (FTS5 summaries) → `recall` (full transcript). Registered in Cortex at boot. |
 | **Arc Rhythm** | `src/arc-rhythm/` | 60s scheduler tick. Auto-pause after 5 failures. Shares Memory's SQLite via `memory.database`. |
 | **The Forge** | `src/modules/forge/` | Self-improvement. Failed modules don't crash boot. Filesystem module + Forge are core-protected. |
@@ -202,7 +209,8 @@ tests/
 - **Singleton mode**: `friday serve` writes PID + socket files; `friday chat` requires a running server and connects via `SocketBridge` (no local runtime fallback — exits with error if no server is running)
 - **SessionHub**: Owns client lifecycle in server mode. Both WebSocket and Unix socket transports register/unregister via hub. History hydrated on connect via `conversation:message` with `source: "replay"`. Saves conversation + clears history on last client disconnect. Reconnect guard prevents clearing if a new client connects during save.
 - **Protected paths**: `isProtectedPath()` in `src/modules/filesystem/containment.ts` — blocks writes to Genesis and core modules
-- **Voice narration**: VoiceBridge uses a sequential TTS queue (FIFO) gated by Grok's `response.done`. Acks are hardcoded phrases (no LLM call). Tool narrations fire after 2s delay with 5s debounce.
+- **Dual-mode Cortex**: `chatStream()` (TextWorker/AI SDK) for CLI, `chatStreamVoice()` (VoiceWorker/Grok realtime) for browser voice. Both share system prompt enrichment, tool bridge, history, clearance. Voice mode uses Grok as native agent — no sentence splitting, no TTS pipe.
+- **Voice narration**: NarrationPicker + ACK_PHRASES still available for Vox (notification TTS). VoiceSessionManager routes through Cortex natively — Grok handles its own speech.
 
 ## Testing
 

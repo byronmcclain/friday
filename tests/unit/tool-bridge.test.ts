@@ -215,11 +215,12 @@ describe("toGrokTools", () => {
 			],
 		}];
 		const result = toGrokTools(defs);
-		expect(result[0]!.parameters.properties.s.type).toBe("string");
-		expect(result[0]!.parameters.properties.n.type).toBe("number");
-		expect(result[0]!.parameters.properties.b.type).toBe("boolean");
-		expect(result[0]!.parameters.properties.a.type).toBe("array");
-		expect(result[0]!.parameters.properties.o.type).toBe("object");
+		const props = result[0]!.parameters.properties;
+		expect(props.s!.type).toBe("string");
+		expect(props.n!.type).toBe("number");
+		expect(props.b!.type).toBe("boolean");
+		expect(props.a!.type).toBe("array");
+		expect(props.o!.type).toBe("object");
 	});
 
 	test("tool with no parameters has empty properties", () => {
