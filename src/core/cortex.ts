@@ -11,10 +11,11 @@ import type { SignalBus } from "./events.ts";
 import type { ScopedMemory } from "./memory.ts";
 import type { Vox } from "./voice/vox.ts";
 import { HistoryManager } from "./history-manager.ts";
-import type { ChatStream } from "./stream-types.ts";
+import type { ChatStream, VoiceChatStream } from "./stream-types.ts";
 import { appendInferenceLog } from "../providers/debug-log.ts";
 import { buildToolDefinitions, createToolExecutor } from "./tool-bridge.ts";
 import { TextWorker } from "./workers/text-worker.ts";
+import { VoiceWorker } from "./workers/voice-worker.ts";
 
 export interface CortexConfig extends Partial<FridayConfig> {
 	injectedModel?: LanguageModelV3;
@@ -185,6 +186,61 @@ export class Cortex {
 
 		return {
 			textStream: workerResult.textStream,
+			fullText: fullTextPromise,
+			usage: workerResult.usage,
+		};
+	}
+
+	async chatStreamVoice(
+		userMessage: string,
+		voiceWorker: VoiceWorker,
+	): Promise<VoiceChatStream> {
+		await this.historyManager.compact();
+		const systemPrompt = await this.buildSystemPrompt(userMessage);
+		this.historyManager.push({ role: "user", content: userMessage });
+
+		// Cached tool infrastructure — rebuilt only when tools change
+		const defs = (this._cachedDefs ??= buildToolDefinitions(this.tools));
+		const executor = (this._cachedExecutor ??= createToolExecutor({
+			tools: this.tools,
+			clearance: this.clearance,
+			audit: this.audit,
+			signals: this.signals,
+			toolMemory: this.toolMemory,
+		}));
+
+		// Delegate to VoiceWorker
+		const workerResult = voiceWorker.process({
+			systemPrompt,
+			messages: this.historyManager.toMessages(),
+			tools: defs,
+			executeTool: executor,
+			maxToolIterations: this.maxToolIterations,
+			maxOutputTokens: this.maxTokens,
+		});
+
+		// Record in history when complete — do NOT fire Vox (Grok speaks directly)
+		const fullTextPromise = workerResult.fullText.then(
+			async (text: string) => {
+				this.historyManager.push({ role: "assistant", content: text });
+
+				const usage = await workerResult.usage;
+				if (
+					usage?.inputTokens != null &&
+					usage?.outputTokens != null
+				) {
+					this.historyManager.recordUsage(
+						usage.inputTokens + usage.outputTokens,
+					);
+				}
+				return text;
+			},
+		);
+
+		return {
+			textStream: workerResult.textStream,
+			audioStream: workerResult.audioStream!,
+			toolEvents: workerResult.toolEvents,
 			fullText: fullTextPromise,
 			usage: workerResult.usage,
 		};

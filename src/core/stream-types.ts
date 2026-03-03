@@ -1,3 +1,5 @@
+import type { ToolEvent } from "./workers/types.ts";
+
 /** Token usage from an LLM invocation */
 export interface TokenUsage {
 	inputTokens: number | undefined;
@@ -12,4 +14,12 @@ export interface ChatStream {
 	fullText: PromiseLike<string>;
 	/** Resolves to token usage after completion */
 	usage: PromiseLike<TokenUsage>;
+}
+
+/** Voice streaming response — extends ChatStream with audio and tool events */
+export interface VoiceChatStream extends ChatStream {
+	/** Async iterable of base64-encoded PCM audio chunks */
+	audioStream: AsyncIterable<string>;
+	/** Async iterable of tool execution events for narration */
+	toolEvents: AsyncIterable<ToolEvent>;
 }
