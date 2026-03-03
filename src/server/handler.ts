@@ -6,7 +6,7 @@ import {
 } from "./protocol.ts";
 import type { SessionHub } from "./session-hub.ts";
 import { WebSocketNotificationChannel } from "./ws-channel.ts";
-import { VoiceBridge, type VoiceBridgeConfig } from "../core/voice/bridge.ts";
+import { VoiceSessionManager, type VoiceSessionConfig } from "../core/voice/session-manager.ts";
 import { FRIDAY_VOICE_IDENTITY } from "../core/voice/prompt.ts";
 import type { GrokVoice } from "../core/voice/types.ts";
 import type { SignalHandler } from "../core/events.ts";
@@ -21,7 +21,7 @@ export class WebSocketHandler {
 	private clientId: string;
 	private channelName: string;
 	private defaultSend?: SendFn;
-	private voiceBridge: VoiceBridge | null = null;
+	private voiceSession: VoiceSessionManager | null = null;
 	private assistantTranscriptBuffer = "";
 	private toolSignalHandler: SignalHandler | null = null;
 
@@ -84,9 +84,9 @@ export class WebSocketHandler {
 	}
 
 	handleAudio(audioData: Buffer): void {
-		if (!this.voiceBridge?.isActive) return;
+		if (!this.voiceSession?.isActive) return;
 		const base64 = audioData.toString("base64");
-		this.voiceBridge.appendAudio(base64);
+		this.voiceSession.appendAudio(base64);
 	}
 
 	pushSensoriumUpdate(send?: SendFn): void {
@@ -292,7 +292,7 @@ export class WebSocketHandler {
 				break;
 			}
 			case "voice:start": {
-				if (this.voiceBridge?.isActive) {
+				if (this.voiceSession?.isActive) {
 					send({
 						type: "voice:error",
 						code: "SESSION_IN_USE",
@@ -308,16 +308,15 @@ export class WebSocketHandler {
 					? requestedVoice as GrokVoice
 					: "Eve";
 
-				const voiceConfig: VoiceBridgeConfig = {
+				const sessionConfig: VoiceSessionConfig = {
 					voice,
 					sampleRate: 48000,
 					instructions: FRIDAY_VOICE_IDENTITY,
-					signals: this.runtime.signals,
 				};
 
-				this.voiceBridge = new VoiceBridge(
+				this.voiceSession = new VoiceSessionManager(
 					this.runtime.cortex,
-					voiceConfig,
+					sessionConfig,
 					{
 						onAudioDelta: (base64) =>
 							send({ type: "voice:audio", delta: base64 }),
@@ -367,7 +366,7 @@ export class WebSocketHandler {
 				);
 
 				try {
-					await this.voiceBridge.start();
+					await this.voiceSession.start();
 					send({ type: "voice:started", requestId: msg.id });
 				} catch (err) {
 					send({
@@ -382,9 +381,9 @@ export class WebSocketHandler {
 				break;
 			}
 			case "voice:stop": {
-				if (this.voiceBridge) {
-					await this.voiceBridge.stop();
-					this.voiceBridge = null;
+				if (this.voiceSession) {
+					await this.voiceSession.stop();
+					this.voiceSession = null;
 				}
 				send({ type: "voice:stopped", requestId: msg.id });
 				break;
