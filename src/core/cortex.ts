@@ -16,6 +16,7 @@ import { appendInferenceLog } from "../providers/debug-log.ts";
 import { buildToolDefinitions, createToolExecutor } from "./tool-bridge.ts";
 import { TextWorker } from "./workers/text-worker.ts";
 import { VoiceWorker } from "./workers/voice-worker.ts";
+import { buildVoiceSystemPrompt } from "./voice/prompt.ts";
 
 export interface CortexConfig extends Partial<FridayConfig> {
 	injectedModel?: LanguageModelV3;
@@ -185,9 +186,12 @@ export class Cortex {
 	): Promise<VoiceChatStream> {
 		const { systemPrompt, defs, executor } = await this.prepareTurn(userMessage);
 
+		// Enrich with voice delivery guidance (identity + delivery rules)
+		const voicePrompt = buildVoiceSystemPrompt(systemPrompt);
+
 		// Delegate to VoiceWorker (messages not needed — Grok has its own conversation context)
 		const workerResult = voiceWorker.process({
-			systemPrompt,
+			systemPrompt: voicePrompt,
 			messages: [],
 			tools: defs,
 			executeTool: executor,
@@ -340,7 +344,7 @@ export class Cortex {
 		if (this.sensorium) {
 			const envBlock = this.sensorium.getContextBlock();
 			if (envBlock) {
-				prompt = `${prompt}\n\n## Environment\n\n${envBlock}`;
+				prompt = `${prompt}\n\n## Environment\n\n${envBlock}\n(Cached ambient snapshot — use the getEnvironmentStatus tool for fresh or detailed readings.)`;
 			}
 		} else {
 			prompt = `${prompt}\n\n## Current Time\n\n${formatDateTime()}`;

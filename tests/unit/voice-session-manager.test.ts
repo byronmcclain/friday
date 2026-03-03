@@ -137,18 +137,20 @@ describe("VoiceSessionManager", () => {
 		);
 
 		// Should have called cortex.chatStreamVoice -> VoiceWorker -> session.update + response.create
-		const sessionUpdate = sent
-			.map((s) => JSON.parse(s))
-			.find(
-				(m) =>
-					m.type === "session.update" &&
-					m.session?.instructions?.includes("FRIDAY"),
-			);
+		const parsed = sent.map((s) => JSON.parse(s));
+		const sessionUpdate = parsed.find(
+			(m) =>
+				m.type === "session.update" &&
+				m.session?.instructions?.includes("FRIDAY"),
+		);
 		expect(sessionUpdate).toBeDefined();
 
-		const responseCreate = sent
-			.map((s) => JSON.parse(s))
-			.find((m) => m.type === "response.create");
+		// Voice delivery rules should be injected by Cortex.chatStreamVoice
+		const instructions = sessionUpdate.session.instructions;
+		expect(instructions).toContain("VOICE DELIVERY RULES");
+		expect(instructions).toContain("County Tipperary");
+
+		const responseCreate = parsed.find((m) => m.type === "response.create");
 		expect(responseCreate).toBeDefined();
 	});
 
