@@ -30,6 +30,13 @@ export function VoiceMode() {
     });
   }, [voice.onAudioReceived, audio.playAudio]);
 
+  // Barge-in: flush playback when user starts speaking
+  useEffect(() => {
+    if (voice.state === "listening") {
+      audio.stopPlayback();
+    }
+  }, [voice.state, audio.stopPlayback]);
+
   // Auto-start voice session when connected
   useEffect(() => {
     if (voice.isConnected && !voice.sessionActive) {

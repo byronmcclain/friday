@@ -199,8 +199,12 @@ export class VoiceSessionManager {
 		}
 
 		switch (data.type) {
-			// -- VAD events
+			// -- VAD events (barge-in: cancel current response immediately)
 			case "input_audio_buffer.speech_started": {
+				if (this.voiceWorker?.isProcessing) {
+					this.sendToGrok(CANCEL_RESPONSE_MSG);
+					this.voiceWorker.abort();
+				}
 				this.emitStateChange("listening");
 				break;
 			}
