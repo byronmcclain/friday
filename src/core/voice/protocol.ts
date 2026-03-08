@@ -46,7 +46,6 @@ function handleStatus(vox: Vox): ProtocolResult {
 	const lines = [
 		`Voice: ${s.mode}`,
 		`Voice name: ${s.voice}`,
-		`Connected: ${s.connected ? "yes" : "no"}`,
 		`API key: ${s.apiKeyAvailable ? "set" : "not set"}`,
 		`Emotion engine: ${s.emotionEngine ? "active" : "not wired"}`,
 	];
