@@ -16,6 +16,9 @@ import { unlink } from "node:fs/promises";
 // Vox lifecycle audit logging
 // ---------------------------------------------------------------------------
 
+// Short timeout so fetch() aborts quickly if XAI_API_KEY is set in the env
+const TEST_VOX_CONFIG = { ...VOX_DEFAULTS, timeoutMs: 100 };
+
 describe("Vox lifecycle audit logging", () => {
 	let signals: SignalBus;
 	let audit: AuditLogger;
@@ -28,7 +31,7 @@ describe("Vox lifecycle audit logging", () => {
 	test("logs vox:speak when speak() is called in on mode", async () => {
 		const clearance = new ClearanceManager(["audio-output"]);
 		const vox = new Vox({
-			config: VOX_DEFAULTS,
+			config: TEST_VOX_CONFIG,
 			signals,
 			notifications: new NotificationManager(),
 			clearance,
@@ -50,7 +53,7 @@ describe("Vox lifecycle audit logging", () => {
 	test("vox:speak truncates long text in detail", async () => {
 		const clearance = new ClearanceManager(["audio-output"]);
 		const vox = new Vox({
-			config: VOX_DEFAULTS,
+			config: TEST_VOX_CONFIG,
 			signals,
 			notifications: new NotificationManager(),
 			clearance,
@@ -71,7 +74,7 @@ describe("Vox lifecycle audit logging", () => {
 	test("vox:speak shows whisper mode in detail", async () => {
 		const clearance = new ClearanceManager(["audio-output"]);
 		const vox = new Vox({
-			config: VOX_DEFAULTS,
+			config: TEST_VOX_CONFIG,
 			signals,
 			notifications: new NotificationManager(),
 			clearance,
@@ -87,7 +90,7 @@ describe("Vox lifecycle audit logging", () => {
 
 	test("no vox:speak when mode is off", async () => {
 		const vox = new Vox({
-			config: VOX_DEFAULTS,
+			config: TEST_VOX_CONFIG,
 			signals,
 			notifications: new NotificationManager(),
 			audit,
@@ -102,7 +105,7 @@ describe("Vox lifecycle audit logging", () => {
 	test("no vox:speak when clearance denied (vox:blocked instead)", async () => {
 		const clearance = new ClearanceManager([]); // No clearances
 		const vox = new Vox({
-			config: VOX_DEFAULTS,
+			config: TEST_VOX_CONFIG,
 			signals,
 			notifications: new NotificationManager(),
 			clearance,

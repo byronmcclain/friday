@@ -26,7 +26,8 @@ describe("/voice protocol", () => {
 	beforeEach(() => {
 		const signals = new SignalBus();
 		const notifications = new NotificationManager();
-		vox = new Vox({ config: VOX_DEFAULTS, signals, notifications });
+		// Short timeout so fetch() aborts quickly if XAI_API_KEY is set in the env
+		vox = new Vox({ config: { ...VOX_DEFAULTS, timeoutMs: 100 }, signals, notifications });
 		protocol = createVoiceProtocol(vox);
 	});
 
