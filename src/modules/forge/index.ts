@@ -15,7 +15,6 @@ const forgeModule = {
 	knowledge: [],
 	triggers: [],
 	clearance: [
-		"provider",
 		"write-fs",
 		"read-fs",
 		"exec-shell",

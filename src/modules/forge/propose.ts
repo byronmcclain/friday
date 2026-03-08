@@ -9,8 +9,23 @@ function generateModuleTemplate(
 	return [
 		{
 			path: "index.ts",
-			// Import path assumes forge/ directory is at the project root
-			content: `import type { FridayModule } from "../../src/modules/types.ts";
+			content: `import type { FridayModule, FridayTool } from "../../src/modules/types.ts";
+
+// TODO: Add your tools here
+// Example tool structure:
+//
+// const myTool: FridayTool = {
+//   name: "${toolName}.my_action",
+//   description: "What this tool does",
+//   parameters: [
+//     { name: "input", type: "string", description: "The input", required: true },
+//   ],
+//   clearance: [],
+//   async execute(args, context) {
+//     const input = args.input as string;
+//     return { success: true, output: \`Processed: \${input}\` };
+//   },
+// };
 
 const ${toolName}Module = {
   name: ${JSON.stringify(moduleName)},
@@ -32,7 +47,7 @@ export default ${toolName}Module;
 export const forgePropose: FridayTool = {
 	name: "forge_propose",
 	description:
-		"Generate code for a new module or a patch to an existing forge module. Returns the proposed code as a preview — does NOT write to disk. The user must approve before forge_apply writes it. IMPORTANT: All generated TypeScript MUST be strict-mode safe — type catch clause errors as `unknown` and narrow before accessing properties, use explicit types on all public interfaces, never use `any` except for external untyped APIs.",
+		"Create a skeleton module or register a patch proposal in the forge. For 'create': generates a template module with empty tools/protocols arrays — after forge_apply writes it to disk, use fs.write to add the actual implementation code to the module files. For 'patch': registers intent to modify an existing module — use fs.read to read current code, then fs.write to make changes, then forge_validate to check. Does NOT write to disk — use forge_apply with the returned proposalId to write.",
 	parameters: [
 		{
 			name: "action",
@@ -54,15 +69,8 @@ export const forgePropose: FridayTool = {
 				"What the module should do (for create) or what to change (for patch)",
 			required: true,
 		},
-		{
-			name: "files",
-			type: "array",
-			description:
-				'For LLM-generated proposals: array of {path, content} objects. If omitted, a template is generated for "create" action.',
-			required: false,
-		},
 	],
-	clearance: ["provider"],
+	clearance: [],
 
 	async execute(
 		args: Record<string, unknown>,

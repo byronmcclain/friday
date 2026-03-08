@@ -1,5 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { forgePropose } from "../../src/modules/forge/propose.ts";
+import forgeModule from "../../src/modules/forge/index.ts";
 import type { ToolContext } from "../../src/modules/types.ts";
 import { AuditLogger } from "../../src/audit/logger.ts";
 import { SignalBus } from "../../src/core/events.ts";
@@ -21,7 +22,30 @@ const context: ToolContext = {
 describe("forge_propose tool", () => {
   test("has correct name and clearance", () => {
     expect(forgePropose.name).toBe("forge_propose");
-    expect(forgePropose.clearance).toContain("provider");
+    expect(forgePropose.clearance).toEqual([]);
+  });
+
+  test("does not expose files parameter to the LLM", () => {
+    const paramNames = forgePropose.parameters.map((p) => p.name);
+    expect(paramNames).not.toContain("files");
+  });
+
+  test("does not require provider clearance", () => {
+    expect(forgePropose.clearance).not.toContain("provider");
+  });
+
+  test("forge module does not declare provider clearance", () => {
+    expect(forgeModule.clearance).not.toContain("provider");
+  });
+
+  test("create template includes example tool comment", async () => {
+    const result = await forgePropose.execute(
+      { action: "create", moduleName: "example-mod", description: "An example" },
+      context,
+    );
+    expect(result.success).toBe(true);
+    expect(result.output).toContain("// TODO: Add your tools here");
+    expect(result.output).toContain("FridayTool");
   });
 
   test("requires action parameter", async () => {
