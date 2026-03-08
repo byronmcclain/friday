@@ -81,11 +81,11 @@ src/
 │   ├── bridges/           # Runtime bridge abstractions for singleton mode
 │   │   ├── socket.ts      # SocketBridge — Unix socket IPC to running server
 │   │   └── types.ts       # RuntimeBridge interface — abstraction for socket access
-│   └── voice/             # Vox — voice output subsystem (TTS via Grok Voice Agent API)
+│   └── voice/             # Vox — voice output subsystem (TTS via Grok REST API)
 │       ├── types.ts        # VoiceMode (off/on/whisper/flat), EmotionMood, EmotionProfile, GrokVoice, VoxConfig
-│       ├── audio.ts        # pcmToWav, detectPlayer, playAudio, cleanupTempFile
-│       ├── prompt.ts       # classifyContent, buildTtsPrompt, FRIDAY_VOICE_IDENTITY
-│       ├── vox.ts          # Vox class — WebSocket lifecycle, modes, speak/cancel, idle eviction
+│       ├── audio.ts        # detectPlayer, playAudio, cleanupTempFile
+│       ├── prompt.ts       # FRIDAY_VOICE_IDENTITY, buildVoiceSystemPrompt, VOICE_DELIVERY_RULES
+│       ├── vox.ts          # Vox class — REST TTS lifecycle, modes, speak/cancel
 │       ├── session-manager.ts # VoiceSessionManager — thin audio I/O + lifecycle (replaces VoiceBridge)
 │       ├── narration.ts    # NarrationPicker, ACK_PHRASES, TOOL_NARRATIONS — Vox notification TTS phrases
 │       ├── channel.ts      # VoiceChannel — notification bridge (NotificationChannel impl)
@@ -184,7 +184,7 @@ tests/
 | **SMARTS** | `src/smarts/` | FTS5-indexed knowledge. Pinned + FTS5-matched injected per message. Staleness pruning on boot via `sessionId`. |
 | **Sensorium** | `src/sensorium/` | Dual-cadence polling (30s/5min). Hysteresis alerts. CPU needs delta between two tick samples. |
 | **Genesis** | `src/core/genesis.ts` | Identity prompt at `~/.friday/GENESIS.md`. Protected path (`chmod 600`). Seed template: `GENESIS_TEMPLATE` in `prompts.ts`. |
-| **Vox** | `src/core/voice/vox.ts` | Fire-and-forget TTS. 60s idle WebSocket eviction. 4 modes: off/on/whisper/flat. Emotional rewrite via fast model. |
+| **Vox** | `src/core/voice/vox.ts` | Fire-and-forget TTS via REST API (`POST /v1/tts`). 4 modes: off/on/whisper/flat. Emotional rewrite via fast model with native speech tags. |
 | **VoiceWorker** | `src/core/workers/voice-worker.ts` | Grok realtime WebSocket agent loop. Implements CortexWorker — reasoning + tool calling + speech natively. |
 | **VoiceSessionManager** | `src/core/voice/session-manager.ts` | Thin audio I/O + lifecycle. Manages Grok WebSocket, VAD, routes transcripts through `cortex.chatStreamVoice()`. |
 | **Recall (Deja Vu)** | `src/core/recall-tool.ts` | `search` (FTS5 summaries) → `recall` (full transcript). Registered in Cortex at boot. |
