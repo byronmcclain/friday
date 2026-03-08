@@ -78,74 +78,60 @@ export const forgeValidate: FridayTool = {
 			});
 		}
 
-		// Step 3: Typecheck (best-effort, non-blocking)
-		try {
-			// Pass compiler flags explicitly — tsc ignores tsconfig.json when
-			// input files are specified on the command line.
-			const proc = Bun.spawn(
-				[
-					"bunx", "tsc", "--noEmit", "--pretty",
-					"--target", "esnext",
-					"--moduleResolution", "bundler",
-					"--module", "preserve",
-					"--allowImportingTsExtensions",
-					"--verbatimModuleSyntax",
-					"--skipLibCheck",
-					"--strict",
-					indexPath,
-				],
-				{
-					cwd: context.workingDirectory,
-					stdout: "pipe",
-					stderr: "pipe",
-				},
-			);
-			// Consume I/O before awaiting exit to prevent pipe buffer deadlock
-			const [, stderrBuf] = await Promise.all([
-				new Response(proc.stdout).arrayBuffer(),
-				new Response(proc.stderr).arrayBuffer(),
-			]);
-			const exitCode = await proc.exited;
-			if (exitCode === 0) {
-				steps.push({ name: "typecheck", passed: true });
-			} else {
-				const stderr = new TextDecoder().decode(stderrBuf);
-				steps.push({
-					name: "typecheck",
-					passed: false,
-					error: stderr.slice(0, 500),
-				});
-			}
-		} catch (err: unknown) {
-			steps.push({ name: "typecheck", passed: false, error: "bunx not found — check skipped" });
-		}
+		// Steps 3 & 4: Typecheck + Lint (independent — run concurrently)
+		const decoder = new TextDecoder();
 
-		// Step 4: Lint (best-effort, non-blocking)
-		try {
-			const proc = Bun.spawn(["bunx", "biome", "check", moduleDir], {
-				cwd: context.workingDirectory,
-				stdout: "pipe",
-				stderr: "pipe",
-			});
-			// Consume I/O before awaiting exit to prevent pipe buffer deadlock
-			const [stdoutBuf] = await Promise.all([
-				new Response(proc.stdout).arrayBuffer(),
-				new Response(proc.stderr).arrayBuffer(),
-			]);
-			const exitCode = await proc.exited;
-			if (exitCode === 0) {
-				steps.push({ name: "lint", passed: true });
-			} else {
-				const stdout = new TextDecoder().decode(stdoutBuf);
-				steps.push({
-					name: "lint",
-					passed: false,
-					error: stdout.slice(0, 500),
-				});
+		const typecheckP = (async (): Promise<ForgeValidationStep> => {
+			try {
+				// Pass compiler flags explicitly — tsc ignores tsconfig.json when
+				// input files are specified on the command line.
+				const proc = Bun.spawn(
+					[
+						"bunx", "tsc", "--noEmit", "--pretty",
+						"--target", "esnext",
+						"--moduleResolution", "bundler",
+						"--module", "preserve",
+						"--allowImportingTsExtensions",
+						"--verbatimModuleSyntax",
+						"--skipLibCheck",
+						"--strict",
+						indexPath,
+					],
+					{ cwd: context.workingDirectory, stdout: "pipe", stderr: "pipe" },
+				);
+				const [, stderrBuf] = await Promise.all([
+					new Response(proc.stdout).arrayBuffer(),
+					new Response(proc.stderr).arrayBuffer(),
+				]);
+				const exitCode = await proc.exited;
+				if (exitCode === 0) return { name: "typecheck", passed: true };
+				const stderr = decoder.decode(stderrBuf);
+				return { name: "typecheck", passed: false, error: stderr.slice(0, 500) };
+			} catch {
+				return { name: "typecheck", passed: false, error: "bunx not found — check skipped" };
 			}
-		} catch (err: unknown) {
-			steps.push({ name: "lint", passed: false, error: "bunx not found — check skipped" });
-		}
+		})();
+
+		const lintP = (async (): Promise<ForgeValidationStep> => {
+			try {
+				const proc = Bun.spawn(["bunx", "biome", "check", moduleDir], {
+					cwd: context.workingDirectory, stdout: "pipe", stderr: "pipe",
+				});
+				const [stdoutBuf] = await Promise.all([
+					new Response(proc.stdout).arrayBuffer(),
+					new Response(proc.stderr).arrayBuffer(),
+				]);
+				const exitCode = await proc.exited;
+				if (exitCode === 0) return { name: "lint", passed: true };
+				const stdout = decoder.decode(stdoutBuf);
+				return { name: "lint", passed: false, error: stdout.slice(0, 500) };
+			} catch {
+				return { name: "lint", passed: false, error: "bunx not found — check skipped" };
+			}
+		})();
+
+		const [typecheckStep, lintStep] = await Promise.all([typecheckP, lintP]);
+		steps.push(typecheckStep, lintStep);
 
 		const allPassed = steps.every((s) => s.passed);
 		const result: ForgeValidationResult = {
