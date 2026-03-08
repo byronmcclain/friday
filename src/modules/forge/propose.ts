@@ -107,6 +107,8 @@ export const forgePropose: FridayTool = {
 			};
 		}
 
+		// files is hidden from the LLM schema but still accepted for programmatic
+		// callers (tests, /forge protocol) that pass file content directly.
 		let files: ForgeFile[];
 		if (args.files) {
 			if (!Array.isArray(args.files)) {

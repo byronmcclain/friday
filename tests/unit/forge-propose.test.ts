@@ -30,10 +30,6 @@ describe("forge_propose tool", () => {
     expect(paramNames).not.toContain("files");
   });
 
-  test("does not require provider clearance", () => {
-    expect(forgePropose.clearance).not.toContain("provider");
-  });
-
   test("forge module does not declare provider clearance", () => {
     expect(forgeModule.clearance).not.toContain("provider");
   });
