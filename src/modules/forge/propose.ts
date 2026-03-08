@@ -9,8 +9,7 @@ function generateModuleTemplate(
 	return [
 		{
 			path: "index.ts",
-			content: `import type { FridayModule } from "../../src/modules/types.ts";
-import type { FridayTool } from "../types.ts";
+			content: `import type { FridayModule, FridayTool, ToolContext, ToolResult } from "../../src/modules/types.ts";
 
 // TODO: Add your tools here
 // Example tool structure:
@@ -22,7 +21,7 @@ import type { FridayTool } from "../types.ts";
 //     { name: "input", type: "string", description: "The input", required: true },
 //   ],
 //   clearance: [],
-//   async execute(args, context) {
+//   async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 //     const input = args.input as string;
 //     return { success: true, output: \`Processed: \${input}\` };
 //   },

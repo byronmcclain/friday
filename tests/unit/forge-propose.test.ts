@@ -42,6 +42,8 @@ describe("forge_propose tool", () => {
     expect(result.success).toBe(true);
     expect(result.output).toContain("// TODO: Add your tools here");
     expect(result.output).toContain("FridayTool");
+    expect(result.output).toContain("ToolContext");
+    expect(result.output).toContain("ToolResult");
   });
 
   test("requires action parameter", async () => {
