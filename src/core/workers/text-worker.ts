@@ -43,6 +43,7 @@ export class TextWorker implements CortexWorker {
 			...(hasTools ? { tools: aiTools } : {}),
 			...(hasTools ? { stopWhen: stepCountIs(request.maxToolIterations) } : {}),
 			maxOutputTokens: request.maxOutputTokens,
+			...(request.stepTimeoutMs ? { timeout: { stepMs: request.stepTimeoutMs } } : {}),
 		});
 
 		const fullText = result.text;

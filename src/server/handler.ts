@@ -73,9 +73,10 @@ export class WebSocketHandler {
 		if (this.runtime.notifications) {
 			this.runtime.notifications.removeChannel(this.channelName);
 		}
-		// Unsubscribe tool signal handler
+		// Unsubscribe tool signal handlers
 		if (this.toolSignalHandler && this.runtime.signals) {
 			this.runtime.signals.off("tool:executing", this.toolSignalHandler);
+			this.runtime.signals.off("tool:completed", this.toolSignalHandler);
 			this.toolSignalHandler = null;
 		}
 		// Stop voice session to close Grok WebSocket on browser disconnect
@@ -148,7 +149,7 @@ export class WebSocketHandler {
 			this.runtime.notifications.addChannel(channel);
 		}
 
-		// Forward tool:executing signals to this client for TUI thinking indicator
+		// Forward tool signals to this client for TUI thinking indicator
 		if (this.runtime.signals) {
 			this.toolSignalHandler = (signal) => {
 				send({
@@ -159,6 +160,7 @@ export class WebSocketHandler {
 				});
 			};
 			this.runtime.signals.on("tool:executing", this.toolSignalHandler);
+			this.runtime.signals.on("tool:completed", this.toolSignalHandler);
 		}
 
 		send({

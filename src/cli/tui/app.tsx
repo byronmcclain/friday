@@ -134,10 +134,14 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 					pushLog(level, entry.source, entry.action, entry.detail);
 				};
 
-				// Wire tool-executing signals from the server into the TUI state
+				// Wire tool signals from the server into the TUI state
 				socketBridge.onToolExecuting = (name, args) => {
 					if (cancelled) return;
 					dispatch({ type: "tool:executing", name, args });
+				};
+				socketBridge.onToolCompleted = () => {
+					if (cancelled) return;
+					dispatch({ type: "tool:completed" });
 				};
 
 				if (cancelled) return;

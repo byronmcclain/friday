@@ -137,6 +137,7 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
 					list: async () => [],
 				},
 			});
+			config.signals?.emit("tool:completed", name, {});
 			return result.output;
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : String(err);
@@ -146,6 +147,7 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
 				detail: msg,
 				success: false,
 			});
+			config.signals?.emit("tool:completed", name, {});
 			return `Tool execution error: ${msg}`;
 		}
 	};

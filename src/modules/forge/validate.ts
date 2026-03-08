@@ -80,8 +80,20 @@ export const forgeValidate: FridayTool = {
 
 		// Step 3: Typecheck (best-effort, non-blocking)
 		try {
+			// Pass compiler flags explicitly — tsc ignores tsconfig.json when
+			// input files are specified on the command line.
 			const proc = Bun.spawn(
-				["bunx", "tsc", "--noEmit", "--pretty", indexPath],
+				[
+					"bunx", "tsc", "--noEmit", "--pretty",
+					"--target", "esnext",
+					"--moduleResolution", "bundler",
+					"--module", "preserve",
+					"--allowImportingTsExtensions",
+					"--verbatimModuleSyntax",
+					"--skipLibCheck",
+					"--strict",
+					indexPath,
+				],
 				{
 					cwd: context.workingDirectory,
 					stdout: "pipe",
@@ -165,7 +177,7 @@ export const forgeValidate: FridayTool = {
 
 		return {
 			success: allPassed,
-			output: `Validation ${allPassed ? "passed" : "FAILED"} for "${moduleName}":\n${report}${allPassed ? "\n\nReady for forge_restart." : "\n\nFix the errors and try again with forge_propose."}`,
+			output: `Validation ${allPassed ? "passed" : "FAILED"} for "${moduleName}":\n${report}${allPassed ? "\n\nReady for forge_restart." : "\n\nUse fs.read to inspect the failing files, fs.write to fix them, then forge_validate again."}`,
 			artifacts: { ...result },
 		};
 	},

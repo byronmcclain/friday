@@ -19,6 +19,8 @@ export interface WorkerRequest {
 	executeTool: (name: string, args: Record<string, unknown>) => Promise<string>;
 	maxToolIterations: number;
 	maxOutputTokens: number;
+	/** Per-step timeout in ms — aborts if a single LLM inference round exceeds this */
+	stepTimeoutMs?: number;
 }
 
 /** What a Worker returns */

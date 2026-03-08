@@ -11,6 +11,7 @@ export type SignalName =
   | "session:end"
   | "error:unhandled"
   | "tool:executing"
+  | "tool:completed"
   | `custom:${string}`;
 
 export interface Signal {

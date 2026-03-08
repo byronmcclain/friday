@@ -31,6 +31,8 @@ export interface CortexConfig extends Partial<FridayConfig> {
 	vox?: Vox;
 	debug?: boolean;
 	projectRoot?: string;
+	/** Per-step inference timeout in ms (default: 120000 = 2 min) */
+	inferenceTimeout?: number;
 }
 
 export class Cortex {
@@ -55,6 +57,7 @@ export class Cortex {
 	private debugPayloadPath?: string;
 	private debugResponsePath?: string;
 	private readonly textWorker: TextWorker;
+	private readonly inferenceTimeout: number;
 	private _cachedDefs: ReturnType<typeof buildToolDefinitions> | null = null;
 	private _cachedExecutor: ReturnType<typeof createToolExecutor> | null = null;
 
@@ -80,6 +83,7 @@ export class Cortex {
 			this.debugResponsePath = `${config.projectRoot}/last-inference-response.log`;
 		}
 		this.textWorker = new TextWorker(this.aiModel);
+		this.inferenceTimeout = config.inferenceTimeout ?? 120_000;
 	}
 
 	get modelName(): string {
@@ -151,6 +155,7 @@ export class Cortex {
 			executeTool: executor,
 			maxToolIterations: this.maxToolIterations,
 			maxOutputTokens: this.maxTokens,
+			stepTimeoutMs: this.inferenceTimeout,
 		});
 
 		const fullTextPromise = workerResult.fullText.then(async (text: string) => {

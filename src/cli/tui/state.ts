@@ -33,7 +33,8 @@ export type AppAction =
 	| { type: "set-welcome"; info: WelcomeInfo }
 	| { type: "clear-messages" }
 	| { type: "toggle-log-panel" }
-	| { type: "tool:executing"; name: string; args: Record<string, unknown> };
+	| { type: "tool:executing"; name: string; args: Record<string, unknown> }
+	| { type: "tool:completed" };
 
 export const initialState: AppState = {
 	phase: "splash",
@@ -81,6 +82,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 			return { ...state, logPanelVisible: !state.logPanelVisible };
 		case "tool:executing":
 			return { ...state, currentTool: { name: action.name, args: action.args } };
+		case "tool:completed":
+			return { ...state, currentTool: null };
 	}
 }
 

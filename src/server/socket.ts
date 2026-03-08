@@ -48,7 +48,7 @@ export class FridaySocketServer {
       });
     };
 
-    // Forward tool:executing signals to connected clients for TUI thinking indicator
+    // Forward tool signals to connected clients for TUI thinking indicator
     if (this.runtime.signals) {
       this.toolSignalHandler = (signal) => {
         if (this.hub.clientCount === 0) return;
@@ -60,6 +60,7 @@ export class FridaySocketServer {
         });
       };
       this.runtime.signals.on("tool:executing", this.toolSignalHandler);
+      this.runtime.signals.on("tool:completed", this.toolSignalHandler);
     }
 
     this.server = Bun.listen({
@@ -104,6 +105,7 @@ export class FridaySocketServer {
     this.runtime.audit.onLog = undefined;
     if (this.toolSignalHandler && this.runtime.signals) {
       this.runtime.signals.off("tool:executing", this.toolSignalHandler);
+      this.runtime.signals.off("tool:completed", this.toolSignalHandler);
       this.toolSignalHandler = null;
     }
     if (this.server) {

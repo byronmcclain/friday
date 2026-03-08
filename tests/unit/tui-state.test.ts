@@ -252,6 +252,17 @@ describe("currentTool", () => {
 		expect(state.currentTool).toBeNull();
 	});
 
+	test("tool:completed clears currentTool", () => {
+		let state = appReducer(initialState, {
+			type: "tool:executing",
+			name: "forge_validate",
+			args: { moduleName: "weather" },
+		});
+		expect(state.currentTool).not.toBeNull();
+		state = appReducer(state, { type: "tool:completed" });
+		expect(state.currentTool).toBeNull();
+	});
+
 	test("tool:executing does not affect other state fields", () => {
 		const msg = createMessage("user", "Hello");
 		let state = appReducer(initialState, { type: "add-message", message: msg });

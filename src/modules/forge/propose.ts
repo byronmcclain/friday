@@ -9,7 +9,8 @@ function generateModuleTemplate(
 	return [
 		{
 			path: "index.ts",
-			content: `import type { FridayModule, FridayTool } from "../../src/modules/types.ts";
+			content: `import type { FridayModule } from "../../src/modules/types.ts";
+// import type { FridayTool } from "../../src/modules/types.ts";
 
 // TODO: Add your tools here
 // Example tool structure:

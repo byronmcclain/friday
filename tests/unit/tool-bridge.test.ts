@@ -122,6 +122,38 @@ describe("createToolExecutor", () => {
 		expect(emitted[0]!.data?.args).toEqual({ input: "hello" });
 	});
 
+	test("emits tool:completed signal after tool execution", async () => {
+		const signals = new SignalBus();
+		const emitted: Array<{ name: string; source: string }> = [];
+		signals.on("tool:completed", (signal) => {
+			emitted.push({ name: signal.name, source: signal.source });
+		});
+
+		const tool = mockTool();
+		const tools = new Map([["test-tool", tool]]);
+		const executor = createToolExecutor({ tools, signals });
+		await executor("test-tool", { input: "hello" });
+
+		expect(emitted).toHaveLength(1);
+		expect(emitted[0]!.source).toBe("test-tool");
+	});
+
+	test("emits tool:completed signal even on tool error", async () => {
+		const signals = new SignalBus();
+		const emitted: string[] = [];
+		signals.on("tool:completed", (signal) => { emitted.push(signal.source); });
+
+		const tool = mockTool({
+			execute: async () => { throw new Error("boom"); },
+		});
+		const tools = new Map([["fail-tool", tool]]);
+		const executor = createToolExecutor({ tools, signals });
+		await executor("fail-tool", {});
+
+		expect(emitted).toHaveLength(1);
+		expect(emitted[0]).toBe("fail-tool");
+	});
+
 	test("logs audit entries on tool call", async () => {
 		const audit = new AuditLogger();
 		const entries: Array<{ action: string; source: string }> = [];
