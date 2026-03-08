@@ -49,7 +49,6 @@ describe("Vox", () => {
 				emitted.push(sig.data as any);
 			});
 			vox.setMode("on");
-			// Signal emission is async, give it a tick
 			await new Promise((r) => setTimeout(r, 10));
 			expect(emitted).toHaveLength(1);
 			expect(emitted[0]).toEqual({ from: "off", to: "on" });
@@ -58,15 +57,20 @@ describe("Vox", () => {
 
 	describe("speak", () => {
 		test("speak is a no-op when mode is off", async () => {
-			// Should resolve without error and without connecting
 			await vox.speak("Hello Boss");
-			expect(vox.isConnected).toBe(false);
+			// Should resolve without error — no fetch called
 		});
 
 		test("speak resolves even without XAI_API_KEY (graceful degradation)", async () => {
 			vox.setMode("on");
-			// speak() should never reject — errors are swallowed
 			await expect(vox.speak("Hello")).resolves.toBeUndefined();
+		});
+
+		test("speak skips empty text", async () => {
+			vox.setMode("on");
+			await vox.speak("");
+			await vox.speak("   ");
+			// Should resolve without error
 		});
 	});
 
@@ -77,23 +81,15 @@ describe("Vox", () => {
 	});
 
 	describe("stop", () => {
-		test("stop sets mode to off and disconnects", () => {
+		test("stop sets mode to off", () => {
 			vox.setMode("on");
 			vox.stop();
 			expect(vox.mode).toBe("off");
-			expect(vox.isConnected).toBe(false);
-		});
-	});
-
-	describe("connection state", () => {
-		test("isConnected is false initially", () => {
-			expect(vox.isConnected).toBe(false);
 		});
 	});
 
 	describe("apiKeyAvailable", () => {
 		test("reports whether XAI_API_KEY is set", () => {
-			// This depends on the environment — just verify it returns boolean
 			expect(typeof vox.apiKeyAvailable).toBe("boolean");
 		});
 	});
@@ -102,14 +98,19 @@ describe("Vox", () => {
 		test("returns current state summary", () => {
 			const status = vox.status();
 			expect(status.mode).toBe("off");
-			expect(status.connected).toBe(false);
 			expect(status.voice).toBe("Eve");
+			expect(typeof status.apiKeyAvailable).toBe("boolean");
 		});
 
 		test("reflects mode changes", () => {
 			vox.setMode("whisper");
 			const status = vox.status();
 			expect(status.mode).toBe("whisper");
+		});
+
+		test("status has no connected field", () => {
+			const status = vox.status();
+			expect((status as any).connected).toBeUndefined();
 		});
 	});
 
@@ -144,7 +145,6 @@ describe("Vox", () => {
 				audit,
 			});
 			gatedVox.setMode("on");
-			// speak will proceed past clearance but fail on API key — that's fine
 			await gatedVox.speak("Should pass clearance");
 			const entries = audit.entries({ action: "vox:blocked" });
 			expect(entries.length).toBe(0);

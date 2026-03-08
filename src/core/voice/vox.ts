@@ -1,23 +1,14 @@
 import type { SignalBus } from "../events.ts";
 import type { ClearanceManager } from "../clearance.ts";
 import type { AuditLogger } from "../../audit/logger.ts";
-import { type VoiceMode, type GrokVoice, type VoxConfig, type VoxOptions, type EmotionProfile } from "./types.ts";
-import { openGrokWebSocket } from "./ws.ts";
-import { buildTtsPrompt } from "./prompt.ts";
-import { pcmToWav, playAudio, cleanupTempFile, detectPlayer } from "./audio.ts";
+import { type VoiceMode, type GrokVoice, type VoxConfig, type VoxOptions } from "./types.ts";
+import { VOX_TTS_URL } from "./types.ts";
+import { playAudio, cleanupTempFile, detectPlayer } from "./audio.ts";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { emotionalRewrite } from "./emotion.ts";
 
-// FUTURE: Full duplex voice conversation
-// This WebSocket connection currently operates in TTS-only mode (text → speech).
-// The Grok Voice Agent API supports bidirectional audio (server_vad turn detection,
-// audio input streaming). When the web UI adds conversational voice, extend this
-// connection to handle audio input + output, enabling real-time voice dialogue.
-// The persistent connection with idle eviction pattern is designed with this in mind.
-
 interface VoxStatus {
 	mode: VoiceMode;
-	connected: boolean;
 	voice: GrokVoice;
 	apiKeyAvailable: boolean;
 	emotionEngine: boolean;
@@ -29,16 +20,10 @@ export class Vox {
 	private _signals: SignalBus;
 	private _clearance?: ClearanceManager;
 	private _audit?: AuditLogger;
-	private _ws: WebSocket | null = null;
-	private _connected = false;
-	private _idleTimer: ReturnType<typeof setTimeout> | null = null;
-	private _speakTimeout: ReturnType<typeof setTimeout> | null = null;
 	private _activeProc: { kill(): void } | null = null;
 	private _activeTmpFile: string | null = null;
 	private _speaking = false;
-	private _audioChunks: Buffer[] = [];
-	private _speakResolve: (() => void) | null = null;
-	private _playerAvailable: boolean | null = null; // null = unchecked
+	private _playerAvailable: boolean | null = null;
 	private _fastModel?: LanguageModelV3;
 	private _getRecentHistory?: () => string[];
 
@@ -51,10 +36,6 @@ export class Vox {
 
 	get mode(): VoiceMode {
 		return this._mode;
-	}
-
-	get isConnected(): boolean {
-		return this._connected;
 	}
 
 	get apiKeyAvailable(): boolean {
@@ -86,7 +67,6 @@ export class Vox {
 	status(): VoxStatus {
 		return {
 			mode: this._mode,
-			connected: this._connected,
 			voice: this._config.defaultVoice,
 			apiKeyAvailable: this.apiKeyAvailable,
 			emotionEngine: this.hasEmotionEngine,
@@ -94,8 +74,7 @@ export class Vox {
 	}
 
 	/**
-	 * Speak text aloud. Fire-and-forget — never rejects.
-	 * Cancels any in-progress playback before starting.
+	 * Speak text aloud via the Grok TTS REST API. Fire-and-forget — never rejects.
 	 */
 	async speak(text: string): Promise<void> {
 		if (this._mode === "off") return;
@@ -127,12 +106,10 @@ export class Vox {
 		}
 		if (!this._playerAvailable) return;
 
-		// Soft cancel: kill current playback, keep WebSocket
+		// Cancel any in-progress playback
 		this.cancelPlayback();
-		this.resetIdleTimer();
 
 		let spokenText = text;
-		let emotionProfile: EmotionProfile | undefined;
 		const activeMode = this._mode as Exclude<VoiceMode, "off">;
 
 		// Emotional rewrite for on/whisper modes when engine is available
@@ -150,72 +127,65 @@ export class Vox {
 					this._fastModel,
 				);
 				spokenText = result.text;
-				emotionProfile = result.emotion;
-				this.logAudit("vox:rewrite", `Emotional rewrite applied (mood: ${emotionProfile?.mood ?? "neutral"}, intensity: ${emotionProfile?.intensity ?? "n/a"})`, true);
+				this.logAudit("vox:rewrite", `Emotional rewrite applied (mood: ${result.emotion?.mood ?? "neutral"})`, true);
 			} catch {
-				// Fallback: use original text, no emotion
+				// Fallback: use original text
 			}
 		}
 
-		const prompt = buildTtsPrompt(spokenText, activeMode, emotionProfile);
-
 		try {
-			if (!this._ws || !this._connected) {
-				await this.connect();
-			}
-
-			this._audioChunks = [];
 			this._speaking = true;
 
-			// Update instructions for this utterance (dynamic prompt per speak)
-			this._ws!.send(
-				JSON.stringify({
-					type: "session.update",
-					session: { instructions: prompt },
+			// Call the Grok TTS REST API
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), this._config.timeoutMs);
+
+			const response = await fetch(VOX_TTS_URL, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${process.env.XAI_API_KEY}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					text: spokenText,
+					voice_id: this._config.defaultVoice.toLowerCase(),
+					output_format: { codec: "wav", sample_rate: 24000 },
 				}),
-			);
+				signal: controller.signal,
+			});
 
-			// Send the text to speak
-			this._ws!.send(
-				JSON.stringify({
-					type: "conversation.item.create",
-					item: {
-						type: "message",
-						role: "user",
-						content: [{ type: "input_text", text: spokenText }],
-					},
-				}),
-			);
+			clearTimeout(timeoutId);
 
-			// Request audio response
-			this._ws!.send(
-				JSON.stringify({
-					type: "response.create",
-					response: { modalities: ["audio"] },
-				}),
-			);
+			if (!response.ok) {
+				const errText = await response.text().catch(() => "unknown error");
+				throw new Error(`TTS API error ${response.status}: ${errText}`);
+			}
 
-			// Wait for response.done or timeout
-			await new Promise<void>((resolve) => {
-				this._speakResolve = () => {
-					if (this._speakTimeout) {
-						clearTimeout(this._speakTimeout);
-						this._speakTimeout = null;
-					}
-					resolve();
-				};
+			const audioBuffer = Buffer.from(await response.arrayBuffer());
+			this.logAudit("vox:tts-complete", `TTS audio received (${audioBuffer.length} bytes)`, true);
 
-				// Per-utterance timeout
-				this._speakTimeout = setTimeout(() => {
-					this._speakTimeout = null;
-					if (this._speaking) {
-						this._speaking = false;
-						this._speakResolve = null;
-						resolve();
-					}
-				}, this._config.timeoutMs);
+			if (!this._speaking) return; // cancelled while waiting for API
+
+			// Play audio
+			const { proc, tmpFile } = await playAudio(audioBuffer, 1.0);
+			this._activeProc = proc;
+			this._activeTmpFile = tmpFile;
+
+			await proc.exited;
+
+			this._activeProc = null;
+			if (this._activeTmpFile) {
+				void cleanupTempFile(this._activeTmpFile);
+				this._activeTmpFile = null;
+			}
+			this._speaking = false;
+
+			this.logAudit("vox:playback", `Audio playback complete (${audioBuffer.length} bytes)`, true);
+			void this._signals.emit("custom:vox-spoke", "vox", {
+				length: audioBuffer.length,
 			});
 		} catch (err) {
+			this._speaking = false;
 			const msg = err instanceof Error ? err.message : String(err);
 			this.logAudit("vox:error", `Speak failed: ${msg}`, false);
 			void this._signals.emit("custom:vox-error", "vox", { error: msg });
@@ -223,32 +193,22 @@ export class Vox {
 	}
 
 	/**
-	 * Cancel in-progress playback (soft cancel). WebSocket stays open.
+	 * Cancel in-progress playback.
 	 */
 	cancel(): void {
 		this.cancelPlayback();
 	}
 
 	/**
-	 * Full shutdown: cancel playback + close WebSocket + clear timers.
+	 * Full shutdown: cancel playback + set mode off.
 	 */
 	stop(): void {
 		this._mode = "off";
 		this.cancelPlayback();
-		this.disconnect();
 	}
 
 	private cancelPlayback(): void {
 		this._speaking = false;
-		this._audioChunks = [];
-		if (this._speakTimeout) {
-			clearTimeout(this._speakTimeout);
-			this._speakTimeout = null;
-		}
-		if (this._speakResolve) {
-			this._speakResolve();
-			this._speakResolve = null;
-		}
 		if (this._activeProc) {
 			try {
 				this._activeProc.kill();
@@ -263,159 +223,7 @@ export class Vox {
 		}
 	}
 
-	private async connect(): Promise<void> {
-		const apiKey = process.env.XAI_API_KEY;
-		if (!apiKey) throw new Error("XAI_API_KEY not set");
-
-		const ws = await openGrokWebSocket(apiKey);
-		this._ws = ws;
-		this._connected = true;
-		this.logAudit("vox:ws-connect", `WebSocket connected (voice: ${this._config.defaultVoice})`, true);
-
-		// Initial session config
-		ws.send(
-			JSON.stringify({
-				type: "session.update",
-				session: {
-					voice: this._config.defaultVoice,
-					turn_detection: { type: null },
-					audio: {
-						output: {
-							format: { type: "audio/pcm", rate: this._config.sampleRate },
-						},
-					},
-				},
-			}),
-		);
-
-		ws.addEventListener("message", (event) => {
-			if (typeof event.data === "string") {
-				this.handleMessage(event.data);
-			}
-		});
-
-		ws.addEventListener("error", () => {
-			this._connected = false;
-			this._ws = null;
-		});
-
-		ws.addEventListener("close", () => {
-			this._connected = false;
-			this._ws = null;
-			this.logAudit("vox:ws-disconnect", "WebSocket disconnected", true);
-			if (this._speaking && this._speakResolve) {
-				this._speakResolve();
-				this._speakResolve = null;
-				this._speaking = false;
-			}
-		});
-	}
-
-	private handleMessage(raw: string): void {
-		let data: { type: string; delta?: string; error?: { message?: string } };
-		try {
-			data = JSON.parse(raw);
-		} catch {
-			return;
-		}
-
-		switch (data.type) {
-			case "response.output_audio.delta": {
-				if (this._speaking && data.delta) {
-					this._audioChunks.push(Buffer.from(data.delta, "base64"));
-				}
-				break;
-			}
-
-			case "response.done": {
-				if (!this._speaking) break;
-				this._speaking = false;
-				const chunks = this._audioChunks;
-				this._audioChunks = [];
-				this.logAudit("vox:tts-complete", `TTS audio received (${chunks.length} chunks)`, true);
-				const resolve = this._speakResolve;
-				this._speakResolve = null;
-
-				// Play audio async — assign kill handle synchronously so cancel() works immediately
-				if (chunks.length > 0) {
-					const pcm = Buffer.concat(chunks);
-					const wav = pcmToWav(pcm, this._config.sampleRate);
-					const volume = this._mode === "whisper" ? this._config.whisperVolume : 1.0;
-
-					// Proxy kill handle set before async playAudio resolves
-					let realProc: { kill(): void } | null = null;
-					const killHandle: { kill(): void } = {
-						kill: () => { realProc?.kill(); },
-					};
-					this._activeProc = killHandle;
-
-					void playAudio(wav, volume)
-						.then(({ proc, tmpFile }) => {
-							realProc = proc;
-							this._activeProc = proc;
-							this._activeTmpFile = tmpFile;
-							return proc.exited;
-						})
-						.then(() => {
-							this._activeProc = null;
-							if (this._activeTmpFile) {
-								void cleanupTempFile(this._activeTmpFile);
-								this._activeTmpFile = null;
-							}
-							this.logAudit("vox:playback", `Audio playback complete (${chunks.length} chunks)`, true);
-							void this._signals.emit("custom:vox-spoke", "vox", {
-								length: chunks.length,
-							});
-						})
-						.catch((err) => {
-							this._activeProc = null;
-							const msg = err instanceof Error ? err.message : String(err);
-							this.logAudit("vox:error", `Playback failed: ${msg}`, false);
-							void this._signals.emit("custom:vox-error", "vox", { error: msg });
-						});
-				}
-
-				resolve?.();
-				break;
-			}
-
-			case "error": {
-				const msg = data.error?.message ?? "Grok voice error";
-				this.logAudit("vox:error", `TTS API error: ${msg}`, false);
-				void this._signals.emit("custom:vox-error", "vox", { error: msg });
-				if (this._speaking) {
-					this._speaking = false;
-					this._audioChunks = [];
-					this._speakResolve?.();
-					this._speakResolve = null;
-				}
-				break;
-			}
-		}
-	}
-
-	private disconnect(): void {
-		if (this._idleTimer) {
-			clearTimeout(this._idleTimer);
-			this._idleTimer = null;
-		}
-		if (this._ws) {
-			try {
-				this._ws.close();
-			} catch {
-				// ignore close errors
-			}
-			this._ws = null;
-			this._connected = false;
-		}
-	}
-
 	private logAudit(action: string, detail: string, success: boolean): void {
 		this._audit?.log({ action, source: "vox", detail, success });
-	}
-
-	private resetIdleTimer(): void {
-		if (this._idleTimer) clearTimeout(this._idleTimer);
-		this._idleTimer = setTimeout(() => this.disconnect(), this._config.idleTimeoutMs);
 	}
 }
