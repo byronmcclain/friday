@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { VOX_DEFAULTS } from "../../src/core/voice/types.ts";
+import { VOX_DEFAULTS, VOX_TTS_URL, GROK_REALTIME_URL } from "../../src/core/voice/types.ts";
 import type {
 	VoiceMode,
 	GrokVoice,
@@ -13,10 +13,19 @@ import type {
 describe("Vox types", () => {
 	test("VOX_DEFAULTS has correct shape", () => {
 		expect(VOX_DEFAULTS.defaultVoice).toBe("Eve");
-		expect(VOX_DEFAULTS.sampleRate).toBe(48000);
-		expect(VOX_DEFAULTS.whisperVolume).toBe(0.3);
 		expect(VOX_DEFAULTS.timeoutMs).toBe(30000);
-		expect(VOX_DEFAULTS.idleTimeoutMs).toBe(60000);
+		// These fields should no longer exist
+		expect((VOX_DEFAULTS as any).sampleRate).toBeUndefined();
+		expect((VOX_DEFAULTS as any).whisperVolume).toBeUndefined();
+		expect((VOX_DEFAULTS as any).idleTimeoutMs).toBeUndefined();
+	});
+
+	test("VOX_TTS_URL points to REST TTS endpoint", () => {
+		expect(VOX_TTS_URL).toBe("https://api.x.ai/v1/tts");
+	});
+
+	test("GROK_REALTIME_URL points to realtime WebSocket endpoint", () => {
+		expect(GROK_REALTIME_URL).toBe("wss://api.x.ai/v1/realtime");
 	});
 
 	test("VoiceMode type accepts valid modes", () => {
@@ -39,10 +48,10 @@ describe("emotion types", () => {
 
 	test("EmotionalRewriteResult satisfies the type contract", () => {
 		const result: EmotionalRewriteResult = {
-			text: "[laugh] Grand stuff, boss.",
+			text: "[chuckle] Grand stuff, boss.",
 			emotion: { mood: "amused", intensity: "subtle" },
 		};
-		expect(result.text).toContain("[laugh]");
+		expect(result.text).toContain("[chuckle]");
 		expect(result.emotion.mood).toBe("amused");
 	});
 });

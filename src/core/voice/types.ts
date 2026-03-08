@@ -37,10 +37,7 @@ export function isGrokVoice(v: string): v is GrokVoice {
 
 export interface VoxConfig {
 	defaultVoice: GrokVoice;
-	sampleRate: number;
-	whisperVolume: number;
 	timeoutMs: number;
-	idleTimeoutMs: number;
 }
 
 export interface VoxOptions {
@@ -51,12 +48,11 @@ export interface VoxOptions {
 	audit?: AuditLogger;
 }
 
-export const VOX_WS_URL = "wss://api.x.ai/v1/realtime";
+export const GROK_REALTIME_URL = "wss://api.x.ai/v1/realtime";
+
+export const VOX_TTS_URL = "https://api.x.ai/v1/tts";
 
 export const VOX_DEFAULTS: VoxConfig = {
 	defaultVoice: "Eve",
-	sampleRate: 48000,
-	whisperVolume: 0.3,
 	timeoutMs: 30000,
-	idleTimeoutMs: 60000,
 };

@@ -1,4 +1,4 @@
-import { VOX_WS_URL } from "./types.ts";
+import { GROK_REALTIME_URL } from "./types.ts";
 
 /**
  * Open an authenticated WebSocket to the Grok realtime API.
@@ -9,7 +9,7 @@ export function openGrokWebSocket(
 	timeoutMs = 10_000,
 ): Promise<WebSocket> {
 	return new Promise<WebSocket>((resolve, reject) => {
-		const ws = new WebSocket(VOX_WS_URL, {
+		const ws = new WebSocket(GROK_REALTIME_URL, {
 			headers: {
 				Authorization: `Bearer ${apiKey}`,
 				"Content-Type": "application/json",
