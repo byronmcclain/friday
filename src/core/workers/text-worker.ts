@@ -36,6 +36,20 @@ export class TextWorker implements CortexWorker {
 
 		const hasTools = Object.keys(aiTools).length > 0;
 
+		// Three-layer timeout defense:
+		// 1. stepMs — AI SDK per-step abort (may not fire reliably with reasoning models)
+		// 2. chunkMs — abort if no text chunk received for 60s (catches silent hangs)
+		// 3. Manual AbortController — hard 5-minute total kill switch
+		const stepMs = request.stepTimeoutMs;
+		const hardAbort = stepMs !== undefined ? new AbortController() : undefined;
+		let hardTimeoutId: ReturnType<typeof setTimeout> | undefined;
+		if (hardAbort && stepMs !== undefined) {
+			hardTimeoutId = setTimeout(
+				() => hardAbort.abort(new Error(`Inference hard timeout (${stepMs * 3}ms total)`)),
+				stepMs * 3,
+			);
+		}
+
 		const result = streamText({
 			model: this.model,
 			system: request.systemPrompt,
@@ -43,7 +57,8 @@ export class TextWorker implements CortexWorker {
 			...(hasTools ? { tools: aiTools } : {}),
 			...(hasTools ? { stopWhen: stepCountIs(request.maxToolIterations) } : {}),
 			maxOutputTokens: request.maxOutputTokens,
-			...(request.stepTimeoutMs !== undefined ? { timeout: { stepMs: request.stepTimeoutMs } } : {}),
+			...(stepMs !== undefined ? { timeout: { stepMs, chunkMs: 60_000 } } : {}),
+			...(hardAbort ? { abortSignal: hardAbort.signal } : {}),
 		});
 
 		const fullText = result.text;
@@ -53,6 +68,12 @@ export class TextWorker implements CortexWorker {
 				outputTokens: u?.outputTokens,
 			}),
 		).catch(() => ({ inputTokens: undefined, outputTokens: undefined }));
+
+		// Clear hard timeout when stream finishes (success or error)
+		if (hardTimeoutId !== undefined) {
+			const clearHard = () => clearTimeout(hardTimeoutId);
+			fullText.then(clearHard, clearHard);
+		}
 
 		return {
 			textStream: result.textStream,
