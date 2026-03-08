@@ -6,7 +6,7 @@ import type { EmotionMood } from "../../src/core/voice/types.ts";
 describe("emotionalRewrite", () => {
 	test("returns rewritten text and emotion profile from fast model", async () => {
 		const mockResponse = JSON.stringify({
-			text: "[laugh] Grand stuff, boss — the build went through.",
+			text: "[chuckle] Grand stuff, boss — <emphasis>the build went through</emphasis>.",
 			mood: "amused",
 			intensity: "moderate",
 		});
@@ -19,14 +19,15 @@ describe("emotionalRewrite", () => {
 			model,
 		);
 
-		expect(result.text).toContain("[laugh]");
+		expect(result.text).toContain("[chuckle]");
+		expect(result.text).toContain("<emphasis>");
 		expect(result.emotion.mood).toBe("amused");
 		expect(result.emotion.intensity).toBe("moderate");
 	});
 
-	test("passes mode context to the fast model prompt", async () => {
+	test("whisper mode prompt instructs wrapping in <whisper> tag", async () => {
 		const mockResponse = JSON.stringify({
-			text: "[whisper] Build passed.",
+			text: "<whisper>Build passed, Boss.</whisper>",
 			mood: "warm",
 			intensity: "subtle",
 		});
@@ -39,11 +40,11 @@ describe("emotionalRewrite", () => {
 			model,
 		);
 
-		expect(result.text).toContain("[whisper]");
-		// Verify the model was called (doGenerate captured)
+		expect(result.text).toContain("<whisper>");
+		// Verify the model was called with whisper guidance
 		expect(model.doGenerateCalls.length).toBe(1);
 		const callPrompt = JSON.stringify(model.doGenerateCalls[0]);
-		expect(callPrompt).toContain("whisper");
+		expect(callPrompt).toContain("<whisper>");
 	});
 
 	test("falls back to original text on model error", async () => {
@@ -121,6 +122,33 @@ describe("emotionalRewrite", () => {
 
 		expect(result.text).toBe("Right so, here we go.");
 		expect(result.emotion.mood).toBe("neutral");
+	});
+
+	test("EMOTION_REWRITE_PROMPT contains native inline tag reference", () => {
+		expect(EMOTION_REWRITE_PROMPT).toContain("[pause]");
+		expect(EMOTION_REWRITE_PROMPT).toContain("[long-pause]");
+		expect(EMOTION_REWRITE_PROMPT).toContain("[chuckle]");
+		expect(EMOTION_REWRITE_PROMPT).toContain("[sigh]");
+		expect(EMOTION_REWRITE_PROMPT).toContain("[breath]");
+		expect(EMOTION_REWRITE_PROMPT).toContain("[tsk]");
+		expect(EMOTION_REWRITE_PROMPT).toContain("[tongue-click]");
+		expect(EMOTION_REWRITE_PROMPT).toContain("[hum-tune]");
+	});
+
+	test("EMOTION_REWRITE_PROMPT contains native wrapping tag reference", () => {
+		expect(EMOTION_REWRITE_PROMPT).toContain("<soft>");
+		expect(EMOTION_REWRITE_PROMPT).toContain("<whisper>");
+		expect(EMOTION_REWRITE_PROMPT).toContain("<emphasis>");
+		expect(EMOTION_REWRITE_PROMPT).toContain("<slow>");
+		expect(EMOTION_REWRITE_PROMPT).toContain("<fast>");
+		expect(EMOTION_REWRITE_PROMPT).toContain("<laugh-speak>");
+		expect(EMOTION_REWRITE_PROMPT).toContain("<build-intensity>");
+	});
+
+	test("EMOTION_REWRITE_PROMPT contains Friday-specific tag guidelines", () => {
+		expect(EMOTION_REWRITE_PROMPT).toContain("Less is more");
+		expect(EMOTION_REWRITE_PROMPT).toContain("[tsk]");
+		expect(EMOTION_REWRITE_PROMPT).toContain("Never use [cry]");
 	});
 
 	test("EMOTION_REWRITE_PROMPT is exported and non-empty", () => {
