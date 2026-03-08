@@ -16,12 +16,6 @@ export const forgeApply: FridayTool = {
 			description: "The proposal ID returned by forge_propose",
 			required: true,
 		},
-		{
-			name: "forgeDir",
-			type: "string",
-			description: "The forge directory path (injected by runtime)",
-			required: true,
-		},
 	],
 	clearance: ["write-fs", "forge-modify"],
 
@@ -30,18 +24,12 @@ export const forgeApply: FridayTool = {
 		context: ToolContext,
 	): Promise<ToolResult> {
 		const proposalId = args.proposalId as string;
-		const forgeDir = args.forgeDir as string;
+		const forgeDir = (args.forgeDir as string) ?? resolve(context.workingDirectory, "forge");
 
 		if (!proposalId) {
 			return {
 				success: false,
 				output: "Missing required parameter: proposalId",
-			};
-		}
-		if (!forgeDir) {
-			return {
-				success: false,
-				output: "Missing required parameter: forgeDir",
 			};
 		}
 

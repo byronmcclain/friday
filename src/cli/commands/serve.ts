@@ -35,6 +35,8 @@ export function serveCommand(program: Command): void {
 					smartsDir: resolve(projectRoot, "smarts"),
 					dataDir: resolve(projectRoot, "data"),
 					modulesDir: resolve(projectRoot, "src/modules"),
+					forgeDir: resolve(projectRoot, "forge"),
+					genesisPath: resolve(homedir(), ".friday/GENESIS.md"),
 					debug: globalOpts.debug,
 				},
 				onBootProgress: (_step, label) => step(label),

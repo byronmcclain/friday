@@ -12,7 +12,7 @@ function generateModuleTemplate(
 			// Import path assumes forge/ directory is at the project root
 			content: `import type { FridayModule } from "../../src/modules/types.ts";
 
-const ${toolName}Module: FridayModule = {
+const ${toolName}Module = {
   name: ${JSON.stringify(moduleName)},
   description: ${JSON.stringify(description)},
   version: "1.0.0",
@@ -21,7 +21,7 @@ const ${toolName}Module: FridayModule = {
   knowledge: [],
   triggers: [],
   clearance: [],
-};
+} satisfies FridayModule;
 
 export default ${toolName}Module;
 `,
@@ -32,7 +32,7 @@ export default ${toolName}Module;
 export const forgePropose: FridayTool = {
 	name: "forge_propose",
 	description:
-		"Generate code for a new module or a patch to an existing forge module. Returns the proposed code as a preview — does NOT write to disk. The user must approve before forge_apply writes it.",
+		"Generate code for a new module or a patch to an existing forge module. Returns the proposed code as a preview — does NOT write to disk. The user must approve before forge_apply writes it. IMPORTANT: All generated TypeScript MUST be strict-mode safe — type catch clause errors as `unknown` and narrow before accessing properties, use explicit types on all public interfaces, never use `any` except for external untyped APIs.",
 	parameters: [
 		{
 			name: "action",

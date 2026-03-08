@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
 import { ForgeManifestManager } from "./manifest.ts";
 
@@ -12,28 +13,15 @@ export const forgeStatus: FridayTool = {
 			description: "Optional: specific module to get details for",
 			required: false,
 		},
-		{
-			name: "forgeDir",
-			type: "string",
-			description: "The forge directory path (injected by runtime)",
-			required: true,
-		},
 	],
 	clearance: ["read-fs"],
 
 	async execute(
 		args: Record<string, unknown>,
-		_context: ToolContext,
+		context: ToolContext,
 	): Promise<ToolResult> {
-		const forgeDir = args.forgeDir as string;
+		const forgeDir = (args.forgeDir as string) ?? resolve(context.workingDirectory, "forge");
 		const moduleName = args.moduleName as string | undefined;
-
-		if (!forgeDir) {
-			return {
-				success: false,
-				output: "Missing required parameter: forgeDir",
-			};
-		}
 
 		const manifest = new ForgeManifestManager(forgeDir);
 

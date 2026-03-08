@@ -18,13 +18,6 @@ export const forgeRestart: FridayTool = {
 			description: "Name of the forge module that was validated",
 			required: true,
 		},
-		{
-			name: "runtimeRef",
-			type: "object",
-			description:
-				"Reference to the runtime object (injected by the module loader)",
-			required: true,
-		},
 	],
 	clearance: ["system", "forge-modify"],
 
@@ -34,9 +27,6 @@ export const forgeRestart: FridayTool = {
 	): Promise<ToolResult> {
 		const reason = args.reason as string;
 		const moduleName = args.moduleName as string;
-		const runtimeRef = args.runtimeRef as
-			| { restartRequested: boolean }
-			| undefined;
 
 		if (!reason) {
 			return {
@@ -50,12 +40,6 @@ export const forgeRestart: FridayTool = {
 				output: "Missing required parameter: moduleName",
 			};
 		}
-		if (!runtimeRef) {
-			return {
-				success: false,
-				output: "Missing runtime reference — cannot trigger restart",
-			};
-		}
 
 		// Verify validation receipt exists
 		const receipt = await context.memory.get(`validation:${moduleName}`);
@@ -66,7 +50,12 @@ export const forgeRestart: FridayTool = {
 			};
 		}
 
-		runtimeRef.restartRequested = true;
+		// Signal the runtime to restart — the signal bus bridges the gap
+		// between the LLM tool boundary and the runtime instance
+		await context.signal.emit("custom:forge-restart-requested", "forge", {
+			reason,
+			moduleName,
+		});
 
 		await context.audit.log({
 			action: "forge:restart",
@@ -78,7 +67,7 @@ export const forgeRestart: FridayTool = {
 		return {
 			success: true,
 			output: `Restart initiated. Reason: ${reason}\nThe runtime will save state and reboot after this response completes.`,
-			artifacts: { reason },
+			artifacts: { reason, moduleName },
 		};
 	},
 };

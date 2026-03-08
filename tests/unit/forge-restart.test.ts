@@ -14,12 +14,14 @@ const stubMemory = {
   list: async (): Promise<string[]> => [],
 };
 
-const context: ToolContext = {
-  workingDirectory: "/tmp",
-  audit: new AuditLogger(),
-  signal: new SignalBus(),
-  memory: stubMemory,
-};
+function makeContext(): ToolContext {
+  return {
+    workingDirectory: "/tmp",
+    audit: new AuditLogger(),
+    signal: new SignalBus(),
+    memory: stubMemory,
+  };
+}
 
 describe("forge_restart tool", () => {
   test("has correct name and clearance", () => {
@@ -29,35 +31,32 @@ describe("forge_restart tool", () => {
   });
 
   test("requires reason parameter", async () => {
-    const result = await forgeRestart.execute({}, context);
+    const result = await forgeRestart.execute({}, makeContext());
     expect(result.success).toBe(false);
     expect(result.output).toContain("reason");
   });
 
-  test("sets restartRequested on the provided runtime ref", async () => {
-    const runtimeRef = { restartRequested: false };
-    const result = await forgeRestart.execute(
-      { reason: "Load new module", moduleName: "test-mod", runtimeRef },
-      context,
-    );
-    expect(result.success).toBe(true);
-    expect(runtimeRef.restartRequested).toBe(true);
-    expect(result.output).toContain("Restart");
-  });
+  test("emits forge-restart-requested signal on success", async () => {
+    const context = makeContext();
+    const signals = context.signal as SignalBus;
+    let emitted = false;
+    signals.on("custom:forge-restart-requested", () => {
+      emitted = true;
+    });
 
-  test("fails without runtimeRef", async () => {
     const result = await forgeRestart.execute(
       { reason: "Load new module", moduleName: "test-mod" },
       context,
     );
-    expect(result.success).toBe(false);
-    expect(result.output).toContain("runtime");
+    expect(result.success).toBe(true);
+    expect(emitted).toBe(true);
+    expect(result.output).toContain("Restart");
   });
 
   test("fails without moduleName", async () => {
     const result = await forgeRestart.execute(
       { reason: "Load new module" },
-      context,
+      makeContext(),
     );
     expect(result.success).toBe(false);
     expect(result.output).toContain("moduleName");
@@ -70,10 +69,10 @@ describe("forge_restart tool", () => {
       delete: async () => {},
       list: async () => [],
     };
+    const context = makeContext();
     const noReceiptCtx = { ...context, memory: noReceiptMemory };
-    const runtimeRef = { restartRequested: false };
     const result = await forgeRestart.execute(
-      { reason: "Load", moduleName: "unvalidated", runtimeRef },
+      { reason: "Load", moduleName: "unvalidated" },
       noReceiptCtx,
     );
     expect(result.success).toBe(false);

@@ -15,12 +15,6 @@ export const forgeValidate: FridayTool = {
 			description: "Name of the forge module to validate",
 			required: true,
 		},
-		{
-			name: "forgeDir",
-			type: "string",
-			description: "The forge directory path (injected by runtime)",
-			required: true,
-		},
 	],
 	clearance: ["exec-shell"],
 
@@ -29,18 +23,12 @@ export const forgeValidate: FridayTool = {
 		context: ToolContext,
 	): Promise<ToolResult> {
 		const moduleName = args.moduleName as string;
-		const forgeDir = args.forgeDir as string;
+		const forgeDir = (args.forgeDir as string) ?? resolve(context.workingDirectory, "forge");
 
 		if (!moduleName) {
 			return {
 				success: false,
 				output: "Missing required parameter: moduleName",
-			};
-		}
-		if (!forgeDir) {
-			return {
-				success: false,
-				output: "Missing required parameter: forgeDir",
 			};
 		}
 

@@ -117,6 +117,19 @@ export class ForgeManifestManager {
 		});
 	}
 
+	async setStatusBatch(
+		updates: Array<{ name: string; status: ForgeModuleEntry["status"] }>,
+	): Promise<void> {
+		return this.withLock(async () => {
+			const manifest = await this._load();
+			for (const { name, status } of updates) {
+				const entry = manifest.modules[name];
+				if (entry) entry.status = status;
+			}
+			await this._save(manifest);
+		});
+	}
+
 	async listModules(): Promise<string[]> {
 		return this.withLock(async () => {
 			const manifest = await this._load();

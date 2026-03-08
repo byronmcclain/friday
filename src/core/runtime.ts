@@ -23,6 +23,7 @@ import { createEnvProtocol } from "../sensorium/protocol.ts";
 import { createEnvironmentTool } from "../sensorium/tool.ts";
 import { SENSORIUM_DEFAULTS } from "../sensorium/types.ts";
 import { createForgeProtocol } from "../modules/forge/protocol.ts";
+import { ForgeManifestManager } from "../modules/forge/manifest.ts";
 import type { ForgeHealthReport } from "../modules/forge/types.ts";
 import { createRecallTool } from "./recall-tool.ts";
 import { RhythmStore } from "../arc-rhythm/store.ts";
@@ -467,7 +468,7 @@ export class FridayRuntime {
 				this._forgeHealthReport = {
 					loaded: forgeResult.loaded.map((m) => m.name),
 					failed: forgeResult.failed,
-					pending: [], // TODO: populate when forge has pending/approval workflow
+					pending: [],
 				};
 
 				for (const mod of forgeResult.loaded) {
@@ -482,6 +483,26 @@ export class FridayRuntime {
 					}
 					this._modules.push(mod);
 				}
+
+				// Batch-update manifest status (single file read/write)
+				const statusUpdates = [
+					...forgeResult.loaded.map((m) => ({ name: m.name, status: "loaded" as const })),
+					...forgeResult.failed.map((f) => ({ name: f.name, status: "failed" as const })),
+				];
+				if (statusUpdates.length > 0) {
+					const manifest = new ForgeManifestManager(config.forgeDir);
+					try {
+						await manifest.setStatusBatch(statusUpdates);
+					} catch (err) {
+						const msg = err instanceof Error ? err.message : String(err);
+						this._audit.log({
+							action: "forge:manifest-error",
+							source: "runtime",
+							detail: `Failed to update manifest status: ${msg}`,
+							success: false,
+						});
+					}
+				}
 			}
 
 			if (this._modules.length > 0) {
@@ -489,6 +510,11 @@ export class FridayRuntime {
 				const protoCount = this._modules.reduce((sum, m) => sum + m.protocols.length, 0);
 				onProgress?.("modules", `${this._modules.length} modules loaded (${toolCount} tools, ${protoCount} protocols)`);
 			}
+
+			// Listen for forge restart requests (emitted by forge_restart tool via signal bus)
+			this._signals.on("custom:forge-restart-requested", () => {
+				this._restartRequested = true;
+			});
 
 			await this._signals.emit("session:start", "runtime");
 			this._booted = true;
