@@ -1,8 +1,7 @@
 import type { SignalBus } from "../events.ts";
 import type { ClearanceManager } from "../clearance.ts";
 import type { AuditLogger } from "../../audit/logger.ts";
-import { type VoiceMode, type GrokVoice, type VoxConfig, type VoxOptions } from "./types.ts";
-import { VOX_TTS_URL } from "./types.ts";
+import { type VoiceMode, type GrokVoice, type VoxConfig, type VoxOptions, VOX_TTS_URL } from "./types.ts";
 import { playAudio, cleanupTempFile, detectPlayer } from "./audio.ts";
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { emotionalRewrite } from "./emotion.ts";
@@ -22,6 +21,7 @@ export class Vox {
 	private _audit?: AuditLogger;
 	private _activeProc: { kill(): void } | null = null;
 	private _activeTmpFile: string | null = null;
+	private _activeController: AbortController | null = null;
 	private _speaking = false;
 	private _playerAvailable: boolean | null = null;
 	private _fastModel?: LanguageModelV3;
@@ -138,23 +138,28 @@ export class Vox {
 
 			// Call the Grok TTS REST API
 			const controller = new AbortController();
+			this._activeController = controller;
 			const timeoutId = setTimeout(() => controller.abort(), this._config.timeoutMs);
 
-			const response = await fetch(VOX_TTS_URL, {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${process.env.XAI_API_KEY}`,
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					text: spokenText,
-					voice_id: this._config.defaultVoice.toLowerCase(),
-					output_format: { codec: "wav", sample_rate: 24000 },
-				}),
-				signal: controller.signal,
-			});
-
-			clearTimeout(timeoutId);
+			let response: Response;
+			try {
+				response = await fetch(VOX_TTS_URL, {
+					method: "POST",
+					headers: {
+						Authorization: `Bearer ${process.env.XAI_API_KEY}`,
+						"Content-Type": "application/json",
+					},
+					body: JSON.stringify({
+						text: spokenText,
+						voice_id: this._config.defaultVoice.toLowerCase(),
+						output_format: { codec: "wav", sample_rate: 24000 },
+					}),
+					signal: controller.signal,
+				});
+			} finally {
+				clearTimeout(timeoutId);
+				this._activeController = null;
+			}
 
 			if (!response.ok) {
 				const errText = await response.text().catch(() => "unknown error");
@@ -209,6 +214,10 @@ export class Vox {
 
 	private cancelPlayback(): void {
 		this._speaking = false;
+		if (this._activeController) {
+			this._activeController.abort();
+			this._activeController = null;
+		}
 		if (this._activeProc) {
 			try {
 				this._activeProc.kill();
