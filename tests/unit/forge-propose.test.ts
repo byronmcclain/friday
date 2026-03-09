@@ -34,16 +34,18 @@ describe("forge_propose tool", () => {
     expect(forgeModule.clearance).not.toContain("provider");
   });
 
-  test("create template includes example tool comment", async () => {
+  test("create template includes type hints and example tool", async () => {
     const result = await forgePropose.execute(
       { action: "create", moduleName: "example-mod", description: "An example" },
       context,
     );
     expect(result.success).toBe(true);
-    expect(result.output).toContain("// TODO: Add your tools here");
+    expect(result.output).toContain("Example tool:");
     expect(result.output).toContain("FridayTool");
     expect(result.output).toContain("ToolContext");
     expect(result.output).toContain("ToolResult");
+    expect(result.output).toContain("does NOT have a tools property");
+    expect(result.output).toContain("artifacts");
   });
 
   test("requires action parameter", async () => {

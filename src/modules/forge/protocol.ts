@@ -8,7 +8,8 @@ import { ForgeManifestManager } from "./manifest.ts";
 export function createForgeProtocol(forgeDir: string): FridayProtocol {
 	return {
 		name: "forge",
-		description: "Manage Friday's self-authored modules",
+		description:
+			"Manage Friday's self-authored modules — list | status <name> | history <name> | protect <name> | unprotect <name> | manifest | rollback <name>",
 		aliases: ["workshop"],
 		parameters: [],
 		clearance: ["read-fs"],
@@ -23,6 +24,24 @@ export function createForgeProtocol(forgeDir: string): FridayProtocol {
 			const manifest = new ForgeManifestManager(forgeDir);
 
 			switch (subcommand) {
+				case "":
+				case "help":
+					return {
+						success: true,
+						summary: [
+							"The Forge — Friday's self-improvement system",
+							"",
+							"  /forge list              List all forge modules with status",
+							"  /forge status <name>     Show details for a module",
+							"  /forge history <name>    Version history from manifest",
+							"  /forge protect <name>    Lock a module from AI modification",
+							"  /forge unprotect <name>  Remove protection lock",
+							"  /forge manifest          Dump raw manifest.json",
+							"  /forge rollback <name>   Restore from backup (not yet implemented)",
+							"",
+							"Alias: /workshop",
+						].join("\n"),
+					};
 				case "list":
 					return handleList(manifest);
 				case "status":
@@ -40,7 +59,7 @@ export function createForgeProtocol(forgeDir: string): FridayProtocol {
 				default:
 					return {
 						success: false,
-						summary: `Unknown subcommand: "${subcommand}". Available: list, status <name>, history <name>, rollback <name> (not yet implemented), protect <name>, unprotect <name>, manifest`,
+						summary: `Unknown subcommand: "${subcommand}". Use /forge help to see available commands.`,
 					};
 			}
 		},

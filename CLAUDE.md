@@ -189,7 +189,7 @@ tests/
 | **VoiceSessionManager** | `src/core/voice/session-manager.ts` | Thin audio I/O + lifecycle. Manages Grok WebSocket, VAD, routes transcripts through `cortex.chatStreamVoice()`. |
 | **Recall (Deja Vu)** | `src/core/recall-tool.ts` | `search` (FTS5 summaries) → `recall` (full transcript). Registered in Cortex at boot. |
 | **Arc Rhythm** | `src/arc-rhythm/` | 60s scheduler tick. Auto-pause after 5 failures. Shares Memory's SQLite via `memory.database`. |
-| **The Forge** | `src/modules/forge/` | Self-improvement. Failed modules don't crash boot. Filesystem module + Forge are core-protected. |
+| **The Forge** | `src/modules/forge/` | Self-improvement. Failed modules don't crash boot. Filesystem module + Forge are core-protected. Validate sanitizes LLM HTML entities before typecheck. |
 | **Bridges** | `src/core/bridges/` | Singleton mode IPC. `SocketBridge` (Unix socket to server). `friday chat` requires a running `friday serve`. |
 | **SessionHub** | `src/server/session-hub.ts` | Session lifecycle for singleton. Hydrates clients on connect, saves on last disconnect, reconnect guard. Unified ClientRegistry across transports. |
 | **Server** | `src/server/` | HTTP + WebSocket + Unix socket. SessionHub coordinates session lifecycle. ttyd for terminal-in-browser. |
@@ -211,10 +211,13 @@ tests/
 - **Protected paths**: `isProtectedPath()` in `src/modules/filesystem/containment.ts` — blocks writes to Genesis and core modules
 - **Dual-mode Cortex**: `chatStream()` (TextWorker/AI SDK) for CLI, `chatStreamVoice()` (VoiceWorker/Grok realtime) for browser voice. Both share system prompt enrichment, tool bridge, history, clearance. Voice mode uses Grok as native agent — no sentence splitting, no TTS pipe.
 - **Voice narration**: NarrationPicker + ACK_PHRASES still available for Vox (notification TTS). VoiceSessionManager routes through Cortex natively — Grok handles its own speech.
+- **ToolResult.error** is an optional field — tool-bridge falls back to `result.output || result.error || "Tool returned no output"`
+- **Forge template** imports `FridayModule, FridayTool, ToolContext, ToolResult` and includes commented usage examples with proper validation patterns
+- **Cortex inference audit**: `inference:start`, `inference:complete` (with duration), `inference:error` (with duration + error message) emitted per `chatStream()` call
 
 ## Testing
 
-- 1057 tests across 99 files (as of 2026-03-01)
+- 1119 tests across 105 files (as of 2026-03-08)
 - Tests use `injectedModel: createMockModel()` (AI SDK `MockLanguageModelV3` from `ai/test` with call capture via `.doStreamCalls`/`.doGenerateCalls`)
 - Use `createErrorModel()` for models that throw on `doGenerate`/`doStream`
 - Shared test stubs live in `tests/helpers/stubs.ts`

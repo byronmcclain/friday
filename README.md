@@ -16,7 +16,7 @@ TUI-first. Module-driven. Built to think, remember, and adapt.
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tests](https://img.shields.io/badge/tests-1057%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-1119%20passing-brightgreen)]()
 [![Biome](https://img.shields.io/badge/lint-Biome-60a5fa?logo=biome)](https://biomejs.dev)
 
 <br />
@@ -262,7 +262,7 @@ Eight operational modules ship with Friday:
 | **Code Exec** | run (sandboxed script execution) | `exec-shell` | Timeout enforcement |
 | **Web Fetch** | fetch (HTTP requests) | `network` | SSRF protection (private IP blocking) |
 | **Notify** | send (multi-channel dispatch) | -- | Channel validation |
-| **Forge** | propose, apply, validate, restart, status | `provider`, `write-fs`, `read-fs`, `exec-shell`, `system`, `forge-modify` | Core module protection |
+| **Forge** | propose, apply, validate, restart, status | `write-fs`, `read-fs`, `exec-shell`, `system`, `forge-modify` | Core module protection, LLM artifact sanitization |
 | **Gmail** | search, read, send, reply, modify, list_labels | `network`, `email-send` | OAuth 2.0, encrypted token storage |
 
 Every tool call flows through the same pipeline: Cortex receives a `tool_use` from the LLM → checks clearance via `ClearanceManager.checkAll()` → calls `tool.execute()` with a `ToolContext` (working directory, audit logger, signal emitter, scoped memory) → returns the result to the LLM.
@@ -343,8 +343,9 @@ Key safety properties:
 - **Core protection** — the filesystem module and the Forge module itself cannot be modified via the Forge
 - **Human-in-the-loop** — every apply step requires explicit approval
 - **Iterative** — when validation fails, errors flow back to Friday so she can fix and retry
+- **LLM artifact sanitization** — `forge_validate` auto-fixes HTML entities (`&lt;` → `<`, `&gt;` → `>`, etc.) that LLMs emit in generated TypeScript before running typecheck and lint
 
-`/forge list` · `/forge status <name>` · `/forge history <name>` · `/forge protect <name>`
+`/forge list` · `/forge status <name>` · `/forge history <name>` · `/forge protect <name>` · `/forge manifest` · `/forge help`
 
 ---
 
@@ -884,6 +885,9 @@ friday --debug serve           # Debug mode — logs inference payloads and resp
 | `/forge status <name>` | Detailed health of a forge module |
 | `/forge history <name>` | Version history of a forge module |
 | `/forge protect <name>` | Mark a forge module as immutable |
+| `/forge unprotect <name>` | Remove protection from a forge module |
+| `/forge manifest` | Dump raw forge manifest.json |
+| `/forge help` | Show forge subcommand reference |
 | `/arc list` | List all scheduled rhythms |
 | `/arc create "cron" desc` | Create a new scheduled rhythm |
 | `/arc show <id>` | Detailed view of a rhythm |

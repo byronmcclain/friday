@@ -11,8 +11,11 @@ function generateModuleTemplate(
 			path: "index.ts",
 			content: `import type { FridayModule, FridayTool, ToolContext, ToolResult } from "../../src/modules/types.ts";
 
-// TODO: Add your tools here
-// Example tool structure:
+// ToolContext has: { workingDirectory: string, audit, signal, memory }
+// ToolResult must have: { success: boolean, output: string, error?: string, artifacts?: Record<string, unknown> }
+// NOTE: ToolContext does NOT have a tools property — tools are standalone, use fetch() directly for HTTP
+//
+// Example tool:
 //
 // const myTool: FridayTool = {
 //   name: "${toolName}.my_action",
@@ -23,7 +26,8 @@ function generateModuleTemplate(
 //   clearance: [],
 //   async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 //     const input = args.input as string;
-//     return { success: true, output: \`Processed: \${input}\` };
+//     if (!input) return { success: false, output: "Missing required parameter: input" };
+//     return { success: true, output: \`Result: \${input}\`, artifacts: { raw: input } };
 //   },
 // };
 

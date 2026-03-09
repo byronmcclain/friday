@@ -138,7 +138,7 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
 				},
 			});
 			config.signals?.emit("tool:completed", name);
-			return result.output;
+			return result.output || result.error || "Tool returned no output";
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : String(err);
 			config.audit?.log({

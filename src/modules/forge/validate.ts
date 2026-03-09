@@ -1,8 +1,46 @@
 import { resolve } from "node:path";
-import { realpath } from "node:fs/promises";
+import { readdir, realpath } from "node:fs/promises";
 import type { FridayTool, ToolContext, ToolResult, FridayModule } from "../types.ts";
 import { validateModule } from "../loader.ts";
 import type { ForgeValidationResult, ForgeValidationStep } from "./types.ts";
+
+/** Known HTML entity patterns LLMs emit inside TypeScript code */
+const HTML_ENTITY_PAIRS: [RegExp, string][] = [
+	[/&lt;/g, "<"],
+	[/&gt;/g, ">"],
+	[/&amp;/g, "&"],
+	[/&quot;/g, '"'],
+	[/&#39;/g, "'"],
+];
+
+/**
+ * Scan all .ts files in a module directory and fix HTML entities in-place.
+ * Returns the list of files that were sanitized (empty if none needed fixing).
+ */
+async function sanitizeLlmArtifacts(moduleDir: string): Promise<string[]> {
+	const fixed: string[] = [];
+	let entries: string[];
+	try {
+		entries = (await readdir(moduleDir, { recursive: true }))
+			.filter((e) => e.endsWith(".ts"));
+	} catch {
+		return fixed;
+	}
+
+	await Promise.all(entries.map(async (entry) => {
+		const filePath = resolve(moduleDir, entry);
+		const content = await Bun.file(filePath).text();
+		let sanitized = content;
+		for (const [pattern, replacement] of HTML_ENTITY_PAIRS) {
+			sanitized = sanitized.replace(pattern, replacement);
+		}
+		if (sanitized !== content) {
+			await Bun.write(filePath, sanitized);
+			fixed.push(entry);
+		}
+	}));
+	return fixed;
+}
 
 export const forgeValidate: FridayTool = {
 	name: "forge_validate",
@@ -44,6 +82,9 @@ export const forgeValidate: FridayTool = {
 				output: `Module "${moduleName}" not found at ${moduleDir}`,
 			};
 		}
+
+		// Step 0: Auto-fix known LLM encoding artifacts (HTML entities in TS files)
+		const sanitizedFiles = await sanitizeLlmArtifacts(moduleDir);
 
 		const steps: ForgeValidationStep[] = [];
 
@@ -161,9 +202,13 @@ export const forgeValidate: FridayTool = {
 			)
 			.join("\n");
 
+		const sanitizeNote = sanitizedFiles.length > 0
+			? `\n\nAuto-fixed HTML entities in: ${sanitizedFiles.join(", ")}`
+			: "";
+
 		return {
 			success: allPassed,
-			output: `Validation ${allPassed ? "passed" : "FAILED"} for "${moduleName}":\n${report}${allPassed ? "\n\nReady for forge_restart." : "\n\nUse fs.read to inspect the failing files, fs.write to fix them, then forge_validate again."}`,
+			output: `Validation ${allPassed ? "passed" : "FAILED"} for "${moduleName}":\n${report}${sanitizeNote}${allPassed ? "\n\nReady for forge_restart." : "\n\nUse fs.read to inspect the failing files, fs.write to fix them, then forge_validate again."}`,
 			artifacts: { ...result },
 		};
 	},

@@ -105,10 +105,20 @@ describe("/forge protocol", () => {
     expect(result.summary).toContain('"version"');
   });
 
-  test("unknown subcommand shows help", async () => {
+  test("unknown subcommand directs to help", async () => {
     const protocol = createForgeProtocol(TEST_FORGE_DIR);
     const result = await protocol.execute({ rawArgs: "invalid" }, context);
     expect(result.success).toBe(false);
-    expect(result.summary).toContain("Available");
+    expect(result.summary).toContain("/forge help");
+  });
+
+  test("empty subcommand shows help screen", async () => {
+    const protocol = createForgeProtocol(TEST_FORGE_DIR);
+    const result = await protocol.execute({ rawArgs: "" }, context);
+    expect(result.success).toBe(true);
+    expect(result.summary).toContain("/forge list");
+    expect(result.summary).toContain("/forge status <name>");
+    expect(result.summary).toContain("/forge protect <name>");
+    expect(result.summary).toContain("Alias: /workshop");
   });
 });

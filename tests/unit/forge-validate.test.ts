@@ -85,6 +85,42 @@ describe("forge_validate tool", () => {
     expect(storedReceipt).toBeDefined();
   });
 
+  test("auto-sanitizes HTML entities before validation", async () => {
+    const modDir = `${TEST_FORGE_DIR}/entity-mod`;
+    await mkdir(modDir, { recursive: true });
+    await Bun.write(
+      `${modDir}/index.ts`,
+      `export default {
+        name: "entity-mod",
+        description: "Has HTML entities",
+        version: "1.0.0",
+        tools: [{
+          name: "entity.test",
+          description: "test",
+          parameters: [],
+          clearance: [],
+          execute: async (args: Record&lt;string, unknown&gt;) =&gt; ({ success: true, output: "ok" }),
+        }],
+        protocols: [],
+        knowledge: [],
+        triggers: [],
+        clearance: [],
+      };`,
+    );
+
+    const result = await forgeValidate.execute(
+      { moduleName: "entity-mod", forgeDir: TEST_FORGE_DIR },
+      context,
+    );
+
+    // Should have auto-fixed the entities and passed import + manifest
+    expect(result.output).toContain("Auto-fixed HTML entities");
+    const content = await Bun.file(`${modDir}/index.ts`).text();
+    expect(content).not.toContain("&lt;");
+    expect(content).not.toContain("&gt;");
+    expect(content).toContain("Record<string, unknown>");
+  });
+
   test("fails import test for module with syntax error", async () => {
     const modDir = `${TEST_FORGE_DIR}/bad-mod`;
     await mkdir(modDir, { recursive: true });

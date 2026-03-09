@@ -22,6 +22,7 @@ export interface ToolContext {
 export interface ToolResult {
   success: boolean;
   output: string;
+  error?: string;
   artifacts?: Record<string, unknown>;
 }
 

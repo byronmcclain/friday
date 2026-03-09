@@ -18,6 +18,10 @@ import { TextWorker } from "./workers/text-worker.ts";
 import { VoiceWorker } from "./workers/voice-worker.ts";
 import { buildVoiceSystemPrompt } from "./voice/prompt.ts";
 
+function fmtDuration(ms: number): string {
+	return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+}
+
 export interface CortexConfig extends Partial<FridayConfig> {
 	injectedModel?: LanguageModelV3;
 	clearance?: ClearanceManager;
@@ -115,6 +119,14 @@ export class Cortex {
 	async chatStream(userMessage: string): Promise<ChatStream> {
 		const { systemPrompt, defs, executor } = await this.prepareTurn(userMessage);
 
+		const inferenceStart = Date.now();
+		this.audit?.log({
+			action: "inference:start",
+			source: "cortex",
+			detail: `model=${this._modelName} tools=${defs.length}`,
+			success: true,
+		});
+
 		if (this._debug) {
 			this.audit?.log({
 				action: "debug:system-prompt",
@@ -158,25 +170,45 @@ export class Cortex {
 			stepTimeoutMs: this.inferenceTimeout,
 		});
 
-		const fullTextPromise = workerResult.fullText.then(async (text: string) => {
-			this.historyManager.push({ role: "assistant", content: text });
+		const fullTextPromise = workerResult.fullText.then(
+			async (text: string) => {
+				const duration = fmtDuration(Date.now() - inferenceStart);
+				this.audit?.log({
+					action: "inference:complete",
+					source: "cortex",
+					detail: `${duration}, ${text.length} chars`,
+					success: true,
+				});
 
-			if (this._debug && this.debugResponsePath) {
-				appendInferenceLog(this.debugResponsePath, 1, { text });
-			}
+				this.historyManager.push({ role: "assistant", content: text });
 
-			const usage = await workerResult.usage;
-			if (usage?.inputTokens != null && usage?.outputTokens != null) {
-				this.historyManager.recordUsage(
-					usage.inputTokens + usage.outputTokens,
-				);
-			}
+				if (this._debug && this.debugResponsePath) {
+					appendInferenceLog(this.debugResponsePath, 1, { text });
+				}
 
-			if (this.vox && this.vox.mode !== "off") {
-				this.vox.speak(text).catch(() => {});
-			}
-			return text;
-		});
+				const usage = await workerResult.usage;
+				if (usage?.inputTokens != null && usage?.outputTokens != null) {
+					this.historyManager.recordUsage(
+						usage.inputTokens + usage.outputTokens,
+					);
+				}
+
+				if (this.vox && this.vox.mode !== "off") {
+					this.vox.speak(text).catch(() => {});
+				}
+				return text;
+			},
+			(err) => {
+				const errDuration = fmtDuration(Date.now() - inferenceStart);
+				this.audit?.log({
+					action: "inference:error",
+					source: "cortex",
+					detail: `${errDuration}: ${err instanceof Error ? err.message : String(err)}`,
+					success: false,
+				});
+				throw err;
+			},
+		);
 
 		return {
 			textStream: workerResult.textStream,
