@@ -4,8 +4,8 @@ import type {
 } from "../core/notifications.ts";
 import type { SendFn } from "./client-registry.ts";
 
-export class WebSocketNotificationChannel implements NotificationChannel {
-	name = "websocket";
+export class PushNotificationChannel implements NotificationChannel {
+	name = "push";
 	private sendFn: SendFn;
 
 	constructor(sendFn: SendFn) {

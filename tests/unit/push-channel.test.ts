@@ -1,11 +1,11 @@
 import { describe, test, expect } from "bun:test";
-import { WebSocketNotificationChannel } from "../../src/server/ws-channel.ts";
+import { PushNotificationChannel } from "../../src/server/push-channel.ts";
 import type { FridayNotification } from "../../src/core/notifications.ts";
 
-describe("WebSocketNotificationChannel", () => {
+describe("PushNotificationChannel", () => {
 	test("sends notification to registered callback", async () => {
 		const sent: any[] = [];
-		const channel = new WebSocketNotificationChannel((msg) => sent.push(msg));
+		const channel = new PushNotificationChannel((msg) => sent.push(msg));
 
 		const notification: FridayNotification = {
 			level: "warning",
@@ -21,8 +21,8 @@ describe("WebSocketNotificationChannel", () => {
 		expect(sent[0].title).toBe("CPU High");
 	});
 
-	test("has name 'websocket'", () => {
-		const channel = new WebSocketNotificationChannel(() => {});
-		expect(channel.name).toBe("websocket");
+	test("has default name 'push'", () => {
+		const channel = new PushNotificationChannel(() => {});
+		expect(channel.name).toBe("push");
 	});
 });

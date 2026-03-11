@@ -5,7 +5,7 @@ import {
 	type ServerMessage,
 } from "./protocol.ts";
 import type { SessionHub } from "./session-hub.ts";
-import { WebSocketNotificationChannel } from "./ws-channel.ts";
+import { PushNotificationChannel } from "./push-channel.ts";
 import { VoiceSessionManager, type VoiceSessionConfig } from "../core/voice/session-manager.ts";
 import { FRIDAY_VOICE_IDENTITY } from "../core/voice/prompt.ts";
 import { isGrokVoice, type GrokVoice } from "../core/voice/types.ts";
@@ -144,7 +144,7 @@ export class WebSocketHandler {
 
 		// Wire notification channel for this client (per-client name avoids collisions)
 		if (this.runtime.notifications) {
-			const channel = new WebSocketNotificationChannel(send);
+			const channel = new PushNotificationChannel(send);
 			channel.name = this.channelName;
 			this.runtime.notifications.addChannel(channel);
 		}
