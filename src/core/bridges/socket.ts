@@ -16,6 +16,7 @@ export class SocketBridge implements RuntimeBridge {
   onAuditEntry?: (entry: Extract<ServerMessage, { type: "audit:entry" }>) => void;
   onToolExecuting?: (name: string, args: Record<string, unknown>) => void;
   onToolCompleted?: () => void;
+  onNotification?: (msg: Extract<ServerMessage, { type: "notification" }>) => void;
 
   constructor(socketPath: string) {
     this.socketPath = socketPath;
@@ -207,6 +208,10 @@ export class SocketBridge implements RuntimeBridge {
     }
     if (msg.type === "audit:entry") {
       this.onAuditEntry?.(msg);
+      return;
+    }
+    if (msg.type === "notification") {
+      this.onNotification?.(msg);
       return;
     }
     if (msg.type === "signal") {

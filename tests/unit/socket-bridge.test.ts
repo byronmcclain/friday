@@ -150,4 +150,53 @@ describe("SocketBridge", () => {
 
 		expect(received).toHaveLength(0);
 	});
+
+	test("fires onNotification for notification events", () => {
+		const bridge = new SocketBridge("/tmp/nonexistent.sock");
+		const received: any[] = [];
+		bridge.onNotification = (msg) => received.push(msg);
+
+		(bridge as any).handleServerMessage({
+			type: "notification",
+			level: "warning",
+			title: "Memory High",
+			body: "Memory usage at 92%",
+			source: "sensorium",
+		});
+
+		expect(received).toHaveLength(1);
+		expect(received[0].level).toBe("warning");
+		expect(received[0].title).toBe("Memory High");
+		expect(received[0].body).toBe("Memory usage at 92%");
+		expect(received[0].source).toBe("sensorium");
+	});
+
+	test("does not throw when onNotification is not set", () => {
+		const bridge = new SocketBridge("/tmp/nonexistent.sock");
+
+		(bridge as any).handleServerMessage({
+			type: "notification",
+			level: "alert",
+			title: "Container Down",
+			body: "nginx is not running",
+			source: "sensorium",
+		});
+	});
+
+	test("notification does not interfere with request-reply messages", () => {
+		const bridge = new SocketBridge("/tmp/nonexistent.sock");
+		const received: any[] = [];
+		bridge.onNotification = (msg) => received.push(msg);
+
+		// A notification should be handled by the callback, not by pendingCallbacks
+		(bridge as any).handleServerMessage({
+			type: "notification",
+			level: "info",
+			title: "Test",
+			body: "test body",
+			source: "test",
+		});
+
+		expect(received).toHaveLength(1);
+	});
 });
