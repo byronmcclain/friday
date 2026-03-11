@@ -150,6 +150,41 @@ describe("FridaySocketServer", () => {
 		await server.stop();
 	});
 
+	test("adds notification channel on session:identify and removes on close", async () => {
+		const addedChannels: string[] = [];
+		const removedChannels: string[] = [];
+		const mockRuntime = {
+			isBooted: true,
+			cortex: { modelName: "test" },
+			protocols: { isProtocol: () => false },
+			audit: new AuditLogger(),
+			notifications: {
+				addChannel: (ch: any) => addedChannels.push(ch.name),
+				removeChannel: (name: string) => removedChannels.push(name),
+			},
+		} as any;
+		const hub = createMockHub();
+		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
+		await server.start();
+
+		const { connect } = await import("node:net");
+		const socket = connect({ path: TEST_SOCKET });
+		await new Promise<void>((resolve) => { socket.on("connect", resolve); });
+		socket.write(JSON.stringify({ type: "session:identify", id: "r1", clientType: "tui" }) + "\n");
+		await new Promise((r) => setTimeout(r, 100));
+
+		expect(addedChannels).toHaveLength(1);
+		expect(addedChannels[0]).toMatch(/^socket-/);
+
+		socket.end();
+		await new Promise((r) => setTimeout(r, 100));
+
+		expect(removedChannels).toHaveLength(1);
+		expect(removedChannels[0]).toBe(addedChannels[0]);
+
+		await server.stop();
+	});
+
 	test("clears audit onLog callback on stop", async () => {
 		const audit = new AuditLogger();
 		const mockRuntime = {

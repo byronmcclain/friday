@@ -3,6 +3,7 @@ import type { FridayRuntime } from "../core/runtime.ts";
 import { parseClientMessage, type ServerMessage } from "./protocol.ts";
 import type { SessionHub } from "./session-hub.ts";
 import type { SignalHandler } from "../core/events.ts";
+import { PushNotificationChannel } from "./push-channel.ts";
 
 const DEFAULT_SOCKET_PATH = `${process.env.HOME}/.friday/friday.sock`;
 const DEFAULT_PID_PATH = `${process.env.HOME}/.friday/friday.pid`;
@@ -13,7 +14,7 @@ export class FridaySocketServer {
   private socketPath: string;
   private pidPath: string;
   private server: ReturnType<typeof Bun.listen> | null = null;
-  private socketClients = new Map<unknown, string>();
+  private socketClients = new Map<unknown, { clientId: string; channelName: string }>();
   private toolSignalHandler: SignalHandler | null = null;
 
   constructor(
@@ -68,11 +69,12 @@ export class FridaySocketServer {
       socket: {
         open: (socket) => {
           const clientId = crypto.randomUUID();
-          this.socketClients.set(socket, clientId);
+          const channelName = `socket-${clientId}`;
+          this.socketClients.set(socket, { clientId, channelName });
         },
         data: (socket, data) => {
-          const clientId = this.socketClients.get(socket);
-          if (!clientId) return;
+          const client = this.socketClients.get(socket);
+          if (!client) return;
 
           // Newline-delimited JSON protocol
           const lines = data.toString().split("\n").filter(Boolean);
@@ -84,13 +86,16 @@ export class FridaySocketServer {
               socket.write(JSON.stringify(response) + "\n");
             };
 
-            void this.handleMessage(msg, send, clientId);
+            void this.handleMessage(msg, send, client.clientId, client.channelName);
           }
         },
         close: (socket) => {
-          const clientId = this.socketClients.get(socket);
-          if (clientId) {
-            void this.hub.unregisterClient(clientId);
+          const client = this.socketClients.get(socket);
+          if (client) {
+            if (this.runtime.notifications) {
+              this.runtime.notifications.removeChannel(client.channelName);
+            }
+            void this.hub.unregisterClient(client.clientId);
             this.socketClients.delete(socket);
           }
         },
@@ -120,6 +125,7 @@ export class FridaySocketServer {
     msg: ReturnType<typeof parseClientMessage> & {},
     send: (msg: ServerMessage) => void,
     clientId: string,
+    channelName: string,
   ): Promise<void> {
     switch (msg.type) {
       case "session:identify": {
@@ -129,6 +135,13 @@ export class FridaySocketServer {
           send,
           capabilities: new Set(["text"]),
         });
+
+        if (this.runtime.notifications) {
+          const channel = new PushNotificationChannel(send);
+          channel.name = channelName;
+          this.runtime.notifications.addChannel(channel);
+        }
+
         send({
           type: "session:ready",
           requestId: msg.id,
@@ -144,6 +157,13 @@ export class FridaySocketServer {
           send,
           capabilities: new Set(["text"]),
         });
+
+        if (this.runtime.notifications) {
+          const channel = new PushNotificationChannel(send);
+          channel.name = channelName;
+          this.runtime.notifications.addChannel(channel);
+        }
+
         send({
           type: "session:ready",
           requestId: msg.id,
