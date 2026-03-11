@@ -8,7 +8,7 @@ import { AuditLogger } from "../audit/logger.ts";
 import { ProtocolRegistry } from "../protocols/registry.ts";
 import { DirectiveStore } from "../directives/store.ts";
 import { DirectiveEngine } from "../directives/engine.ts";
-import { NotificationManager, TerminalChannel, type NotificationChannel } from "./notifications.ts";
+import { NotificationManager, TerminalChannel, AuditLogChannel, type NotificationChannel } from "./notifications.ts";
 import { discoverModules, discoverForgeModules } from "../modules/loader.ts";
 import type { FridayModule } from "../modules/types.ts";
 import { SmartsStore } from "../smarts/store.ts";
@@ -192,7 +192,7 @@ export class FridayRuntime {
 				"audio-output",
 			]);
 			this._audit = new AuditLogger();
-			this._notifications = new NotificationManager(config.channels ?? [new TerminalChannel()]);
+			this._notifications = new NotificationManager(config.channels ?? [new TerminalChannel(), new AuditLogChannel(this._audit)]);
 			this._protocols = new ProtocolRegistry();
 			this._directives = new DirectiveStore();
 			this._directiveEngine = new DirectiveEngine({
