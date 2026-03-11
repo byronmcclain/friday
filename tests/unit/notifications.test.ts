@@ -2,9 +2,10 @@ import { describe, test, expect } from "bun:test";
 import {
   NotificationManager,
   TerminalChannel,
-  LogChannel,
+  AuditLogChannel,
 } from "../../src/core/notifications.ts";
 import type { NotificationChannel } from "../../src/core/notifications.ts";
+import { AuditLogger } from "../../src/audit/logger.ts";
 
 describe("NotificationManager", () => {
   test("sends notification to all registered channels", async () => {
@@ -73,9 +74,42 @@ describe("TerminalChannel", () => {
   });
 });
 
-describe("LogChannel", () => {
-  test("has name 'log'", () => {
-    const channel = new LogChannel("/tmp/friday-test-notifications.log");
-    expect(channel.name).toBe("log");
+describe("AuditLogChannel", () => {
+  test("has name 'audit'", () => {
+    const audit = new AuditLogger();
+    const channel = new AuditLogChannel(audit);
+    expect(channel.name).toBe("audit");
+  });
+
+  test("send() logs notification as audit entry", async () => {
+    const audit = new AuditLogger();
+    const channel = new AuditLogChannel(audit);
+    await channel.send({
+      level: "warning",
+      title: "Memory High",
+      body: "Memory usage at 92%",
+      source: "sensorium",
+    });
+
+    const entries = audit.entries({ action: "notification:warning" });
+    expect(entries).toHaveLength(1);
+    expect(entries[0].action).toBe("notification:warning");
+    expect(entries[0].source).toBe("sensorium");
+    expect(entries[0].detail).toBe("Memory High: Memory usage at 92%");
+    expect(entries[0].success).toBe(true);
+  });
+
+  test("send() maps alert level to action string", async () => {
+    const audit = new AuditLogger();
+    const channel = new AuditLogChannel(audit);
+    await channel.send({
+      level: "alert",
+      title: "Container Down",
+      body: "nginx is not running",
+      source: "sensorium",
+    });
+
+    const entries = audit.entries({ action: "notification:alert" });
+    expect(entries).toHaveLength(1);
   });
 });

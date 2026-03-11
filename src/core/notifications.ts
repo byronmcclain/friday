@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import { appendFile } from "node:fs/promises";
+import type { AuditLogger } from "../audit/logger.ts";
 
 export interface FridayNotification {
   level: "info" | "warning" | "alert";
@@ -70,17 +70,21 @@ export class TerminalChannel implements NotificationChannel {
   }
 }
 
-export class LogChannel implements NotificationChannel {
-  name = "log";
-  private logPath: string;
+export class AuditLogChannel implements NotificationChannel {
+  name = "audit";
+  private audit: AuditLogger;
 
-  constructor(logPath: string) {
-    this.logPath = logPath;
+  constructor(audit: AuditLogger) {
+    this.audit = audit;
   }
 
   async send(notification: FridayNotification): Promise<void> {
-    const line = `[${new Date().toISOString()}] [${notification.level.toUpperCase()}] [${notification.source}] ${notification.title}: ${notification.body}\n`;
-    await appendFile(this.logPath, line);
+    this.audit.log({
+      action: `notification:${notification.level}`,
+      source: notification.source,
+      detail: `${notification.title}: ${notification.body}`,
+      success: true,
+    });
   }
 }
 
