@@ -75,7 +75,7 @@ In `Cortex.chat()`:
 
 ### File I/O
 
-- `appendFile` from `node:fs/promises` for round-by-round appending (same pattern as LogChannel)
+- `appendFile` from `node:fs/promises` for round-by-round appending (same pattern as AuditLogChannel)
 - `Bun.write()` for clearing files at the start of `chat()`
 - All writes wrapped in try/catch with `debug:inference-write-failed` audit entries on failure
 
