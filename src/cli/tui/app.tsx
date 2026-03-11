@@ -144,6 +144,15 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 					dispatch({ type: "tool:completed" });
 				};
 
+				// Wire notification push from the server into TUI toast + log panel
+				socketBridge.onNotification = (msg) => {
+					if (cancelled) return;
+					const prefix = { info: "\u2139", warning: "\u26A0", alert: "\uD83D\uDEA8" }[msg.level];
+					toast(`${prefix} ${msg.title}: ${msg.body}`);
+					const logLevel: LogEntry["level"] = msg.level === "alert" ? "error" : msg.level === "warning" ? "warning" : "info";
+					pushLog(logLevel, msg.source, msg.title, msg.body);
+				};
+
 				if (cancelled) return;
 
 				// Query the server for actual model info
