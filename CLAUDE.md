@@ -46,7 +46,6 @@ src/
 ├── main.ts                # Entrypoint — CLI bootstrap
 ├── cli/
 │   ├── index.ts           # Commander program definition, command registration
-│   ├── render.ts          # renderMarkdown() — marked + marked-terminal ANSI output (legacy, used by web)
 │   ├── commands/          # One file per CLI command (chat.ts delegates to TUI)
 │   └── tui/               # OpenTUI-based terminal interface (React for CLI)
 │       ├── app.tsx         # FridayApp root — lifecycle, boot phases, runtime integration
@@ -55,7 +54,7 @@ src/
 │       ├── filter-commands.ts  # TypeaheadEntry and filterCommands() for /command suggestions
 │       ├── log-store.ts   # LogStore — state store for TUI debug log panel
 │       ├── log-types.ts   # LogEntry types for structured log display
-│       ├── components/    # UI components (Header, ChatArea, InputBar, Message, Splash, LogPanel, etc.)
+│       ├── components/    # UI components (Header, ChatArea, InputBar, Message, Splash, LogPanel, CommandTypeahead, Thinking, Welcome)
 │       └── lib/           # ANSI parser, color utils, chafa logo processor, usePulse hook
 ├── core/
 │   ├── cortex.ts          # Cortex — LLM brain, chatStream() + chatStreamVoice() dual-mode
@@ -90,6 +89,7 @@ src/
 │       ├── narration.ts    # NarrationPicker, ACK_PHRASES, TOOL_NARRATIONS — Vox notification TTS phrases
 │       ├── channel.ts      # VoiceChannel — notification bridge (NotificationChannel impl)
 │       ├── emotion.ts      # emotionalRewrite() — conversation-aware emotional TTS rewriting
+│       ├── ws.ts            # openGrokWebSocket() — authenticated Grok realtime WebSocket factory
 │       └── protocol.ts     # /voice protocol (on, off, whisper, flat, test, status)
 ├── audit/
 │   ├── types.ts           # AuditEntry, AuditFilter interfaces
@@ -97,7 +97,7 @@ src/
 ├── modules/
 │   ├── types.ts           # FridayModule, FridayTool, FridayProtocol interfaces
 │   ├── loader.ts          # Module discovery, validation, and loading
-│   ├── validation.ts      # Shared input validation (path traversal, SSRF, flag injection)
+│   ├── validation.ts      # Shared argument validation (SSRF protection, flag injection guards)
 │   ├── filesystem/        # Filesystem module — read, write, list, delete, exec tools
 │   ├── git/               # Git module — status, diff, log, branch, stash, push, pull
 │   ├── docker/            # Docker module — ps, logs, inspect, stats, exec
@@ -144,7 +144,7 @@ src/
 │   ├── client-registry.ts # ClientRegistry — multi-client WebSocket tracking
 │   ├── socket.ts          # Unix socket server for singleton IPC (~/.friday/friday.sock)
 │   ├── ttyd.ts            # Terminal-in-browser support (spawns ttyd on port 7681)
-│   └── ws-channel.ts      # WebSocket notification channel
+│   └── push-channel.ts    # PushNotificationChannel — bridges notifications to WebSocket/socket clients
 ├── providers/             # AI SDK model factory (createModel), Zod schema converter
 │   ├── index.ts           # createModel(), GROK_DEFAULTS
 │   ├── schemas.ts         # toZodSchema() — converts FridayTool parameters to Zod for AI SDK
@@ -157,11 +157,11 @@ web/                       # React web UI (Vite + Tailwind) — voice-focused ar
 │   ├── App.tsx            # Root app component
 │   ├── main.tsx           # Vite entry point
 │   ├── components/
-│   │   ├── voice/         # VoiceControls, VoiceOrb, VoiceMode, VoiceStatus
+│   │   ├── voice/         # VoiceControls, VoiceOrb, VoiceMode, VoiceStatus + types, constants, barrel
 │   │   ├── terminal/      # TerminalEmbed — embedded terminal via ttyd
 │   │   └── menu/          # MenuBar — navigation and controls
 │   ├── hooks/             # useVoiceAudio, useVoiceSession
-│   └── index.css          # Tailwind theme (Friday amber palette)
+│   └── index.css          # Tailwind CSS v4 theme (Friday amber palette, @theme block)
 smarts/                    # Runtime-generated knowledge files (gitignored, user-specific)
 forge/                     # Friday-authored modules (gitignored, AI-generated)
 tests/
@@ -217,7 +217,7 @@ tests/
 
 ## Testing
 
-- 1119 tests across 105 files (as of 2026-03-08)
+- 1129 tests across 105 files (as of 2026-03-12)
 - Tests use `injectedModel: createMockModel()` (AI SDK `MockLanguageModelV3` from `ai/test` with call capture via `.doStreamCalls`/`.doGenerateCalls`)
 - Use `createErrorModel()` for models that throw on `doGenerate`/`doStream`
 - Shared test stubs live in `tests/helpers/stubs.ts`
@@ -270,7 +270,7 @@ docker run -e XAI_API_KEY=xai-... friday chat
 
 ## Design Documents
 
-All design docs live in `docs/plans/` with naming convention `YYYY-MM-DD-<topic>-design.md` (31 documents as of 2026-03-01). Key ones: `friday-agent-runtime-design`, `cortex-ai-sdk-migration-design`, `vox-voice-output-design`, `voice-web-integration-design`.
+All design docs live in `docs/plans/` with naming convention `YYYY-MM-DD-<topic>-design.md` (41 documents as of 2026-03-12). Key ones: `friday-agent-runtime-design`, `cortex-ai-sdk-migration-design`, `vox-voice-output-design`, `voice-web-integration-design`.
 
 **MCU concept mapping:** Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler, Genesis=identity template, Vox=voice
 
@@ -287,7 +287,6 @@ Always use Context7 MCP (`resolve-library-id` then `query-docs`) to fetch up-to-
 
 - Friday's personality is defined in `~/.friday/GENESIS.md` (loaded at boot) — seed template lives in `src/core/prompts.ts` as `GENESIS_TEMPLATE`
 - The user is a 30+ year programming veteran — Friday should match that expertise level in generated code
-- Interactive chat uses the OpenTUI-based TUI (`src/cli/tui/`) — not the legacy marked-terminal renderer
-- `renderMarkdown()` in `src/cli/render.ts` is still used by the web server, not the primary CLI chat
+- Interactive chat uses the OpenTUI-based TUI (`src/cli/tui/`) — not a legacy marked-terminal renderer
 - CLI banner and non-TUI output uses chalk (colors) with Friday amber palette
 - Biome handles both linting and formatting — run `bun run lint:fix` before committing

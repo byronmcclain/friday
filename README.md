@@ -16,7 +16,7 @@ TUI-first. Module-driven. Built to think, remember, and adapt.
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tests](https://img.shields.io/badge/tests-1119%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-1129%20passing-brightgreen)]()
 [![Biome](https://img.shields.io/badge/lint-Biome-60a5fa?logo=biome)](https://biomejs.dev)
 
 <br />
@@ -594,7 +594,7 @@ flowchart TB
 
 The **dynamic TTS prompt system** is the key innovation: `classifyContent()` detects what kind of content Friday is about to speak (tables, code blocks, bullet lists, URLs) and `buildTtsPrompt()` injects specific instructions for that utterance. A table gets "summarize the data verbally", while code gets "describe the code's purpose, don't read syntax aloud". The voice identity (`FRIDAY_VOICE_IDENTITY`) specifies a Kerry Condon-inspired County Tipperary Irish accent.
 
-**VoiceBridge** (`src/core/voice/bridge.ts`) provides a separate conversational voice interface — connecting to the Grok Realtime API (`wss://api.x.ai/v1/realtime`) for bidirectional audio conversations, with a state machine (idle → listening → thinking → speaking → error).
+**VoiceSessionManager** (`src/core/voice/session-manager.ts`) provides a separate conversational voice interface — connecting to the Grok Realtime API via `ws.ts` for bidirectional audio conversations, with a state machine (idle → listening → thinking → speaking → error). Routes transcripts through `cortex.chatStreamVoice()` with barge-in support (cancels in-flight responses on VAD speech detection).
 
 | Feature | Detail |
 |---|---|
@@ -1011,7 +1011,7 @@ Bun loads `.env` automatically — no dotenv needed.
 
 ```bash
 bun run dev              # Auto-restart on file changes
-bun test                 # Run all tests (1057 tests across 99 files)
+bun test                 # Run all tests (1129 tests across 105 files)
 bun test --watch         # Watch mode
 bun test tests/unit/cortex.test.ts  # Single test file
 bun run lint             # Lint check
@@ -1030,7 +1030,7 @@ src/
 ├── main.ts                # Entrypoint — CLI bootstrap
 ├── cli/
 │   ├── index.ts           # Commander program definition
-│   ├── render.ts          # Markdown → ANSI rendering (legacy, used by web server)
+
 │   ├── commands/          # One file per CLI command (chat.ts delegates to TUI)
 │   └── tui/               # OpenTUI terminal interface (React for CLI)
 │       ├── app.tsx         # FridayApp root — lifecycle, boot, runtime integration
@@ -1042,9 +1042,15 @@ src/
 │       ├── components/    # Header, ChatArea, InputBar, Message, Splash, Thinking, Welcome, LogPanel
 │       └── lib/           # ANSI parser, color utils, chafa logo processor, usePulse hook
 ├── core/
-│   ├── cortex.ts          # LLM brain and conversation state
+│   ├── cortex.ts          # LLM brain — chat(), chatStream() (TextWorker), chatStreamVoice() (VoiceWorker)
 │   ├── history-manager.ts # Token-budget conversation history with compaction
-│   ├── stream-types.ts    # ChatStream interface — textStream, fullText, usage
+│   ├── stream-types.ts    # ChatStream, VoiceChatStream interfaces
+│   ├── tool-bridge.ts     # Portable tool bridge — buildToolDefinitions, createToolExecutor, toGrokTools
+│   ├── workers/           # CortexWorker implementations
+│   │   ├── types.ts        # CortexWorker interface, WorkerRequest, WorkerResult, ToolEvent
+│   │   ├── text-worker.ts  # TextWorker — AI SDK streamText() agent loop
+│   │   ├── voice-worker.ts # VoiceWorker — Grok realtime WebSocket agent loop
+│   │   └── push-iterable.ts # Push-based AsyncIterable utility
 │   ├── summarizer.ts      # Session summaries via fast model
 │   ├── runtime.ts         # Boot/shutdown orchestrator
 │   ├── events.ts          # SignalBus — typed event system
@@ -1061,18 +1067,20 @@ src/
 │   │   └── types.ts       # RuntimeBridge interface
 │   └── voice/             # Vox — voice output and realtime conversational voice
 │       ├── vox.ts         # Vox class — fire-and-forget TTS, idle eviction
-│       ├── bridge.ts      # VoiceBridge — Grok Realtime API WebSocket
+│       ├── session-manager.ts # VoiceSessionManager — thin audio I/O + lifecycle (replaces VoiceBridge)
 │       ├── audio.ts       # pcmToWav, detectPlayer, playAudio
 │       ├── prompt.ts      # classifyContent, buildTtsPrompt, FRIDAY_VOICE_IDENTITY
+│       ├── narration.ts   # NarrationPicker, ACK_PHRASES, TOOL_NARRATIONS — Vox notification TTS phrases
 │       ├── channel.ts     # VoiceChannel — notification bridge
 │       ├── emotion.ts     # emotionalRewrite() — conversation-aware TTS rewriting
+│       ├── ws.ts          # openGrokWebSocket() — authenticated Grok realtime WebSocket factory
 │       ├── protocol.ts    # /voice protocol (on, off, whisper, flat, test, status)
 │       └── types.ts       # VoiceMode (off/on/whisper/flat), EmotionMood, EmotionProfile, GrokVoice, VoxConfig
 ├── audit/                 # Action tracking and filtering
 ├── modules/
 │   ├── types.ts           # FridayModule, FridayTool interfaces
 │   ├── loader.ts          # Module discovery and validation
-│   ├── validation.ts      # Shared input validation (path traversal, SSRF, flag injection)
+│   ├── validation.ts      # Shared argument validation (SSRF protection, flag injection guards)
 │   ├── filesystem/        # Read, write, list, delete, exec tools
 │   ├── git/               # Git operations (status, diff, log, branch, stash, push, pull)
 │   ├── docker/            # Docker management (ps, logs, inspect, stats, exec)
@@ -1114,7 +1122,7 @@ src/
 │   ├── client-registry.ts # ClientRegistry — multi-client WebSocket tracking
 │   ├── socket.ts          # Unix socket server for singleton IPC (~/.friday/friday.sock)
 │   ├── ttyd.ts            # Terminal-in-browser support (spawns ttyd on port 7681)
-│   └── ws-channel.ts      # WebSocket notification channel
+│   └── push-channel.ts    # PushNotificationChannel — bridges notifications to WebSocket/socket clients
 ├── providers/             # Grok model factory (createModel, Zod schema converter, debug-log)
 └── utils/
     └── timeout.ts         # Shared timeout utilities
