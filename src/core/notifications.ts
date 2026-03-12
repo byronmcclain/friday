@@ -118,6 +118,12 @@ export class WebhookChannel implements NotificationChannel {
   }
 }
 
+export const SLACK_LEVEL_EMOJI: Record<string, string> = {
+  info: ":information_source:",
+  warning: ":warning:",
+  alert: ":rotating_light:",
+};
+
 export class SlackChannel implements NotificationChannel {
   name = "slack";
   private webhookUrl: string;
@@ -127,11 +133,6 @@ export class SlackChannel implements NotificationChannel {
   }
 
   async send(notification: FridayNotification): Promise<void> {
-    const emoji = {
-      info: ":information_source:",
-      warning: ":warning:",
-      alert: ":rotating_light:",
-    };
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
     try {
@@ -139,7 +140,7 @@ export class SlackChannel implements NotificationChannel {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          text: `${emoji[notification.level]} *${notification.title}*\n${notification.body}`,
+          text: `${SLACK_LEVEL_EMOJI[notification.level]} *${notification.title}*\n${notification.body}`,
         }),
         signal: controller.signal,
       });

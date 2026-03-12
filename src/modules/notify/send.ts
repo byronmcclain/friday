@@ -1,5 +1,6 @@
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
 import { assertAllowedProtocol, assertNotPrivateIP } from "../validation.ts";
+import { SLACK_LEVEL_EMOJI } from "../../core/notifications.ts";
 
 const WEBHOOK_TIMEOUT_MS = 10_000;
 
@@ -70,7 +71,7 @@ export const notifySend: FridayTool = {
 		const explicitUrl = args.url as string | undefined;
 
 		// Always fire through NotificationManager (→ TUI toast, web UI, etc.)
-		const delivered: string[] = [];
+		const localDelivered = !!context.notifications;
 		if (context.notifications) {
 			await context.notifications.notify({
 				level: level as "info" | "warning" | "alert",
@@ -78,7 +79,6 @@ export const notifySend: FridayTool = {
 				body,
 				source: "notify.send",
 			});
-			delivered.push("local");
 		}
 
 		// If no external channel requested, we're done
@@ -91,14 +91,15 @@ export const notifySend: FridayTool = {
 			});
 			return {
 				success: true,
-				output: delivered.length > 0
+				output: localDelivered
 					? `Notification sent locally: ${title}`
 					: "No notification channels available",
-				artifacts: { level, title, delivered },
+				artifacts: { level, title, delivered: localDelivered ? ["local"] : [] },
 			};
 		}
 
 		// External channel dispatch
+		const suffix = localDelivered ? " — delivered locally" : "";
 		try {
 			switch (channel) {
 				case "slack": {
@@ -106,8 +107,8 @@ export const notifySend: FridayTool = {
 						explicitUrl ?? process.env.FRIDAY_SLACK_WEBHOOK_URL;
 					if (!webhookUrl) {
 						return {
-							success: delivered.length > 0,
-							output: delivered.length > 0
+							success: localDelivered,
+							output: localDelivered
 								? `Notification sent locally but no Slack webhook URL configured. Provide 'url' parameter or set FRIDAY_SLACK_WEBHOOK_URL env var.`
 								: "No Slack webhook URL. Provide 'url' parameter or set FRIDAY_SLACK_WEBHOOK_URL env var.",
 						};
@@ -117,17 +118,11 @@ export const notifySend: FridayTool = {
 					const slackIpCheck = assertNotPrivateIP(webhookUrl);
 					if (slackIpCheck) return slackIpCheck;
 
-					const emoji: Record<string, string> = {
-						info: ":information_source:",
-						warning: ":warning:",
-						alert: ":rotating_light:",
-					};
-
 					const payload = {
-						text: `${emoji[level]} *${title}*\n${body}`,
+						text: `${SLACK_LEVEL_EMOJI[level]} *${title}*\n${body}`,
 					};
 
-					return dispatchNotification("Slack", webhookUrl, payload, title, level, delivered, context);
+					return dispatchNotification("Slack", webhookUrl, payload, title, level, localDelivered, context);
 				}
 
 				case "webhook": {
@@ -135,8 +130,8 @@ export const notifySend: FridayTool = {
 						explicitUrl ?? process.env.FRIDAY_WEBHOOK_URL;
 					if (!webhookUrl) {
 						return {
-							success: delivered.length > 0,
-							output: delivered.length > 0
+							success: localDelivered,
+							output: localDelivered
 								? `Notification sent locally but no webhook URL configured. Provide 'url' parameter or set FRIDAY_WEBHOOK_URL env var.`
 								: "No webhook URL. Provide 'url' parameter or set FRIDAY_WEBHOOK_URL env var.",
 						};
@@ -154,7 +149,7 @@ export const notifySend: FridayTool = {
 						timestamp: new Date().toISOString(),
 					};
 
-					return dispatchNotification("Webhook", webhookUrl, payload, title, level, delivered, context);
+					return dispatchNotification("Webhook", webhookUrl, payload, title, level, localDelivered, context);
 				}
 
 				case "email": {
@@ -162,8 +157,8 @@ export const notifySend: FridayTool = {
 						explicitUrl ?? process.env.FRIDAY_EMAIL_WEBHOOK_URL;
 					if (!emailWebhookUrl) {
 						return {
-							success: delivered.length > 0,
-							output: delivered.length > 0
+							success: localDelivered,
+							output: localDelivered
 								? `Notification sent locally but no email webhook URL configured. Provide 'url' parameter or set FRIDAY_EMAIL_WEBHOOK_URL env var.`
 								: "No email webhook URL. Provide 'url' parameter or set FRIDAY_EMAIL_WEBHOOK_URL env var.",
 						};
@@ -181,7 +176,7 @@ export const notifySend: FridayTool = {
 						timestamp: new Date().toISOString(),
 					};
 
-					return dispatchNotification("Email", emailWebhookUrl, payload, title, level, delivered, context);
+					return dispatchNotification("Email", emailWebhookUrl, payload, title, level, localDelivered, context);
 				}
 
 				default:
@@ -193,37 +188,39 @@ export const notifySend: FridayTool = {
 		} catch (err) {
 			if (err instanceof DOMException && err.name === "AbortError") {
 				return {
-					success: delivered.length > 0,
-					output: `Notification timed out (${channel})${delivered.length > 0 ? " — delivered locally" : ""}`,
+					success: localDelivered,
+					output: `Notification timed out (${channel})${suffix}`,
 				};
 			}
 			const msg = err instanceof Error ? err.message : String(err);
 			return {
-				success: delivered.length > 0,
-				output: `External notification failed: ${msg}${delivered.length > 0 ? " — delivered locally" : ""}`,
+				success: localDelivered,
+				output: `External notification failed: ${msg}${suffix}`,
 			};
 		}
 	},
 };
 
 async function dispatchNotification(
-	channel: string,
+	channelLabel: string,
 	webhookUrl: string,
 	payload: Record<string, unknown>,
 	title: string,
 	level: string,
-	delivered: string[],
+	localDelivered: boolean,
 	context: ToolContext,
 ): Promise<ToolResult> {
 	const result = await sendWebhook(webhookUrl, payload);
+	const suffix = localDelivered ? " — delivered locally" : "";
 	if (!result.ok) {
 		return {
-			success: delivered.length > 0,
-			output: `${channel} webhook failed: ${result.status} ${result.statusText}${delivered.length > 0 ? " — delivered locally" : ""}`,
+			success: localDelivered,
+			output: `${channelLabel} webhook failed: ${result.status} ${result.statusText}${suffix}`,
 		};
 	}
 
-	delivered.push(channel.toLowerCase());
+	const channelKey = channelLabel.toLowerCase();
+	const delivered = localDelivered ? ["local", channelKey] : [channelKey];
 
 	await context.audit.log({
 		action: "tool:notify.send",
@@ -235,7 +232,7 @@ async function dispatchNotification(
 	return {
 		success: true,
 		output: `Notification sent (${delivered.join(", ")}): ${title}`,
-		artifacts: { channel, level, title, delivered },
+		artifacts: { channel: channelLabel, level, title, delivered },
 	};
 }
 

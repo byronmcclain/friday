@@ -123,10 +123,24 @@ export class WebSocketHandler {
 		}
 	}
 
+	private wireNotificationChannel(send: SendFn): void {
+		if (!this.runtime.notifications) return;
+		const channel = new PushNotificationChannel(send);
+		channel.name = this.channelName;
+		this.runtime.notifications.addChannel(channel);
+	}
+
 	private handleIdentify(
 		msg: Extract<ClientMessage, { type: "session:identify" }>,
 		send: SendFn,
 	): void {
+		// Clean up prior registrations to prevent signal handler leaks on re-identify
+		if (this.toolSignalHandler && this.runtime.signals) {
+			this.runtime.signals.off("tool:executing", this.toolSignalHandler);
+			this.runtime.signals.off("tool:completed", this.toolSignalHandler);
+			this.toolSignalHandler = null;
+		}
+
 		const capabilities = new Set<string>(["text"]);
 		if (msg.clientType === "voice") {
 			capabilities.add("audio-in");
@@ -142,12 +156,7 @@ export class WebSocketHandler {
 			capabilities,
 		});
 
-		// Wire notification channel for this client (per-client name avoids collisions)
-		if (this.runtime.notifications) {
-			const channel = new PushNotificationChannel(send);
-			channel.name = this.channelName;
-			this.runtime.notifications.addChannel(channel);
-		}
+		this.wireNotificationChannel(send);
 
 		// Forward tool signals to this client for TUI thinking indicator
 		if (this.runtime.signals) {
@@ -185,12 +194,7 @@ export class WebSocketHandler {
 				capabilities: new Set(["text"]),
 			});
 
-			// Wire notification channel (same as handleIdentify)
-			if (this.runtime.notifications) {
-				const channel = new PushNotificationChannel(send);
-				channel.name = this.channelName;
-				this.runtime.notifications.addChannel(channel);
-			}
+			this.wireNotificationChannel(send);
 		}
 
 		send({
