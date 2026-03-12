@@ -5,7 +5,7 @@ import type {
 	CortexWorker,
 } from "./types.ts";
 import { createPushIterable, type PushIterable } from "./push-iterable.ts";
-import { toGrokTools } from "../tool-bridge.ts";
+import { toGrokTools, type ToolDefinition, type GrokToolDefinition } from "../tool-bridge.ts";
 
 export interface VoiceWorkerConfig {
 	send: (data: string) => void;
@@ -27,6 +27,8 @@ export class VoiceWorker implements CortexWorker {
 	private toolPush: PushIterable<ToolEvent> | null = null;
 	private activeRequest: WorkerRequest | null = null;
 	private toolIterationCount = 0;
+	private _lastDefs: ToolDefinition[] | null = null;
+	private _cachedGrokTools: GrokToolDefinition[] | null = null;
 
 	constructor(config: VoiceWorkerConfig) {
 		this.send = config.send;
@@ -46,7 +48,11 @@ export class VoiceWorker implements CortexWorker {
 		this.toolPush = createPushIterable<ToolEvent>();
 
 		// 1. Send session.update with enriched system prompt + tools
-		const grokTools = toGrokTools(request.tools);
+		if (request.tools !== this._lastDefs) {
+			this._cachedGrokTools = toGrokTools(request.tools);
+			this._lastDefs = request.tools;
+		}
+		const grokTools = this._cachedGrokTools!;
 		this.send(
 			JSON.stringify({
 				type: "session.update",

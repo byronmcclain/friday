@@ -53,10 +53,10 @@ export class SignalBus implements SignalEmitter {
   }
 
   async emit(name: SignalName, source: string, data?: Record<string, unknown>): Promise<void> {
-    const signal: Signal = { name, timestamp: new Date(), source, data };
     const handlers = this.listeners.get(name);
-    if (!handlers) return;
-    for (const handler of [...handlers]) {
+    if (!handlers || handlers.size === 0) return;
+    const signal: Signal = { name, timestamp: new Date(), source, data };
+    for (const handler of handlers) {
       try {
         await handler(signal);
       } catch (err) {

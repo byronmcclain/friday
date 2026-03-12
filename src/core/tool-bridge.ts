@@ -88,6 +88,20 @@ export function toGrokTools(defs: ToolDefinition[]): GrokToolDefinition[] {
  * (via AI SDK tool wrappers) and VoiceWorker (via Grok function calls).
  */
 export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
+	// Pre-build context once — all fields are stable for executor lifetime
+	const context = {
+		workingDirectory: process.cwd(),
+		audit: config.audit ?? ({ log: () => {} } as unknown as AuditLogger),
+		signal: config.signals ?? ({ emit: async () => {} } as SignalEmitter),
+		memory: config.toolMemory ?? {
+			get: async () => undefined,
+			set: async () => {},
+			delete: async () => {},
+			list: async () => [],
+		},
+		notifications: config.notifications,
+	};
+
 	return async (name: string, args: Record<string, unknown>): Promise<string> => {
 		const fridayTool = config.tools.get(name);
 		if (!fridayTool) {
@@ -126,20 +140,9 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
 		});
 		config.signals?.emit("tool:executing", name, { args });
 
-		// Execute with context
+		// Execute with pre-built context
 		try {
-			const result = await fridayTool.execute(args, {
-				workingDirectory: process.cwd(),
-				audit: config.audit ?? ({ log: () => {} } as unknown as AuditLogger),
-				signal: config.signals ?? ({ emit: async () => {} } as SignalEmitter),
-				memory: config.toolMemory ?? {
-					get: async () => undefined,
-					set: async () => {},
-					delete: async () => {},
-					list: async () => [],
-				},
-				notifications: config.notifications,
-			});
+			const result = await fridayTool.execute(args, context);
 			config.signals?.emit("tool:completed", name);
 			return result.output || result.error || "Tool returned no output";
 		} catch (err) {

@@ -106,7 +106,7 @@ export class HistoryManager {
 		}
 	}
 
-	/** Get messages ready to send to the model */
+	/** Get messages ready to send to the model (returns internal array directly when no summary prefix) */
 	toMessages(): ModelMessage[] {
 		if (this.summaryPrefix) {
 			return [
@@ -121,7 +121,7 @@ export class HistoryManager {
 				...this.messages,
 			];
 		}
-		return [...this.messages];
+		return this.messages;
 	}
 
 	private estimateTokens(message: ModelMessage | string): number {

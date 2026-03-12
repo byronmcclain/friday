@@ -343,13 +343,18 @@ export class Cortex {
 			const sections: string[] = [];
 			let totalChars = 0;
 
-			for (const name of this.pinnedSmarts) {
+			// Parallel fetch — pinned smarts are independent reads
+			const pinnedEntries = this.pinnedSmarts.size > 0
+				? await Promise.all(
+					[...this.pinnedSmarts].map(name => this.smartsStore!.getByName(name))
+				)
+				: [];
+			for (const entry of pinnedEntries) {
 				if (
 					sections.length >= MAX_SMARTS_SECTIONS ||
 					totalChars >= MAX_SMARTS_CHARS
 				)
 					break;
-				const entry = await this.smartsStore.getByName(name);
 				if (entry) {
 					const title =
 						entry.content.split("\n")[0]?.replace(/^#+\s*/, "") ||

@@ -2,6 +2,7 @@ import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { streamText, tool as aiTool, stepCountIs } from "ai";
 import { toZodSchema } from "../../providers/schemas.ts";
 import type { WorkerRequest, WorkerResult, ToolEvent, CortexWorker } from "./types.ts";
+import type { ToolDefinition, ToolExecutor } from "../tool-bridge.ts";
 
 /** Empty async iterable — TextWorker delegates tool event signaling to createToolExecutor */
 const EMPTY_TOOL_EVENTS: AsyncIterable<ToolEvent> = {
@@ -20,21 +21,33 @@ const EMPTY_TOOL_EVENTS: AsyncIterable<ToolEvent> = {
  * and returns the standard WorkerResult.
  */
 export class TextWorker implements CortexWorker {
+	private _lastDefs: ToolDefinition[] | null = null;
+	private _lastExecutor: ToolExecutor | null = null;
+	private _cachedAiTools: Record<string, ReturnType<typeof aiTool<any, any>>> | null = null;
+	private _cachedHasTools = false;
+
 	constructor(private readonly model: LanguageModelV3) {}
 
 	process(request: WorkerRequest): WorkerResult {
-		// Build AI SDK tools from portable definitions
-		const aiTools: Record<string, ReturnType<typeof aiTool<any, any>>> = {};
-		for (const def of request.tools) {
-			aiTools[def.name] = aiTool({
-				description: def.description,
-				inputSchema: toZodSchema(def.parameters),
-				execute: async (args: Record<string, unknown>) =>
-					request.executeTool(def.name, args),
-			});
+		// Cache AI SDK tools — rebuild only when defs or executor change
+		if (request.tools !== this._lastDefs || request.executeTool !== this._lastExecutor) {
+			const executeTool = request.executeTool;
+			const aiTools: Record<string, ReturnType<typeof aiTool<any, any>>> = {};
+			for (const def of request.tools) {
+				aiTools[def.name] = aiTool({
+					description: def.description,
+					inputSchema: toZodSchema(def.parameters),
+					execute: async (args: Record<string, unknown>) =>
+						executeTool(def.name, args),
+				});
+			}
+			this._cachedAiTools = aiTools;
+			this._cachedHasTools = Object.keys(aiTools).length > 0;
+			this._lastDefs = request.tools;
+			this._lastExecutor = request.executeTool;
 		}
 
-		const hasTools = Object.keys(aiTools).length > 0;
+		const hasTools = this._cachedHasTools;
 
 		// Three-layer timeout defense:
 		// 1. stepMs — AI SDK per-step abort (may not fire reliably with reasoning models)
@@ -54,7 +67,7 @@ export class TextWorker implements CortexWorker {
 			model: this.model,
 			system: request.systemPrompt,
 			messages: request.messages,
-			...(hasTools ? { tools: aiTools } : {}),
+			...(hasTools ? { tools: this._cachedAiTools! } : {}),
 			...(hasTools ? { stopWhen: stepCountIs(request.maxToolIterations) } : {}),
 			maxOutputTokens: request.maxOutputTokens,
 			...(stepMs !== undefined ? { timeout: { stepMs, chunkMs: 60_000 } } : {}),
