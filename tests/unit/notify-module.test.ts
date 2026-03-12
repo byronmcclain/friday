@@ -3,6 +3,7 @@ import { AuditLogger } from "../../src/audit/logger.ts";
 import notifyModule from "../../src/modules/notify/index.ts";
 import { notifySend } from "../../src/modules/notify/send.ts";
 import type { ToolContext } from "../../src/modules/types.ts";
+import { NotificationManager, type FridayNotification } from "../../src/core/notifications.ts";
 
 let mockWebhookServer: ReturnType<typeof Bun.serve>;
 let mockWebhookUrl: string;
@@ -32,6 +33,19 @@ const ctx: ToolContext = {
 		list: async () => [],
 	},
 };
+
+function ctxWithNotifications() {
+	const sent: FridayNotification[] = [];
+	const notifications = new NotificationManager();
+	notifications.addChannel({
+		name: "test",
+		async send(n: FridayNotification) { sent.push(n); },
+	});
+	return {
+		ctx: { ...ctx, notifications } satisfies ToolContext,
+		sent,
+	};
+}
 
 // ─── Module manifest ────────────────────────────────────────────────
 describe("notify module", () => {
@@ -83,7 +97,7 @@ describe("notify.send", () => {
 		expect(result.output).toContain("Unsupported channel");
 	});
 
-	test("fails for webhook without URL configured", async () => {
+	test("fails for webhook without URL when no local channels", async () => {
 		const result = await notifySend.execute(
 			{ title: "test", body: "test", channel: "webhook" },
 			ctx,
@@ -92,7 +106,7 @@ describe("notify.send", () => {
 		expect(result.output).toContain("No webhook URL");
 	});
 
-	test("fails for slack without URL configured", async () => {
+	test("fails for slack without URL when no local channels", async () => {
 		const result = await notifySend.execute(
 			{ title: "test", body: "test", channel: "slack" },
 			ctx,
@@ -101,7 +115,7 @@ describe("notify.send", () => {
 		expect(result.output).toContain("No Slack webhook URL");
 	});
 
-	test("fails for email without URL configured", async () => {
+	test("fails for email without URL when no local channels", async () => {
 		const result = await notifySend.execute(
 			{ title: "test", body: "test", channel: "email" },
 			ctx,
@@ -141,8 +155,8 @@ describe("notify.send", () => {
 				ctx,
 			);
 			expect(result.success).toBe(true);
-			expect(result.output).toContain("Webhook notification sent");
-			expect(result.artifacts?.channel).toBe("Webhook");
+			expect(result.output).toContain("Notification sent");
+			expect(result.output).toContain("webhook");
 			expect(result.artifacts?.title).toBe("Test Alert");
 		} finally {
 			globalThis.fetch = originalFetch;
@@ -158,9 +172,67 @@ describe("notify.send", () => {
 				ctx,
 			);
 			expect(result.success).toBe(true);
-			expect(result.output).toContain("Slack notification sent");
+			expect(result.output).toContain("Notification sent");
+			expect(result.output).toContain("slack");
 		} finally {
 			globalThis.fetch = originalFetch;
 		}
+	});
+
+	// ─── Local notification (NotificationManager) tests ──────────────
+	test("sends local-only notification when no channel specified", async () => {
+		const { ctx: localCtx, sent } = ctxWithNotifications();
+		const result = await notifySend.execute(
+			{ title: "Local Alert", body: "TUI toast test", level: "warning" },
+			localCtx,
+		);
+		expect(result.success).toBe(true);
+		expect(result.output).toContain("locally");
+		expect(sent).toHaveLength(1);
+		expect(sent[0]!.title).toBe("Local Alert");
+		expect(sent[0]!.body).toBe("TUI toast test");
+		expect(sent[0]!.level).toBe("warning");
+		expect(sent[0]!.source).toBe("notify.send");
+	});
+
+	test("fires local notification even when external channel also dispatches", async () => {
+		const originalFetch = globalThis.fetch;
+		globalThis.fetch = Object.assign(async () => new Response("ok", { status: 200 }), { preconnect: globalThis.fetch.preconnect }) as typeof fetch;
+		try {
+			const { ctx: localCtx, sent } = ctxWithNotifications();
+			const result = await notifySend.execute(
+				{ title: "Dual", body: "Both paths", channel: "webhook", url: "https://hooks.example.com/webhook" },
+				localCtx,
+			);
+			expect(result.success).toBe(true);
+			expect(result.output).toContain("local");
+			expect(result.output).toContain("webhook");
+			expect(sent).toHaveLength(1);
+			expect(sent[0]!.title).toBe("Dual");
+		} finally {
+			globalThis.fetch = originalFetch;
+		}
+	});
+
+	test("succeeds locally when webhook URL is missing but notifications available", async () => {
+		const { ctx: localCtx, sent } = ctxWithNotifications();
+		const result = await notifySend.execute(
+			{ title: "Fallback", body: "No webhook", channel: "webhook" },
+			localCtx,
+		);
+		expect(result.success).toBe(true);
+		expect(result.output).toContain("locally");
+		expect(result.output).toContain("no webhook URL");
+		expect(sent).toHaveLength(1);
+	});
+
+	test("default level is info for local notifications", async () => {
+		const { ctx: localCtx, sent } = ctxWithNotifications();
+		await notifySend.execute(
+			{ title: "Default Level", body: "Should be info" },
+			localCtx,
+		);
+		expect(sent).toHaveLength(1);
+		expect(sent[0]!.level).toBe("info");
 	});
 });

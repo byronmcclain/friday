@@ -3,6 +3,7 @@ import type { ClearanceManager } from "./clearance.ts";
 import type { AuditLogger } from "../audit/logger.ts";
 import type { SignalBus, SignalEmitter } from "./events.ts";
 import type { ScopedMemory } from "./memory.ts";
+import type { NotificationManager } from "./notifications.ts";
 
 /** Portable tool definition — works for AI SDK, Grok realtime, or any LLM API */
 export type ToolDefinition = Pick<FridayTool, "name" | "description" | "parameters">;
@@ -35,6 +36,7 @@ export interface ToolExecutorConfig {
 	audit?: AuditLogger;
 	signals?: SignalBus;
 	toolMemory?: ScopedMemory;
+	notifications?: NotificationManager;
 }
 
 /** Grok realtime API function tool definition */
@@ -136,6 +138,7 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
 					delete: async () => {},
 					list: async () => [],
 				},
+				notifications: config.notifications,
 			});
 			config.signals?.emit("tool:completed", name);
 			return result.output || result.error || "Tool returned no output";

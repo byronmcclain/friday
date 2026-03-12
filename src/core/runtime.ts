@@ -380,6 +380,7 @@ export class FridayRuntime {
 				audit: this._audit,
 				signals: this._signals,
 				toolMemory: this._memory?.scoped("tools"),
+				notifications: this._notifications,
 				genesisPrompt,
 				vox: this._vox,
 				debug: config.debug,

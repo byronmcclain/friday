@@ -20,7 +20,7 @@ import {
 import type { TypeaheadEntry } from "./filter-commands.ts";
 import { LogStore } from "./log-store.ts";
 import { LogPanel } from "./components/log-panel.tsx";
-import type { LogEntry } from "./log-types.ts";
+import { LOG_ICONS, type LogEntry } from "./log-types.ts";
 
 // Module-level renderer reference so shutdown can call destroy()
 let activeRenderer: Awaited<ReturnType<typeof createCliRenderer>> | null =
@@ -63,6 +63,33 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 	const isShuttingDownRef = useRef(false);
 	const phaseRef = useRef(state.phase);
 	phaseRef.current = state.phase;
+
+	// Add toast overlay AFTER React's initial commit — must happen here
+	// because React's ConcurrentRoot calls clearContainer() during the
+	// first commit, which removes all pre-existing renderer.root children.
+	useEffect(() => {
+		const toastWidth = Math.min(100, Math.floor(renderer.width * 0.6));
+		const toaster = new ToasterRenderable(renderer, {
+			position: "top-right",
+			stackingMode: "stack",
+			visibleToasts: 3,
+			maxWidth: toastWidth,
+			toastOptions: {
+				duration: 8000,
+				style: {
+					backgroundColor: PALETTE.surface,
+					foregroundColor: PALETTE.textPrimary,
+					borderColor: PALETTE.copperAccent,
+					maxWidth: toastWidth,
+				},
+			},
+		});
+		renderer.root.add(toaster);
+		return () => {
+			renderer.root.remove(toaster.id);
+			toaster.destroy();
+		};
+	}, [renderer]);
 
 	const pushLog = useCallback((level: LogEntry["level"], source: string, message: string, detail?: string) => {
 		const entry: LogEntry = {
@@ -147,9 +174,12 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 				// Wire notification push from the server into TUI toast + log panel
 				socketBridge.onNotification = (msg) => {
 					if (cancelled) return;
-					const prefix = { info: "\u2139", warning: "\u26A0", alert: "\uD83D\uDEA8" }[msg.level];
-					toast(`${prefix} ${msg.title}: ${msg.body}`);
 					const logLevel: LogEntry["level"] = msg.level === "alert" ? "error" : msg.level === "warning" ? "warning" : "info";
+					// Toast shows title + truncated body preview; full content lives in the log panel
+					const preview = msg.body.length > 160
+						? msg.body.slice(0, 160).trimEnd() + "…"
+						: msg.body;
+					toast(`${LOG_ICONS[logLevel]} ${msg.title}`, { description: preview });
 					pushLog(logLevel, msg.source, msg.title, msg.body);
 				};
 
@@ -435,21 +465,6 @@ export async function launchTui(options: {
 		};
 		process.on("SIGTERM", emergencyCleanup);
 		process.on("SIGINT", emergencyCleanup);
-
-		// Add toast overlay to the renderer
-		const toaster = new ToasterRenderable(renderer, {
-			position: "top-right",
-			stackingMode: "stack",
-			visibleToasts: 3,
-			toastOptions: {
-				style: {
-					backgroundColor: PALETTE.surface,
-					foregroundColor: PALETTE.textPrimary,
-					borderColor: PALETTE.copperAccent,
-				},
-			},
-		});
-		renderer.root.add(toaster);
 
 		const root = createRoot(renderer);
 		root.render(<FridayApp options={options} renderer={renderer} />);

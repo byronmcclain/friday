@@ -93,10 +93,11 @@ describe("AuditLogChannel", () => {
 
     const entries = audit.entries({ action: "notification:warning" });
     expect(entries).toHaveLength(1);
-    expect(entries[0].action).toBe("notification:warning");
-    expect(entries[0].source).toBe("sensorium");
-    expect(entries[0].detail).toBe("Memory High: Memory usage at 92%");
-    expect(entries[0].success).toBe(true);
+    const entry = entries[0]!;
+    expect(entry.action).toBe("notification:warning");
+    expect(entry.source).toBe("sensorium");
+    expect(entry.detail).toBe("Memory High: Memory usage at 92%");
+    expect(entry.success).toBe(true);
   });
 
   test("send() maps alert level to action string", async () => {

@@ -3,6 +3,7 @@ import type { SignalName } from "../core/events.ts";
 import type { AuditLogger } from "../audit/logger.ts";
 import type { SignalEmitter } from "../core/events.ts";
 import type { ScopedMemory } from "../core/memory.ts";
+import type { NotificationManager } from "../core/notifications.ts";
 
 export interface ToolParameter {
   name: string;
@@ -17,6 +18,7 @@ export interface ToolContext {
   audit: AuditLogger;
   signal: SignalEmitter;
   memory: ScopedMemory;
+  notifications?: NotificationManager;
 }
 
 export interface ToolResult {

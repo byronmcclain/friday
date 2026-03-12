@@ -184,6 +184,13 @@ export class WebSocketHandler {
 				send,
 				capabilities: new Set(["text"]),
 			});
+
+			// Wire notification channel (same as handleIdentify)
+			if (this.runtime.notifications) {
+				const channel = new PushNotificationChannel(send);
+				channel.name = this.channelName;
+				this.runtime.notifications.addChannel(channel);
+			}
 		}
 
 		send({

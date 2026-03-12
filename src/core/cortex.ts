@@ -9,6 +9,7 @@ import { type Sensorium, formatDateTime } from "../sensorium/sensorium.ts";
 import type { AuditLogger } from "../audit/logger.ts";
 import type { SignalBus } from "./events.ts";
 import type { ScopedMemory } from "./memory.ts";
+import type { NotificationManager } from "./notifications.ts";
 import type { Vox } from "./voice/vox.ts";
 import { HistoryManager } from "./history-manager.ts";
 import type { ChatStream, VoiceChatStream } from "./stream-types.ts";
@@ -31,6 +32,7 @@ export interface CortexConfig extends Partial<FridayConfig> {
 	audit?: AuditLogger;
 	signals?: SignalBus;
 	toolMemory?: ScopedMemory;
+	notifications?: NotificationManager;
 	genesisPrompt?: string;
 	vox?: Vox;
 	debug?: boolean;
@@ -54,6 +56,7 @@ export class Cortex {
 	private audit?: AuditLogger;
 	private signals?: SignalBus;
 	private toolMemory?: ScopedMemory;
+	private notifications?: NotificationManager;
 	private pinnedSmarts = new Set<string>();
 	private genesisPrompt?: string;
 	private vox?: Vox;
@@ -79,6 +82,7 @@ export class Cortex {
 		this.audit = config.audit;
 		this.signals = config.signals;
 		this.toolMemory = config.toolMemory;
+		this.notifications = config.notifications;
 		this.genesisPrompt = config.genesisPrompt;
 		this.vox = config.vox;
 		this._debug = config.debug ?? false;
@@ -288,6 +292,7 @@ export class Cortex {
 			audit: this.audit,
 			signals: this.signals,
 			toolMemory: this.toolMemory,
+			notifications: this.notifications,
 		}));
 
 		return { systemPrompt, defs, executor };
