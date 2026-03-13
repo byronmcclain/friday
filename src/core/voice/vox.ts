@@ -152,6 +152,7 @@ export class Vox {
 					body: JSON.stringify({
 						text: spokenText,
 						voice_id: this._config.defaultVoice.toLowerCase(),
+						language: "en",
 						output_format: { codec: "wav", sample_rate: 24000 },
 					}),
 					signal: controller.signal,
