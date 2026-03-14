@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 export interface UseVoiceAudioReturn {
   startCapture: () => Promise<void>;
@@ -21,6 +21,16 @@ export function useVoiceAudio(
 
   const playbackCtxRef = useRef<AudioContext | null>(null);
   const nextPlayTimeRef = useRef(0);
+
+  // Cleanup mic resources on unmount — releases browser mic indicator
+  useEffect(() => {
+    return () => {
+      workletRef.current?.disconnect();
+      sourceRef.current?.disconnect();
+      audioCtxRef.current?.close();
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
 
   const startCapture = useCallback(async () => {
     if (isCapturing) return;

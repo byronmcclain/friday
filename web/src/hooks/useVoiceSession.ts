@@ -64,6 +64,12 @@ export function useVoiceSession({ wsUrl }: UseVoiceSessionOptions): UseVoiceSess
     wsRef.current = ws;
 
     return () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: "voice:stop",
+          id: crypto.randomUUID(),
+        }));
+      }
       ws.close();
       wsRef.current = null;
     };
