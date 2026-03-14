@@ -34,7 +34,7 @@ onLoad?(): Promise<void>;
 onLoad?(context: ModuleContext): Promise<void>;
 ```
 
-**Backward compatible**: JavaScript functions silently ignore extra arguments. Existing modules with zero-arg `onLoad()` continue to work unchanged. TypeScript also allows this — a function accepting fewer params is assignable to a function type expecting more params.
+**Backward compatible at the module level**: JavaScript functions silently ignore extra arguments. Existing modules with zero-arg `onLoad()` continue to work unchanged — TypeScript allows a function accepting fewer params to be assigned to a function type expecting more params. The two call sites in `runtime.ts` **must** be updated to pass the context argument (TypeScript will error until they do). No new imports needed in `types.ts` — `ScopedMemory` is already imported there for `ToolContext`.
 
 ### Runtime wiring
 
@@ -58,6 +58,8 @@ await mod.onLoad({
 ```
 
 Each module gets its own SQLite KV namespace keyed by `mod.name` (e.g., `"gmail"`, `"filesystem"`). This follows the existing pattern used for tools (`this._memory?.scoped("tools")`), directives (`scoped("directive")`), and Arc Rhythm (`scoped("arc-rhythm")`).
+
+**Null-object fallback**: When `this._memory` is undefined (no `dataDir` at boot), the no-op fallback silently degrades to ephemeral behavior — the same as today's `Map` workaround. This is acceptable: `dataDir` is always set in normal operation. The fallback matches the existing pattern used for directives and protocols.
 
 ### Gmail module update
 
@@ -95,7 +97,24 @@ This removes ~15 lines of `Map` boilerplate and the TODO comment. Encrypted toke
 
 ### Forge template update
 
-In `src/modules/forge/propose.ts`, update the `generateModuleTemplate()` commented example to mention that `onLoad(context: ModuleContext)` provides `context.memory` for persistent storage. The generated module itself does not define `onLoad()` (unchanged).
+In `src/modules/forge/propose.ts`, update `generateModuleTemplate()`:
+
+1. Add `ModuleContext` to the template's import line:
+   ```typescript
+   import type { FridayModule, FridayTool, ToolContext, ToolResult, ModuleContext } from "../../src/modules/types.ts";
+   ```
+
+2. Add a commented `onLoad` example after the existing tool example:
+   ```typescript
+   // Optional lifecycle hook with persistent storage:
+   //
+   // async onLoad(context: ModuleContext) {
+   //   const saved = await context.memory.get<string>("my-key");
+   //   await context.memory.set("my-key", "my-value");
+   // },
+   ```
+
+The generated module itself does not define `onLoad()` (unchanged).
 
 ### Documentation updates
 
@@ -129,3 +148,5 @@ Design docs in `docs/plans/` are historical snapshots — left as-is.
 - Existing module loader tests should continue to pass (they test discovery/validation, not `onLoad` args)
 - Add a test verifying that `onLoad` receives a `ModuleContext` with working `ScopedMemory` (roundtrip set/get)
 - Verify backward compatibility: a module with zero-arg `onLoad()` still loads without error
+- Test null-object fallback: boot without `dataDir`, module with `onLoad` defined — should not throw
+- Test Gmail token roundtrip: `SecretStore` backed by real `ScopedMemory` can encrypt, persist, and decrypt tokens across two separate `loadTokens()` calls (proves the core fix works)
