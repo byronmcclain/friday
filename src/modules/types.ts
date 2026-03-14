@@ -71,6 +71,6 @@ export interface FridayModule {
   knowledge: string[];
   triggers: SignalName[];
   clearance: ClearanceName[];
-  onLoad?(context?: ModuleContext): Promise<void>;
+  onLoad?(context: ModuleContext): Promise<void>;
   onUnload?(): Promise<void>;
 }
