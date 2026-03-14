@@ -456,7 +456,14 @@ export class FridayRuntime {
 						this._protocols.register(protocol);
 					}
 					if (mod.onLoad) {
-						await mod.onLoad();
+						await mod.onLoad({
+							memory: this._memory?.scoped(mod.name) ?? {
+								get: async () => undefined,
+								set: async () => {},
+								delete: async () => {},
+								list: async () => [],
+							},
+						});
 					}
 				}
 			}
@@ -480,7 +487,14 @@ export class FridayRuntime {
 						this._protocols.register(protocol);
 					}
 					if (mod.onLoad) {
-						await mod.onLoad();
+						await mod.onLoad({
+							memory: this._memory?.scoped(mod.name) ?? {
+								get: async () => undefined,
+								set: async () => {},
+								delete: async () => {},
+								list: async () => [],
+							},
+						});
 					}
 					this._modules.push(mod);
 				}
