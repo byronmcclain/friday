@@ -200,7 +200,7 @@ tests/
 
 - **Dual-model architecture**: reasoning model (Cortex) + fast model (SmartsCurator, Summarizer). Resolution: CLI flag > env var > `GROK_DEFAULTS`. `FridayConfig.fastModel` carries through config chain.
 - **Tool registration**: `registerTool()` → `toZodSchema()` converts FridayTool params to AI SDK tools
-- **Module pattern**: `satisfies FridayModule` preferred over `: FridayModule` for literal type preservation. Mutable arrays for triggers/clearance (no `as const`).
+- **Module pattern**: `satisfies FridayModule` preferred over `: FridayModule` for literal type preservation. Mutable arrays for triggers/clearance (no `as const`). `onLoad(context: ModuleContext)` receives `ScopedMemory` for persistent storage (namespaced by module name).
 - **`AuditEntry`** requires `action`, `source`, `detail`, `success` — NOT `target` or `message`
 - **Types split by domain**: core config in `src/core/types.ts`, tool/module contracts in `src/modules/types.ts`, directive structures in `src/directives/types.ts`
 - **Commands** registered via Commander.js in `src/cli/index.ts`, one file per command under `src/cli/commands/`

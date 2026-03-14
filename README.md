@@ -238,7 +238,7 @@ flowchart TB
         M --> KNOW[Knowledge: static entries]
         M --> TRIG[Triggers: signal subscriptions]
         M --> CLEAR[Clearance: required permissions]
-        M --> LC[Lifecycle: onLoad / onUnload]
+        M --> LC[Lifecycle: onLoad&#40;context&#41; / onUnload]
     end
 
     subgraph Validation ["Shared Validation Layer"]
@@ -954,8 +954,8 @@ const myModule: FridayModule = {
   triggers: ["file:changed"],
   clearance: ["read-fs"],
 
-  async onLoad() {
-    // Called when the module is loaded at boot
+  async onLoad(context) {
+    // Called when the module is loaded at boot — context.memory provides persistent ScopedMemory
   },
 
   async onUnload() {
