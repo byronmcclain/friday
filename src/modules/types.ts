@@ -58,6 +58,10 @@ export interface ProtocolResult {
   details?: string;
 }
 
+export interface ModuleContext {
+  memory: ScopedMemory;
+}
+
 export interface FridayModule {
   name: string;
   description: string;
@@ -67,6 +71,6 @@ export interface FridayModule {
   knowledge: string[];
   triggers: SignalName[];
   clearance: ClearanceName[];
-  onLoad?(): Promise<void>;
+  onLoad?(context?: ModuleContext): Promise<void>;
   onUnload?(): Promise<void>;
 }
