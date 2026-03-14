@@ -9,7 +9,7 @@ function generateModuleTemplate(
 	return [
 		{
 			path: "index.ts",
-			content: `import type { FridayModule, FridayTool, ToolContext, ToolResult } from "../../src/modules/types.ts";
+			content: `import type { FridayModule, FridayTool, ToolContext, ToolResult, ModuleContext } from "../../src/modules/types.ts";
 
 // ToolContext has: { workingDirectory: string, audit, signal, memory }
 // ToolResult must have: { success: boolean, output: string, error?: string, artifacts?: Record<string, unknown> }
@@ -30,6 +30,13 @@ function generateModuleTemplate(
 //     return { success: true, output: \`Result: \${input}\`, artifacts: { raw: input } };
 //   },
 // };
+//
+// Optional lifecycle hook with persistent storage:
+//
+// async onLoad(context: ModuleContext) {
+//   const saved = await context.memory.get<string>("my-key");
+//   await context.memory.set("my-key", "my-value");
+// },
 
 const ${toolName}Module = {
   name: ${JSON.stringify(moduleName)},
