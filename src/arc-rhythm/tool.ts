@@ -190,6 +190,39 @@ function handleUpdate(
 		updates.nextRun = nextOccurrence(args.cron as string);
 	}
 
+	const actionType = args.action_type as string | undefined;
+	const actionConfig = args.action_config as string | undefined;
+	if (actionType && actionConfig) {
+		let action: RhythmAction;
+		try {
+			const config = JSON.parse(actionConfig);
+			switch (actionType) {
+				case "prompt":
+					action = { type: "prompt", prompt: config.prompt ?? actionConfig };
+					break;
+				case "tool":
+					action = { type: "tool", tool: config.tool, args: config.args };
+					break;
+				case "protocol":
+					action = { type: "protocol", protocol: config.protocol, args: config.args };
+					break;
+				default:
+					return {
+						success: false,
+						output: `Unknown action type: ${actionType}`,
+					};
+			}
+		} catch {
+			// For prompt actions, action_config can be a plain string (not JSON)
+			if (actionType === "prompt") {
+				action = { type: "prompt", prompt: actionConfig };
+			} else {
+				return { success: false, output: "Invalid action_config JSON" };
+			}
+		}
+		updates.action = action;
+	}
+
 	store.update(rhythmId, updates);
 	return {
 		success: true,
