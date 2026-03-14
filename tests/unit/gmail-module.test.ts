@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import gmailModule from "../../src/modules/gmail/index.ts";
+import type { ModuleContext } from "../../src/modules/types.ts";
 
 describe("gmail module", () => {
 	test("exports valid module manifest", () => {
@@ -31,5 +32,18 @@ describe("gmail module", () => {
 
 	test("has onLoad lifecycle hook", () => {
 		expect(typeof gmailModule.onLoad).toBe("function");
+	});
+
+	test("onLoad accepts ModuleContext without error", async () => {
+		const context: ModuleContext = {
+			memory: {
+				get: async () => undefined,
+				set: async () => {},
+				delete: async () => {},
+				list: async () => [],
+			},
+		};
+		// Should not throw — early returns due to missing env vars
+		await gmailModule.onLoad(context);
 	});
 });

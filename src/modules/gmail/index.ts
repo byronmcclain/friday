@@ -1,4 +1,4 @@
-import type { FridayModule } from "../types.ts";
+import type { FridayModule, ModuleContext } from "../types.ts";
 import { gmailSearch } from "./tools/search.ts";
 import { gmailRead } from "./tools/read.ts";
 import { gmailSend } from "./tools/send.ts";
@@ -29,7 +29,7 @@ const gmailModule = {
 	triggers: ["custom:gmail-auth-expired"],
 	clearance: ["network", "email-send"],
 
-	async onLoad() {
+	async onLoad(context: ModuleContext) {
 		const clientId = process.env.GOOGLE_CLIENT_ID;
 		const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
@@ -40,24 +40,7 @@ const gmailModule = {
 			return;
 		}
 
-		// SecretStore needs ScopedMemory for encrypted blob persistence.
-		// TODO: FridayModule.onLoad() receives no context — once the interface
-		// is extended to pass ModuleContext we should use context.memory here
-		// instead of an ephemeral Map (tokens still survive via OS keychain).
-		const memoryStore = new Map<string, unknown>();
-		const scopedMemory = {
-			get: async <T>(key: string) =>
-				memoryStore.get(key) as T | undefined,
-			set: async <T>(key: string, value: T) => {
-				memoryStore.set(key, value);
-			},
-			delete: async (key: string) => {
-				memoryStore.delete(key);
-			},
-			list: async () => [...memoryStore.keys()],
-		};
-
-		const secrets = new SecretStore(scopedMemory);
+		const secrets = new SecretStore(context.memory);
 		const auth = new GmailAuth(secrets, clientId, clientSecret);
 		setGmailAuth(auth);
 
