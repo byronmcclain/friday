@@ -50,12 +50,36 @@ export const gmailProtocol: FridayProtocol = {
 								"Gmail auth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET env vars.",
 						};
 					}
-					const authenticated = auth.isAuthenticated();
+					if (!auth.isAuthenticated()) {
+						return {
+							success: true,
+							summary: "Gmail: not authenticated. Run /gmail auth",
+						};
+					}
+					// Check if token is actually usable
+					const refreshOk = await auth.refreshIfNeeded();
 					return {
 						success: true,
-						summary: authenticated
-							? "Gmail: authenticated"
-							: "Gmail: not authenticated. Run /gmail auth",
+						summary: refreshOk
+							? "Gmail: authenticated (token valid)"
+							: "Gmail: authenticated but token expired. Run /gmail auth to re-authenticate, or /gmail auth refresh to retry.",
+					};
+				}
+
+				if (rest === "refresh") {
+					const auth = getGmailAuth();
+					if (!auth) {
+						return {
+							success: false,
+							summary: "Gmail auth not configured.",
+						};
+					}
+					const refreshed = await auth.forceRefresh();
+					return {
+						success: refreshed,
+						summary: refreshed
+							? "Gmail: token refreshed successfully"
+							: "Gmail: token refresh failed — refresh token may be expired. Run /gmail auth to re-authenticate.\n\nNote: Google Cloud apps in 'Testing' mode expire refresh tokens after 7 days. Consider publishing your app to get long-lived tokens.",
 					};
 				}
 

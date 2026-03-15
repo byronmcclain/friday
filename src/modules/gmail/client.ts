@@ -114,6 +114,16 @@ export class GmailClient {
 		return this.auth.isAuthenticated() && this.gmail !== null;
 	}
 
+	/** Refresh access token if needed before making API calls. */
+	async ensureFreshToken(): Promise<void> {
+		const refreshed = await this.auth.refreshIfNeeded();
+		if (!refreshed) {
+			throw new Error(
+				"Gmail token expired and refresh failed. Run /gmail auth to re-authenticate.",
+			);
+		}
+	}
+
 	private assertReady(): gmail_v1.Gmail {
 		if (!this.gmail) {
 			throw new Error(
@@ -127,6 +137,7 @@ export class GmailClient {
 		id: string,
 		format: "full" | "metadata" | "minimal" = "full",
 	): Promise<GmailMessage> {
+		await this.ensureFreshToken();
 		const gmail = this.assertReady();
 		const res = await gmail.users.messages.get({
 			userId: "me",
@@ -140,6 +151,7 @@ export class GmailClient {
 		query: string,
 		maxResults = 10,
 	): Promise<GmailMessageList> {
+		await this.ensureFreshToken();
 		const gmail = this.assertReady();
 		const listRes = await gmail.users.messages.list({
 			userId: "me",
@@ -191,6 +203,7 @@ export class GmailClient {
 		bcc?: string,
 		format: "plain" | "html" = "plain",
 	): Promise<{ id: string; threadId: string }> {
+		await this.ensureFreshToken();
 		const gmail = this.assertReady();
 		const contentType = format === "html"
 			? "text/html; charset=utf-8"
@@ -221,6 +234,7 @@ export class GmailClient {
 		body: string,
 		format: "plain" | "html" = "plain",
 	): Promise<{ id: string; threadId: string }> {
+		await this.ensureFreshToken();
 		const gmail = this.assertReady();
 
 		// Fetch thread to get headers for In-Reply-To
@@ -266,6 +280,7 @@ export class GmailClient {
 		id: string,
 		opts: { addLabels?: string[]; removeLabels?: string[] },
 	): Promise<void> {
+		await this.ensureFreshToken();
 		const gmail = this.assertReady();
 		await gmail.users.messages.modify({
 			userId: "me",
@@ -278,16 +293,19 @@ export class GmailClient {
 	}
 
 	async trashMessage(id: string): Promise<void> {
+		await this.ensureFreshToken();
 		const gmail = this.assertReady();
 		await gmail.users.messages.trash({ userId: "me", id });
 	}
 
 	async deleteMessage(id: string): Promise<void> {
+		await this.ensureFreshToken();
 		const gmail = this.assertReady();
 		await gmail.users.messages.delete({ userId: "me", id });
 	}
 
 	async listLabels(): Promise<GmailLabel[]> {
+		await this.ensureFreshToken();
 		const gmail = this.assertReady();
 		const res = await gmail.users.labels.list({ userId: "me" });
 		return (res.data.labels ?? []).map((l) => ({

@@ -150,6 +150,35 @@ export class GmailAuth {
 		return this.authenticated;
 	}
 
+	/** Force-refresh the access token using the stored refresh token. */
+	async forceRefresh(): Promise<boolean> {
+		try {
+			const { credentials } = await this.oauth2Client.refreshAccessToken();
+			this.oauth2Client.setCredentials(credentials);
+			return true;
+		} catch (err) {
+			console.warn(
+				"[Gmail] Token refresh failed:",
+				err instanceof Error ? err.message : err,
+			);
+			this.authenticated = false;
+			return false;
+		}
+	}
+
+	/** Refresh if the access token is expired or will expire within 5 minutes. */
+	async refreshIfNeeded(): Promise<boolean> {
+		const creds = this.oauth2Client.credentials;
+		if (!creds.refresh_token) return false;
+
+		const expiryDate = creds.expiry_date;
+		// Refresh if: no expiry known, or expiring within 5 minutes
+		if (!expiryDate || expiryDate < Date.now() + 5 * 60 * 1000) {
+			return this.forceRefresh();
+		}
+		return true;
+	}
+
 	getClient(): OAuth2Client {
 		return this.oauth2Client;
 	}
