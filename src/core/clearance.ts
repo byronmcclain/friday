@@ -9,7 +9,6 @@ export type ClearanceName =
   | "provider"
   | "system"
   | "forge-modify"
-  | "email-send"
   | "audio-output";
 
 export interface ClearanceCheck {

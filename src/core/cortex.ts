@@ -19,6 +19,9 @@ import { TextWorker } from "./workers/text-worker.ts";
 import { VoiceWorker } from "./workers/voice-worker.ts";
 import { buildVoiceSystemPrompt } from "./voice/prompt.ts";
 
+/** Max retries when LLM returns an empty response */
+const MAX_EMPTY_RETRIES = 2;
+
 function fmtDuration(ms: number): string {
 	return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 }
@@ -176,31 +179,82 @@ export class Cortex {
 
 		const fullTextPromise = workerResult.fullText.then(
 			async (text: string) => {
+				let finalText = text;
+				let finalUsage = workerResult.usage;
+
+				// Guard: empty LLM response — retry silently before giving up
+				if (!finalText.trim()) {
+					this.audit?.log({
+						action: "inference:empty",
+						source: "cortex",
+						detail: `Empty response from ${this._modelName}, retrying`,
+						success: false,
+					});
+
+					for (let attempt = 1; attempt <= MAX_EMPTY_RETRIES; attempt++) {
+						const retry = this.textWorker.process({
+							systemPrompt,
+							messages: this.historyManager.toMessages(),
+							tools: defs,
+							executeTool: executor,
+							maxToolIterations: this.maxToolIterations,
+							maxOutputTokens: this.maxTokens,
+							stepTimeoutMs: this.inferenceTimeout,
+						});
+
+						try {
+							finalText = await retry.fullText;
+							if (finalText.trim()) {
+								finalUsage = retry.usage;
+								this.audit?.log({
+									action: "inference:retry-success",
+									source: "cortex",
+									detail: `Retry ${attempt}/${MAX_EMPTY_RETRIES} succeeded, ${finalText.length} chars`,
+									success: true,
+								});
+								break;
+							}
+						} catch {
+							// Retry failed — continue to next attempt
+						}
+					}
+
+					if (!finalText.trim()) {
+						finalText = "Apologies — I received an empty response. Could you try again?";
+						this.audit?.log({
+							action: "inference:empty-fallback",
+							source: "cortex",
+							detail: `${MAX_EMPTY_RETRIES} retries all empty, using fallback`,
+							success: false,
+						});
+					}
+				}
+
 				const duration = fmtDuration(Date.now() - inferenceStart);
 				this.audit?.log({
 					action: "inference:complete",
 					source: "cortex",
-					detail: `${duration}, ${text.length} chars`,
+					detail: `${duration}, ${finalText.length} chars`,
 					success: true,
 				});
 
-				this.historyManager.push({ role: "assistant", content: text });
+				this.historyManager.push({ role: "assistant", content: finalText });
 
 				if (this._debug && this.debugResponsePath) {
-					appendInferenceLog(this.debugResponsePath, 1, { text });
+					appendInferenceLog(this.debugResponsePath, 1, { text: finalText });
 				}
 
-				const usage = await workerResult.usage;
+				const usage = await finalUsage;
 				if (usage?.inputTokens != null && usage?.outputTokens != null) {
 					this.historyManager.recordUsage(
 						usage.inputTokens + usage.outputTokens,
 					);
 				}
 
-				if (this.vox && this.vox.mode !== "off") {
-					this.vox.speak(text).catch(() => {});
+				if (this.vox && this.vox.mode !== "off" && finalText.trim()) {
+					this.vox.speak(finalText).catch(() => {});
 				}
-				return text;
+				return finalText;
 			},
 			(err) => {
 				const errDuration = fmtDuration(Date.now() - inferenceStart);

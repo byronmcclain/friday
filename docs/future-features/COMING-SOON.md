@@ -79,7 +79,7 @@ Risk categories organize the status display so BOSS can eyeball his exposure at 
 
 - **Filesystem** — `read-fs`, `write-fs`, `delete-fs`
 - **Execution** — `exec-shell`, `forge-modify`
-- **Network** — `network`, `email-send`
+- **Network** — `network`
 - **Git** — `git-read`, `git-write`
 - **System** — `provider`, `system`, `audio-output`
 

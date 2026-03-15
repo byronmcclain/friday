@@ -51,14 +51,4 @@ describe("ClearanceManager", () => {
     expect(mgr.check("forge-modify").granted).toBe(true);
   });
 
-  test("supports email-send clearance", () => {
-    const mgr = new ClearanceManager(["email-send"]);
-    expect(mgr.check("email-send").granted).toBe(true);
-  });
-
-  test("denies email-send when not granted", () => {
-    const mgr = new ClearanceManager(["network"]);
-    const result = mgr.check("email-send");
-    expect(result.granted).toBe(false);
-  });
 });

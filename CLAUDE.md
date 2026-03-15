@@ -105,7 +105,7 @@ src/
 │   ├── web-fetch/         # Web fetch module — HTTP requests with SSRF protection
 │   ├── notify/            # Notification module — multi-channel dispatch
 │   ├── forge/             # The Forge — self-improvement system
-│   └── gmail/             # Gmail module — read, search, send, reply, label, archive
+│   └── (reserved for future communication modules)
 ├── protocols/
 │   ├── types.ts           # Re-exports from modules/types.ts
 │   └── registry.ts        # ProtocolRegistry — /command routing with aliases
@@ -180,7 +180,7 @@ tests/
 | **SignalBus** | `src/core/events.ts` | Typed events. Error-isolated handlers. `custom:${string}` for custom signals. |
 | **Protocols** | `src/protocols/registry.ts` | `/command` routing. **Bypass LLM entirely** — direct handler dispatch. |
 | **Directives** | `src/directives/` | Autonomous signal→action rules. Clearance-gated. Dynamic subscriptions via `store.onStoreChange()`. |
-| **Modules** | `src/modules/` | Auto-loaded tool/protocol bundles. Shared validation in `validation.ts`. 8 modules: filesystem, git, docker, code-exec, web-fetch, notify, forge, gmail. |
+| **Modules** | `src/modules/` | Auto-loaded tool/protocol bundles. Shared validation in `validation.ts`. 7 modules: filesystem, git, docker, code-exec, web-fetch, notify, forge. |
 | **SMARTS** | `src/smarts/` | FTS5-indexed knowledge. Pinned + FTS5-matched injected per message. Staleness pruning on boot via `sessionId`. |
 | **Sensorium** | `src/sensorium/` | Dual-cadence polling (30s/5min). Hysteresis alerts. CPU needs delta between two tick samples. |
 | **Genesis** | `src/core/genesis.ts` | Identity prompt at `~/.friday/GENESIS.md`. Protected path (`chmod 600`). Seed template: `GENESIS_TEMPLATE` in `prompts.ts`. |
@@ -204,7 +204,6 @@ tests/
 - **`AuditEntry`** requires `action`, `source`, `detail`, `success` — NOT `target` or `message`
 - **Types split by domain**: core config in `src/core/types.ts`, tool/module contracts in `src/modules/types.ts`, directive structures in `src/directives/types.ts`
 - **Commands** registered via Commander.js in `src/cli/index.ts`, one file per command under `src/cli/commands/`
-- **Gmail**: send/reply tools require `"email-send"` clearance. OAuth tokens encrypted via `SecretStore` (AES-256-GCM).
 - **Debug logging**: `--debug` writes `last-inference-payload.log` + `last-inference-response.log` — cleared per `Cortex.chat()`, round-appended. Config chain: CLI → `RuntimeConfig.debug` → `CortexConfig.debug`.
 - **Singleton mode**: `friday serve` writes PID + socket files; `friday chat` requires a running server and connects via `SocketBridge` (no local runtime fallback — exits with error if no server is running)
 - **SessionHub**: Owns client lifecycle in server mode. Both WebSocket and Unix socket transports register/unregister via hub. History hydrated on connect via `conversation:message` with `source: "replay"`. Saves conversation + clears history on last client disconnect. Reconnect guard prevents clearing if a new client connects during save.
@@ -253,7 +252,6 @@ Default to Bun APIs instead of Node.js equivalents or third-party packages:
 
 Requires `XAI_API_KEY` in `.env` for the Grok provider. Bun loads `.env` automatically.
 Optional: `FRIDAY_REASONING_MODEL` and `FRIDAY_FAST_MODEL` to override default models (resolution: CLI flag > env var > `GROK_DEFAULTS`).
-Optional: `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` for Gmail module (OAuth 2.0).
 Optional: `FRIDAY_SECRET_KEY` — fallback master key for SecretStore when OS keychain is unavailable.
 Optional: `FRIDAY_GENESIS_PATH` to override default `~/.friday/GENESIS.md` location.
 Optional: `FRIDAY_VOICE` to override default voice (Eve). Available: Ara, Eve, Rex, Sal, Leo.

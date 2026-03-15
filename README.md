@@ -263,7 +263,6 @@ Eight operational modules ship with Friday:
 | **Web Fetch** | fetch (HTTP requests) | `network` | SSRF protection (private IP blocking) |
 | **Notify** | send (multi-channel dispatch) | -- | Channel validation |
 | **Forge** | propose, apply, validate, restart, status | `write-fs`, `read-fs`, `exec-shell`, `system`, `forge-modify` | Core module protection, LLM artifact sanitization |
-| **Gmail** | search, read, send, reply, modify, list_labels | `network`, `email-send` | OAuth 2.0, encrypted token storage |
 
 Every tool call flows through the same pipeline: Cortex receives a `tool_use` from the LLM → checks clearance via `ClearanceManager.checkAll()` → calls `tool.execute()` with a `ToolContext` (working directory, audit logger, signal emitter, scoped memory) → returns the result to the LLM.
 
@@ -687,7 +686,6 @@ flowchart TB
 | `provider` | Calling the LLM provider |
 | `system` | System-level operations (restart, env access) |
 | `forge-modify` | Creating or patching forge modules |
-| `email-send` | Sending or replying to emails |
 | `audio-output` | Playing audio / voice output via Vox |
 
 The **AuditLogger** records every action with structured entries: `action` (what happened), `source` (who did it), `detail` (human-readable description), `success` (boolean), and optional `metadata` (signal name, directive ID, etc.). This creates a complete trail of everything Friday does.
@@ -716,7 +714,6 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 | Heads-up display | **TUI** | Interactive terminal interface — boot splash, shimmer header, chat |
 | "I remember when..." | **Deja Vu** | Conversational memory recall — FTS5 search across past sessions |
 | Heartbeat / scheduler | **Arc Rhythm** | Autonomous scheduled task execution — cron-driven, headless |
-| Email identity | **Gmail** | Email via Gmail API — search, read, send, reply with OAuth 2.0 |
 | Friday's voice | **Vox** | Voice output via Grok Voice Agent API — fire-and-forget TTS, content-aware prompts, emotional rewriting |
 
 ---
@@ -895,11 +892,6 @@ friday --debug serve           # Debug mode — logs inference payloads and resp
 | `/arc history [id]` | View execution history |
 | `/arc delete <id>` | Remove a rhythm |
 | `/arc run` | Trigger a manual scheduler tick |
-| `/gmail inbox` | View recent inbox messages |
-| `/gmail search <query>` | Search emails |
-| `/gmail read <id>` | Read a specific email |
-| `/gmail send` | Compose and send an email |
-| `/gmail labels` | List Gmail labels |
 | `/voice on` / `off` / `whisper` | Set voice output mode |
 | `/voice flat` | Literal TTS — no emotional rewrite |
 | `/voice test` | Speak a test phrase |
@@ -983,10 +975,6 @@ FRIDAY_REASONING_MODEL=grok-4-1-fast-reasoning-latest
 
 # Optional: Override fast model for utility tasks (CLI: --fast-model)
 FRIDAY_FAST_MODEL=grok-4-1-fast-non-reasoning
-
-# Optional: Gmail module (OAuth 2.0)
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
 
 # Optional: Fallback master key for SecretStore (when OS keychain unavailable)
 FRIDAY_SECRET_KEY=...
@@ -1088,7 +1076,7 @@ src/
 │   ├── web-fetch/         # HTTP requests with SSRF protection
 │   ├── notify/            # Multi-channel notification dispatch
 │   ├── forge/             # The Forge — self-improvement system
-│   └── gmail/             # Gmail — email via OAuth 2.0
+│   └── (future communication modules)
 ├── protocols/             # Protocol registry and routing
 ├── directives/            # Autonomous rule engine
 ├── smarts/

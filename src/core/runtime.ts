@@ -188,7 +188,6 @@ export class FridayRuntime {
 				"provider",
 				"system",
 				"forge-modify",
-				"email-send",
 				"audio-output",
 			]);
 			this._audit = new AuditLogger();

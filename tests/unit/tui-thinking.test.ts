@@ -30,11 +30,11 @@ describe("formatToolSummary", () => {
 	});
 
 	test("picks first string arg when multiple exist", () => {
-		const result = formatToolSummary("gmail.search", {
-			query: "subject:invoice",
-			maxResults: "10",
+		const result = formatToolSummary("web_fetch.get", {
+			url: "https://example.com",
+			timeout: "5000",
 		});
-		expect(result).toBe("gmail.search subject:invoice");
+		expect(result).toBe("web_fetch.get https://example.com");
 	});
 
 	test("does not truncate string args at exactly 50 chars", () => {

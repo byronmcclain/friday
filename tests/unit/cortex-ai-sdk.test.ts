@@ -1,7 +1,10 @@
 import { describe, test, expect, mock } from "bun:test";
 import { Cortex } from "../../src/core/cortex.ts";
-import { createMockModel } from "../helpers/stubs.ts";
+import { createMockModel, buildUsage } from "../helpers/stubs.ts";
 import { AuditLogger } from "../../src/audit/logger.ts";
+import { MockLanguageModelV3 } from "ai/test";
+import { simulateReadableStream } from "ai";
+import type { LanguageModelV3StreamPart } from "@ai-sdk/provider";
 
 describe("Cortex (AI SDK)", () => {
 	test("chat returns text response", async () => {
@@ -102,5 +105,107 @@ describe("Cortex (AI SDK)", () => {
 			model: "test-model-id",
 		});
 		expect(cortex.modelName).toBe("test-model-id");
+	});
+});
+
+// Helper: creates a mock model that returns different text per call
+function createSequencingModel(responses: string[]): MockLanguageModelV3 {
+	let callCount = 0;
+	return new MockLanguageModelV3({
+		doStream: async () => {
+			const text = responses[callCount] ?? "";
+			callCount++;
+			const usage = buildUsage();
+			return {
+				stream: simulateReadableStream<LanguageModelV3StreamPart>({
+					chunks: [
+						{ type: "text-start" as const, id: "text-0" },
+						...(text
+							? [{ type: "text-delta" as const, id: "text-0", delta: text }]
+							: []),
+						{ type: "text-end" as const, id: "text-0" },
+						{
+							type: "finish" as const,
+							finishReason: { unified: "stop" as const, raw: undefined },
+							usage,
+						},
+					],
+					initialDelayInMs: null,
+					chunkDelayInMs: null,
+				}),
+			};
+		},
+	});
+}
+
+describe("Cortex — empty response guard", () => {
+	test("retries on empty response and returns retry text", async () => {
+		// First call returns empty, second returns real text
+		const model = createSequencingModel(["", "Retry worked"]);
+		const cortex = new Cortex({ injectedModel: model });
+		const result = await cortex.chat("test");
+		expect(result).toBe("Retry worked");
+	});
+
+	test("returns fallback after all retries exhausted", async () => {
+		// All calls return empty
+		const model = createSequencingModel(["", "", ""]);
+		const cortex = new Cortex({ injectedModel: model });
+		const result = await cortex.chat("test");
+		expect(result).toContain("empty response");
+	});
+
+	test("does not push empty assistant text to history", async () => {
+		const model = createSequencingModel(["", "Recovered"]);
+		const cortex = new Cortex({ injectedModel: model });
+		await cortex.chat("test");
+		const history = cortex.getHistory();
+		// user + assistant (retried text), no empty entry
+		expect(history).toHaveLength(2);
+		expect(history[1]!.content).toBe("Recovered");
+	});
+
+	test("audit logs inference:empty on empty response", async () => {
+		const audit = new AuditLogger();
+		const entries: Array<{ action: string; detail: string }> = [];
+		audit.log = (entry: any) => { entries.push(entry); };
+
+		const model = createSequencingModel(["", "ok"]);
+		const cortex = new Cortex({ injectedModel: model, audit });
+		await cortex.chat("test");
+
+		expect(entries.some(e => e.action === "inference:empty")).toBe(true);
+	});
+
+	test("audit logs retry-success when retry recovers", async () => {
+		const audit = new AuditLogger();
+		const entries: Array<{ action: string; detail: string }> = [];
+		audit.log = (entry: any) => { entries.push(entry); };
+
+		const model = createSequencingModel(["", "recovered"]);
+		const cortex = new Cortex({ injectedModel: model, audit });
+		await cortex.chat("test");
+
+		expect(entries.some(e => e.action === "inference:retry-success")).toBe(true);
+	});
+
+	test("audit logs empty-fallback when all retries fail", async () => {
+		const audit = new AuditLogger();
+		const entries: Array<{ action: string; detail: string }> = [];
+		audit.log = (entry: any) => { entries.push(entry); };
+
+		const model = createSequencingModel(["", "", ""]);
+		const cortex = new Cortex({ injectedModel: model, audit });
+		await cortex.chat("test");
+
+		expect(entries.some(e => e.action === "inference:empty-fallback")).toBe(true);
+	});
+
+	test("normal non-empty response is unaffected", async () => {
+		const cortex = new Cortex({
+			injectedModel: createMockModel({ text: "Normal response" }),
+		});
+		const result = await cortex.chat("test");
+		expect(result).toBe("Normal response");
 	});
 });
