@@ -48,6 +48,13 @@ describe("gmail.send", () => {
 		expect(result.success).toBe(false);
 		expect(result.output).toContain("body");
 	});
+
+	test("has format parameter", () => {
+		const param = gmailSend.parameters.find((p) => p.name === "format");
+		expect(param).toBeDefined();
+		expect(param!.required).toBe(false);
+		expect(param!.type).toBe("string");
+	});
 });
 
 describe("gmail.reply", () => {
@@ -65,6 +72,13 @@ describe("gmail.reply", () => {
 		const result = await gmailReply.execute({ thread_id: "abc" }, ctx);
 		expect(result.success).toBe(false);
 		expect(result.output).toContain("body");
+	});
+
+	test("has format parameter", () => {
+		const param = gmailReply.parameters.find((p) => p.name === "format");
+		expect(param).toBeDefined();
+		expect(param!.required).toBe(false);
+		expect(param!.type).toBe("string");
 	});
 });
 

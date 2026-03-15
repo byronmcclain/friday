@@ -189,14 +189,18 @@ export class GmailClient {
 		body: string,
 		cc?: string,
 		bcc?: string,
+		format: "plain" | "html" = "plain",
 	): Promise<{ id: string; threadId: string }> {
 		const gmail = this.assertReady();
+		const contentType = format === "html"
+			? "text/html; charset=utf-8"
+			: "text/plain; charset=utf-8";
 		const lines = [
 			`To: ${to}`,
 			cc ? `Cc: ${cc}` : "",
 			bcc ? `Bcc: ${bcc}` : "",
 			`Subject: ${subject}`,
-			"Content-Type: text/plain; charset=utf-8",
+			`Content-Type: ${contentType}`,
 			"",
 			body,
 		].filter(Boolean);
@@ -215,6 +219,7 @@ export class GmailClient {
 	async replyToThread(
 		threadId: string,
 		body: string,
+		format: "plain" | "html" = "plain",
 	): Promise<{ id: string; threadId: string }> {
 		const gmail = this.assertReady();
 
@@ -233,12 +238,15 @@ export class GmailClient {
 		const subject = extractHeader(headers, "Subject");
 		const from = extractHeader(headers, "From");
 
+		const contentType = format === "html"
+			? "text/html; charset=utf-8"
+			: "text/plain; charset=utf-8";
 		const lines = [
 			`To: ${from}`,
 			`Subject: ${subject.startsWith("Re: ") ? subject : `Re: ${subject}`}`,
 			`In-Reply-To: ${messageId}`,
 			`References: ${messageId}`,
-			"Content-Type: text/plain; charset=utf-8",
+			`Content-Type: ${contentType}`,
 			"",
 			body,
 		];

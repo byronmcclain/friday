@@ -20,8 +20,14 @@ export const gmailSend: FridayTool = {
 		{
 			name: "body",
 			type: "string",
-			description: "Email body (plain text)",
+			description: "Email body content. Plain text by default, or full HTML when format is 'html'.",
 			required: true,
+		},
+		{
+			name: "format",
+			type: "string",
+			description: "Body format: 'plain' (default) or 'html' for rich HTML emails with inline CSS",
+			required: false,
 		},
 		{
 			name: "cc",
@@ -63,6 +69,8 @@ export const gmailSend: FridayTool = {
 			};
 		}
 
+		const format = (args.format as string) === "html" ? "html" as const : "plain" as const;
+
 		try {
 			const result = await client.sendMessage(
 				to,
@@ -70,6 +78,7 @@ export const gmailSend: FridayTool = {
 				body,
 				args.cc as string,
 				args.bcc as string,
+				format,
 			);
 
 			await context.audit.log({

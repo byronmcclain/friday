@@ -15,8 +15,14 @@ export const gmailReply: FridayTool = {
 		{
 			name: "body",
 			type: "string",
-			description: "Reply body (plain text)",
+			description: "Reply body content. Plain text by default, or full HTML when format is 'html'.",
 			required: true,
+		},
+		{
+			name: "format",
+			type: "string",
+			description: "Body format: 'plain' (default) or 'html' for rich HTML replies with inline CSS",
+			required: false,
 		},
 	],
 	clearance: ["network", "email-send"],
@@ -43,8 +49,10 @@ export const gmailReply: FridayTool = {
 			};
 		}
 
+		const format = (args.format as string) === "html" ? "html" as const : "plain" as const;
+
 		try {
-			const result = await client.replyToThread(threadId, body);
+			const result = await client.replyToThread(threadId, body, format);
 
 			await context.audit.log({
 				action: "tool:gmail.reply",
