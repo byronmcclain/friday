@@ -130,7 +130,9 @@ export class TelegramListener {
 
     // Fall back to polling
     await bot.api.deleteWebhook();
-    bot.start(); // non-blocking — enters polling loop
+    bot.start().catch(err => {
+      config.audit.log({ action: "telegram:polling-error", source: "telegram", detail: err instanceof Error ? err.message : String(err), success: false });
+    });
     this.mode = "polling";
     config.audit.log({ action: "telegram:polling-active", source: "telegram", detail: "Webhook unavailable, using long-polling", success: true });
   }
