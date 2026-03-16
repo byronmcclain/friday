@@ -29,7 +29,7 @@ Notifications (Arc Rhythm, Sensorium, Directives)
 ## Dependencies
 
 - `grammy` — TypeScript Telegram Bot framework (1.2M weekly downloads, native TypeScript, supports polling + webhooks)
-- No other new dependencies
+- `@grammyjs/parse-mode` — Official grammY plugin for message formatting. Provides `markdownToFormattable()` which converts standard Markdown (from Cortex LLM output) to Telegram-compatible entities. Gracefully degrades malformed markdown to plain text instead of failing.
 
 ## File Structure
 
@@ -52,21 +52,25 @@ Wraps grammY's `Bot` class. Responsible for sending messages only — receiving 
 
 ```typescript
 import { Bot } from "grammy";
+import { hydrateReply, markdownToFormattable } from "@grammyjs/parse-mode";
+import type { ParseModeFlavor } from "@grammyjs/parse-mode";
 
 export class TelegramClient {
-  private bot: Bot;
+  private bot: Bot<ParseModeFlavor<Context>>;
   private ownerChatId: number | null = null;
 
   constructor(token: string) {
-    this.bot = new Bot(token);
+    this.bot = new Bot<ParseModeFlavor<Context>>(token);
+    this.bot.use(hydrateReply);  // Enables ctx.replyFmt()
   }
 
   /** Get the underlying grammY Bot instance (for listener setup) */
-  getBot(): Bot { return this.bot; }
+  getBot(): Bot<ParseModeFlavor<Context>> { return this.bot; }
 
-  /** Send a text message to the owner */
+  /** Send a formatted message — converts Markdown to Telegram entities */
   async sendMessage(chatId: number, text: string): Promise<void> {
-    await this.bot.api.sendMessage(chatId, text, { parse_mode: "HTML" });
+    const formatted = markdownToFormattable(text);
+    await this.bot.api.sendMessage(chatId, formatted.text, { entities: formatted.entities });
   }
 
   /** Get bot info (username, id) */
@@ -78,7 +82,7 @@ export class TelegramClient {
 }
 ```
 
-HTML parse mode by default — Telegram supports `<b>`, `<i>`, `<code>`, `<pre>`, `<a href>`. This lets Friday format responses nicely without Markdown escaping headaches (MarkdownV2 requires escaping `.`, `!`, `-`, `(`, `)`, etc.).
+Uses `@grammyjs/parse-mode` with `markdownToFormattable()` — converts standard Markdown (as output by Cortex/LLM) directly to Telegram message entities. No HTML, no MarkdownV2 escaping. Malformed markdown gracefully degrades to plain text instead of failing the send.
 
 ### TelegramListener (`listener.ts`)
 
@@ -112,7 +116,7 @@ export class TelegramListener {
       // Route to Cortex
       config.audit.log({ action: "telegram:message-received", source: "telegram", detail: `From ${ctx.from.id}`, success: true });
       const response = await cortex.chat(ctx.message.text);
-      await ctx.reply(response, { parse_mode: "HTML" });
+      await ctx.replyFmt(markdownToFormattable(response));
       config.audit.log({ action: "telegram:message-sent", source: "telegram", detail: `Reply sent`, success: true });
     });
 
@@ -175,8 +179,8 @@ export class TelegramChannel implements NotificationChannel {
     const chatId = this.client.getOwnerChatId();
     if (!chatId) return; // Can't send if we don't know the owner's chat yet
 
-    const text = `<b>${notification.title}</b>\n${notification.body}`;
-    await this.client.sendMessage(chatId, text);
+    const text = `**${notification.title}**\n${notification.body}`;
+    await this.client.sendMessage(chatId, text);  // sendMessage converts markdown → entities
   }
 }
 ```
@@ -322,7 +326,7 @@ This means Friday can send you notifications even after a restart, without you n
 | `src/server/index.ts` | Add `/hooks/telegram` route for webhook mode |
 | `CLAUDE.md` | Add Telegram to module list (7→8), add env vars, update `ModuleContext` docs |
 | `README.md` | Add Telegram module docs, protocol commands, env vars |
-| `package.json` | Add `grammy` dependency |
+| `package.json` | Add `grammy` and `@grammyjs/parse-mode` dependencies |
 | `.env.example` | Already done (TELEGRAM_BOT_TOKEN, TELEGRAM_OWNER_ID) |
 
 ## Testing
