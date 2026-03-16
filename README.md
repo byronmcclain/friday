@@ -263,6 +263,7 @@ Eight operational modules ship with Friday:
 | **Web Fetch** | fetch (HTTP requests) | `network` | SSRF protection (private IP blocking) |
 | **Notify** | send (multi-channel dispatch) | -- | Channel validation |
 | **Forge** | propose, apply, validate, restart, status | `write-fs`, `read-fs`, `exec-shell`, `system`, `forge-modify` | Core module protection, LLM artifact sanitization |
+| **Telegram** | send | `network` | Owner-only filtering, webhook secret validation |
 
 Every tool call flows through the same pipeline: Cortex receives a `tool_use` from the LLM → checks clearance via `ClearanceManager.checkAll()` → calls `tool.execute()` with a `ToolContext` (working directory, audit logger, signal emitter, scoped memory) → returns the result to the LLM.
 
@@ -892,6 +893,8 @@ friday --debug serve           # Debug mode — logs inference payloads and resp
 | `/arc history [id]` | View execution history |
 | `/arc delete <id>` | Remove a rhythm |
 | `/arc run` | Trigger a manual scheduler tick |
+| `/telegram status` | Show bot username, mode, owner |
+| `/telegram send <message>` | Send a message to the owner via Telegram |
 | `/voice on` / `off` / `whisper` | Set voice output mode |
 | `/voice flat` | Literal TTS — no emotional rewrite |
 | `/voice test` | Speak a test phrase |
@@ -985,6 +988,13 @@ FRIDAY_GENESIS_PATH=...
 # Optional: Override voice (default: Eve). Available: Ara, Eve, Rex, Sal, Leo
 FRIDAY_VOICE=Eve
 
+# Optional: Telegram bot (from @BotFather)
+TELEGRAM_BOT_TOKEN=...
+# Optional: Restrict bot to a single Telegram user ID
+TELEGRAM_OWNER_ID=123456789
+# Optional: Telegram webhook URL (requires public endpoint, e.g., Cloudflare tunnel)
+TELEGRAM_WEBHOOK_URL=https://friday-hooks.yourdomain.com/hooks/telegram
+
 # Optional: Notification webhooks
 FRIDAY_SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 FRIDAY_WEBHOOK_URL=https://example.com/webhook
@@ -1076,7 +1086,7 @@ src/
 │   ├── web-fetch/         # HTTP requests with SSRF protection
 │   ├── notify/            # Multi-channel notification dispatch
 │   ├── forge/             # The Forge — self-improvement system
-│   └── (future communication modules)
+│   └── telegram/          # Telegram bot — mobile chat + notifications
 ├── protocols/             # Protocol registry and routing
 ├── directives/            # Autonomous rule engine
 ├── smarts/

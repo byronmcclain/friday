@@ -105,7 +105,7 @@ src/
 │   ├── web-fetch/         # Web fetch module — HTTP requests with SSRF protection
 │   ├── notify/            # Notification module — multi-channel dispatch
 │   ├── forge/             # The Forge — self-improvement system
-│   └── (reserved for future communication modules)
+│   └── telegram/          # Telegram bot — mobile chat + notifications
 ├── protocols/
 │   ├── types.ts           # Re-exports from modules/types.ts
 │   └── registry.ts        # ProtocolRegistry — /command routing with aliases
@@ -180,7 +180,7 @@ tests/
 | **SignalBus** | `src/core/events.ts` | Typed events. Error-isolated handlers. `custom:${string}` for custom signals. |
 | **Protocols** | `src/protocols/registry.ts` | `/command` routing. **Bypass LLM entirely** — direct handler dispatch. |
 | **Directives** | `src/directives/` | Autonomous signal→action rules. Clearance-gated. Dynamic subscriptions via `store.onStoreChange()`. |
-| **Modules** | `src/modules/` | Auto-loaded tool/protocol bundles. Shared validation in `validation.ts`. 7 modules: filesystem, git, docker, code-exec, web-fetch, notify, forge. |
+| **Modules** | `src/modules/` | Auto-loaded tool/protocol bundles. Shared validation in `validation.ts`. 8 modules: filesystem, git, docker, code-exec, web-fetch, notify, forge, telegram. |
 | **SMARTS** | `src/smarts/` | FTS5-indexed knowledge. Pinned + FTS5-matched injected per message. Staleness pruning on boot via `sessionId`. |
 | **Sensorium** | `src/sensorium/` | Dual-cadence polling (30s/5min). Hysteresis alerts. CPU needs delta between two tick samples. |
 | **Genesis** | `src/core/genesis.ts` | Identity prompt at `~/.friday/GENESIS.md`. Protected path (`chmod 600`). Seed template: `GENESIS_TEMPLATE` in `prompts.ts`. |
@@ -200,7 +200,7 @@ tests/
 
 - **Dual-model architecture**: reasoning model (Cortex) + fast model (SmartsCurator, Summarizer). Resolution: CLI flag > env var > `GROK_DEFAULTS`. `FridayConfig.fastModel` carries through config chain.
 - **Tool registration**: `registerTool()` → `toZodSchema()` converts FridayTool params to AI SDK tools
-- **Module pattern**: `satisfies FridayModule` preferred over `: FridayModule` for literal type preservation. Mutable arrays for triggers/clearance (no `as const`). `onLoad(context: ModuleContext)` receives `ScopedMemory` for persistent storage (namespaced by module name).
+- **Module pattern**: `satisfies FridayModule` preferred over `: FridayModule` for literal type preservation. Mutable arrays for triggers/clearance (no `as const`). `onLoad(context: ModuleContext)` receives `ScopedMemory` for persistent storage (namespaced by module name), plus optional `cortex` (for bidirectional chat), `audit` (for logging), and `notifications` (for registering channels).
 - **`AuditEntry`** requires `action`, `source`, `detail`, `success` — NOT `target` or `message`
 - **Types split by domain**: core config in `src/core/types.ts`, tool/module contracts in `src/modules/types.ts`, directive structures in `src/directives/types.ts`
 - **Commands** registered via Commander.js in `src/cli/index.ts`, one file per command under `src/cli/commands/`
@@ -255,6 +255,9 @@ Optional: `FRIDAY_REASONING_MODEL` and `FRIDAY_FAST_MODEL` to override default m
 Optional: `FRIDAY_SECRET_KEY` — fallback master key for SecretStore when OS keychain is unavailable.
 Optional: `FRIDAY_GENESIS_PATH` to override default `~/.friday/GENESIS.md` location.
 Optional: `FRIDAY_VOICE` to override default voice (Eve). Available: Ara, Eve, Rex, Sal, Leo.
+Optional: `TELEGRAM_BOT_TOKEN` for Telegram bot module (from @BotFather).
+Optional: `TELEGRAM_OWNER_ID` to restrict Telegram bot to a single user.
+Optional: `TELEGRAM_WEBHOOK_URL` for Telegram webhook mode (requires public URL, e.g., Cloudflare tunnel).
 Optional: `FRIDAY_SLACK_WEBHOOK_URL` for Slack notification channel.
 Optional: `FRIDAY_WEBHOOK_URL` for generic webhook notification channel.
 Optional: `FRIDAY_EMAIL_WEBHOOK_URL` for email webhook notification channel.
