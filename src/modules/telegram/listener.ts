@@ -15,6 +15,7 @@ export class TelegramListener {
 	private webhookHandler:
 		| ((req: Request) => Response | Promise<Response>)
 		| null = null;
+	private pollingDone: Promise<void> | null = null;
 
 	async start(
 		client: TelegramClient,
@@ -34,9 +35,12 @@ export class TelegramListener {
 			}
 
 			if (!ownerId) {
-				console.log(
-					`[Telegram] Message from user ${ctx.from.id} — set TELEGRAM_OWNER_ID to lock access`,
-				);
+				audit?.log({
+					action: "telegram:no-owner-warning",
+					source: "telegram",
+					detail: `Message from user ${ctx.from.id} — set TELEGRAM_OWNER_ID to lock access`,
+					success: true,
+				});
 			}
 
 			audit?.log({
@@ -65,10 +69,11 @@ export class TelegramListener {
 		// Try webhook first
 		if (config.webhookUrl) {
 			try {
-				const secretToken =
-					(await config.memory.get<string>("webhook_secret")) ??
-					crypto.randomUUID();
-				await config.memory.set("webhook_secret", secretToken);
+				let secretToken = await config.memory.get<string>("webhook_secret");
+				if (!secretToken) {
+					secretToken = crypto.randomUUID();
+					await config.memory.set("webhook_secret", secretToken);
+				}
 
 				await bot.api.setWebhook(config.webhookUrl, {
 					secret_token: secretToken,
@@ -97,7 +102,7 @@ export class TelegramListener {
 
 		// Fall back to polling
 		await bot.api.deleteWebhook();
-		bot.start().catch((err) => {
+		this.pollingDone = bot.start().catch((err) => {
 			const msg = err instanceof Error ? err.message : String(err);
 			audit?.log({
 				action: "telegram:polling-error",
@@ -118,6 +123,8 @@ export class TelegramListener {
 	async stop(client: TelegramClient): Promise<void> {
 		if (this.mode === "polling") {
 			await client.getBot().stop();
+			await this.pollingDone;
+			this.pollingDone = null;
 		} else if (this.mode === "webhook") {
 			await client.getBot().api.deleteWebhook();
 		}

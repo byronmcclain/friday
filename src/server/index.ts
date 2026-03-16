@@ -4,6 +4,7 @@ import { WebSocketHandler, type SendFn } from "./handler.ts";
 import { SessionHub } from "./session-hub.ts";
 import type { ServerMessage } from "./protocol.ts";
 import type { ServerWebSocket } from "bun";
+import { getTelegramListener } from "../modules/telegram/state.ts";
 
 export interface FridayServerConfig {
 	port: number;
@@ -71,12 +72,8 @@ export async function createFridayServer(config: FridayServerConfig) {
 
 			// Telegram webhook handler
 			if (req.method === "POST" && url.pathname === "/hooks/telegram") {
-				const { getTelegramListener } = await import("../modules/telegram/state.ts");
-				const listener = getTelegramListener();
-				const handler = listener?.getWebhookHandler();
-				if (handler) {
-					return await handler(req);
-				}
+				const handler = getTelegramListener()?.getWebhookHandler();
+				if (handler) return handler(req);
 				return new Response("Telegram webhook not active", { status: 503 });
 			}
 

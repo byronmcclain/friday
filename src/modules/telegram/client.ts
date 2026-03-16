@@ -3,6 +3,7 @@ import { Bot } from "grammy";
 export class TelegramClient {
 	private bot: Bot;
 	private ownerChatId: number | null = null;
+	private cachedMe: { id: number; username: string } | null = null;
 
 	constructor(token: string) {
 		this.bot = new Bot(token);
@@ -19,8 +20,10 @@ export class TelegramClient {
 	}
 
 	async getMe(): Promise<{ id: number; username: string }> {
+		if (this.cachedMe) return this.cachedMe;
 		const me = await this.bot.api.getMe();
-		return { id: me.id, username: me.username ?? "" };
+		this.cachedMe = { id: me.id, username: me.username ?? "" };
+		return this.cachedMe;
 	}
 
 	setOwnerChatId(chatId: number): void {
