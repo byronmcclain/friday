@@ -69,6 +69,17 @@ export async function createFridayServer(config: FridayServerConfig) {
 				return new Response("WebSocket upgrade failed", { status: 400 });
 			}
 
+			// Telegram webhook handler
+			if (req.method === "POST" && url.pathname === "/hooks/telegram") {
+				const { getTelegramListener } = await import("../modules/telegram/state.ts");
+				const listener = getTelegramListener();
+				const handler = listener?.getWebhookHandler();
+				if (handler) {
+					return await handler(req);
+				}
+				return new Response("Telegram webhook not active", { status: 503 });
+			}
+
 			// Static file serving (SPA) — guard against path traversal
 			const filePath = url.pathname === "/" ? "/index.html" : url.pathname;
 			const resolvedPath = resolve(staticDir, `.${filePath}`);
