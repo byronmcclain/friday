@@ -462,6 +462,9 @@ export class FridayRuntime {
 								delete: async () => {},
 								list: async () => [],
 							},
+							cortex: this._cortex ? { chat: (msg: string) => this._cortex.chat(msg) } : undefined,
+							audit: this._audit,
+							notifications: this._notifications,
 						});
 					}
 				}
@@ -493,6 +496,9 @@ export class FridayRuntime {
 								delete: async () => {},
 								list: async () => [],
 							},
+							cortex: this._cortex ? { chat: (msg: string) => this._cortex.chat(msg) } : undefined,
+							audit: this._audit,
+							notifications: this._notifications,
 						});
 					}
 					this._modules.push(mod);

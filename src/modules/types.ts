@@ -60,6 +60,9 @@ export interface ProtocolResult {
 
 export interface ModuleContext {
   memory: ScopedMemory;
+  cortex?: { chat(msg: string): Promise<string> };
+  audit?: AuditLogger;
+  notifications?: NotificationManager;
 }
 
 export interface FridayModule {
