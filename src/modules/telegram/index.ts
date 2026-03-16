@@ -59,6 +59,15 @@ const telegramModule = {
 
 		const mode = listener.getMode();
 		console.log(`[Telegram] Bot active — ${mode} mode`);
+
+		// Send session separator to owner on Telegram so they know context is fresh
+		const chatId = client.getOwnerChatId();
+		if (chatId) {
+			client.sendMessage(
+				chatId,
+				"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔄 *Friday restarted — new session*\n_My active context is fresh, but I can recall past conversations via memory._\n━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+			).catch(() => {}); // Fire-and-forget — don't block boot if Telegram is unreachable
+		}
 	},
 
 	async onUnload() {
