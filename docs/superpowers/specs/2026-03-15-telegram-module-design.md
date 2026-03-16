@@ -148,23 +148,28 @@ export class TelegramListener {
 }
 ```
 
-**Webhook integration**: When in webhook mode, Friday's server (`src/server/index.ts`) needs a route to handle incoming Telegram updates. grammY provides `webhookCallback(bot, "std/http")` which returns a `Request → Response` handler — compatible with `Bun.serve()`. The module registers this route during `onLoad()`.
+**Webhook integration**: When in webhook mode, Friday's server (`src/server/index.ts`) needs a route to handle incoming Telegram updates. grammY provides `webhookCallback(bot, "bun")` which returns a Bun-compatible `(Request) => Response | Promise<Response>` handler. The module registers this route during `onLoad()`.
 
-**Polling mode**: `bot.start()` enters grammY's built-in long-polling loop. The returned Promise never resolves until `bot.stop()` is called. This runs in the background — does not block Friday's boot.
+**Polling mode**: `bot.start()` enters grammY's built-in long-polling loop. The returned Promise never resolves until `bot.stop()` is called. This runs in the background — does not block Friday's boot. Must attach `.catch()` to handle startup errors (e.g., invalid token):
+```typescript
+bot.start().catch(err => {
+  config.audit.log({ action: "telegram:polling-error", source: "telegram", detail: err.message, success: false });
+});
+```
 
 ### TelegramChannel (`channel.ts`)
 
 Implements `NotificationChannel` so Friday can proactively message you.
 
 ```typescript
-import type { NotificationChannel, Notification } from "../../core/notifications.ts";
+import type { NotificationChannel, FridayNotification } from "../../core/notifications.ts";
 
 export class TelegramChannel implements NotificationChannel {
   name = "telegram";
 
   constructor(private client: TelegramClient) {}
 
-  async send(notification: Notification): Promise<void> {
+  async send(notification: FridayNotification): Promise<void> {
     const chatId = this.client.getOwnerChatId();
     if (!chatId) return; // Can't send if we don't know the owner's chat yet
 
@@ -190,7 +195,7 @@ export class TelegramChannel implements NotificationChannel {
 `telegram.send` FridayTool — lets the LLM proactively message you:
 
 - **Parameters**: `message` (string, required)
-- **Clearance**: `["network"]`
+- **Clearance**: `["network"]` — using the existing `"network"` clearance rather than a dedicated `"telegram-send"` to keep the clearance list small. Telegram send is low-risk (owner-only, not arbitrary recipients like email). Revisit if send-gating granularity is needed later.
 - **Behavior**: Sends to `ownerChatId` via `client.sendMessage()`. Fails gracefully if owner chat ID not yet known.
 
 This is how Arc Rhythm prompt results reach you: Cortex processes the rhythm, decides you should know about it, and calls `telegram.send`.
@@ -225,11 +230,11 @@ const telegramModule = {
     const ownerId = process.env.TELEGRAM_OWNER_ID ? Number(process.env.TELEGRAM_OWNER_ID) : undefined;
     const webhookUrl = process.env.TELEGRAM_WEBHOOK_URL;
 
-    await listener.start(client, cortex, {
+    await listener.start(client, context.cortex, {
       ownerId,
       webhookUrl,
       memory: context.memory,
-      audit,
+      audit: context.audit,
     });
 
     // Register as notification channel
@@ -238,31 +243,49 @@ const telegramModule = {
 } satisfies FridayModule;
 ```
 
-## Cortex Access
+## ModuleContext Expansion
 
-The listener needs access to `Cortex` to route messages. Since modules load after Cortex in the boot order, there are two options:
+The listener needs `Cortex` (to route messages) and `AuditLogger` (to log events). Neither is currently in `ModuleContext`. Since modules load after Cortex in the boot order, both are available at `onLoad()` time.
 
-**Option A**: Access Cortex via `FridayRuntime` singleton (if exposed)
-**Option B**: Store a reference in module state (getter/setter pattern, same as old Gmail module)
+**Decision**: Expand `ModuleContext` to include both:
 
-Use **Option B** — module state pattern with `setTelegramCortex()` / `getTelegramCortex()`. The runtime calls `onLoad()` after Cortex is initialized, so we can wire it there. However, the current `ModuleContext` doesn't include `cortex`. We need to either:
+```typescript
+export interface ModuleContext {
+  memory: ScopedMemory;
+  cortex?: { chat(msg: string): Promise<string> };  // Optional — not all modules need it
+  audit?: AuditLogger;                                // Optional — not all modules need it
+}
+```
 
-1. Expand `ModuleContext` to include a `cortex` reference, or
-2. Use the `telegram.send` tool's `ToolContext` for outbound, and register an `onMessage` callback via runtime for inbound
+Both fields are optional so existing modules (filesystem, git, etc.) don't need changes. The runtime passes them at both loading sites:
 
-**Recommended**: Expand `ModuleContext` to optionally include `cortex: { chat(msg: string): Promise<string> }` — a minimal interface, not the full Cortex class. This keeps the module decoupled while enabling bidirectional chat. This is a small addition to the interface we just built today.
+```typescript
+// In runtime.ts, both module loading loops:
+await mod.onLoad({
+  memory: this._memory?.scoped(mod.name) ?? { /* noop fallback */ },
+  cortex: this._cortex ? { chat: (msg) => this._cortex.chat(msg) } : undefined,
+  audit: this._audit,
+});
+```
+
+The `cortex` field exposes a minimal interface (`{ chat(msg): Promise<string> }`) — not the full `Cortex` class. This keeps modules decoupled from Cortex internals. Only the Telegram module (and future chat-channel modules) will use it.
 
 ## Webhook Route in Server
 
-When webhook mode is active, Friday's HTTP server needs to handle `POST /hooks/telegram`. Add a route check in `src/server/index.ts`:
+When webhook mode is active, Friday's HTTP server needs to handle incoming Telegram updates. The route uses grammY's `secret_token` parameter (cleaner than embedding the bot token in the URL path):
 
 ```typescript
+// In setWebhook call:
+await bot.api.setWebhook(webhookUrl, { secret_token: secretToken });
+
+// In server route:
 if (req.method === "POST" && url.pathname === "/hooks/telegram") {
+  // grammY's webhookCallback validates the X-Telegram-Bot-Api-Secret-Token header
   return await telegramWebhookHandler(req);
 }
 ```
 
-The `telegramWebhookHandler` is set by the module during `onLoad()` via a shared setter (similar to how the Forge protocol is registered dynamically).
+The `secretToken` is a random string generated on first boot and persisted via `context.memory.set("webhook_secret", token)`. The `telegramWebhookHandler` is created via `webhookCallback(bot, "bun", { secretToken })` and registered via a shared setter during `onLoad()`.
 
 ## Env Vars
 
@@ -285,17 +308,17 @@ This means Friday can send you notifications even after a restart, without you n
 
 - **Owner-only**: When `TELEGRAM_OWNER_ID` is set, messages from other users are silently dropped
 - **First-message discovery**: If not set, Friday logs the user ID so you can configure it
-- **Webhook secret**: Use the bot token as the webhook path secret (standard Telegram pattern) — `/hooks/telegram/<token>` prevents unauthorized POSTs
+- **Webhook secret**: Uses grammY's `secret_token` parameter — Telegram sends an `X-Telegram-Bot-Api-Secret-Token` header that grammY validates automatically. No token in the URL path.
 - **No sensitive data in messages**: Cortex clearance system still gates tools
 
 ## What Changes in Existing Code
 
 | File | Change |
 |------|--------|
-| `src/modules/types.ts` | Add optional `cortex` to `ModuleContext` |
-| `src/core/runtime.ts` | Pass `cortex` reference in `ModuleContext` at both loading sites |
+| `src/modules/types.ts` | Add optional `cortex` and `audit` to `ModuleContext` |
+| `src/core/runtime.ts` | Pass `cortex` and `audit` in `ModuleContext` at both loading sites |
 | `src/server/index.ts` | Add `/hooks/telegram` route for webhook mode |
-| `CLAUDE.md` | Add Telegram to module list (7→8), add env vars |
+| `CLAUDE.md` | Add Telegram to module list (7→8), add env vars, update `ModuleContext` docs |
 | `README.md` | Add Telegram module docs, protocol commands, env vars |
 | `package.json` | Add `grammy` dependency |
 | `.env.example` | Already done (TELEGRAM_BOT_TOKEN, TELEGRAM_OWNER_ID) |
