@@ -22,10 +22,13 @@ describe("FridayRuntime", () => {
 	});
 
 	test("exposes cortex after boot", async () => {
+		const savedModel = process.env.FRIDAY_REASONING_MODEL;
+		delete process.env.FRIDAY_REASONING_MODEL;
 		runtime = new FridayRuntime();
 		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.cortex).toBeDefined();
 		expect(runtime.cortex.modelName).toBe(GROK_DEFAULTS.model);
+		if (savedModel) process.env.FRIDAY_REASONING_MODEL = savedModel;
 	});
 
 	test("exposes protocol registry after boot", async () => {
@@ -389,10 +392,13 @@ describe("FridayRuntime — Sensorium integration", () => {
 
 describe("FridayRuntime — dual-model architecture", () => {
 	test("fastModel returns GROK_DEFAULTS when no override", async () => {
+		const savedFast = process.env.FRIDAY_FAST_MODEL;
+		delete process.env.FRIDAY_FAST_MODEL;
 		const runtime = new FridayRuntime();
 		await runtime.boot({ injectedModel: createMockModel() });
 		expect(runtime.fastModel).toBe(GROK_DEFAULTS.fastModel);
 		await runtime.shutdown();
+		if (savedFast) process.env.FRIDAY_FAST_MODEL = savedFast;
 	});
 
 	test("fastModel respects config override", async () => {
