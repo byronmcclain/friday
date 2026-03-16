@@ -10,12 +10,15 @@ export interface ListenerConfig {
 	audit?: AuditLogger;
 }
 
+export type BroadcastFn = (role: "user" | "assistant", content: string, source: "telegram") => void;
+
 export class TelegramListener {
 	private mode: "webhook" | "polling" | "stopped" = "stopped";
 	private webhookHandler:
 		| ((req: Request) => Response | Promise<Response>)
 		| null = null;
 	private pollingDone: Promise<void> | null = null;
+	private broadcast: BroadcastFn | null = null;
 
 	async start(
 		client: TelegramClient,
@@ -55,8 +58,14 @@ export class TelegramListener {
 				return;
 			}
 
+			// Broadcast user message to other clients (TUI, web)
+			this.broadcast?.("user", ctx.message.text, "telegram");
+
 			const response = await cortex.chat(ctx.message.text);
 			await ctx.reply(response, { parse_mode: "Markdown" });
+
+			// Broadcast assistant response to other clients
+			this.broadcast?.("assistant", response, "telegram");
 
 			audit?.log({
 				action: "telegram:message-sent",
@@ -130,6 +139,11 @@ export class TelegramListener {
 		}
 		this.mode = "stopped";
 		this.webhookHandler = null;
+	}
+
+	/** Set the broadcast function — called by the server after boot to wire SessionHub. */
+	setBroadcast(fn: BroadcastFn): void {
+		this.broadcast = fn;
 	}
 
 	getMode(): "webhook" | "polling" | "stopped" {

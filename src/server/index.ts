@@ -43,6 +43,19 @@ export async function createFridayServer(config: FridayServerConfig) {
 		summarizer: runtime.summarizer,
 		curator: runtime.curator,
 	});
+	// Wire Telegram listener broadcast to SessionHub so TUI/web clients see Telegram messages
+	const telegramListener = getTelegramListener();
+	if (telegramListener) {
+		telegramListener.setBroadcast((role, content, source) => {
+			hub.broadcast({
+				type: "conversation:message",
+				role,
+				content,
+				source,
+			});
+		});
+	}
+
 	const pushIntervals = new Map<string, ReturnType<typeof setInterval>>();
 
 	const server = Bun.serve<WSData>({
