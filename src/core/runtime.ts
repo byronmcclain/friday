@@ -368,10 +368,13 @@ export class FridayRuntime {
 				onProgress?.("vox", "Vox voice engine ready");
 			}
 
+			const cacheSessionId = this._sessionId ?? crypto.randomUUID();
+
 			this._cortex = new Cortex({
 				model: reasoningModel,
 				maxTokens: config.maxTokens,
 				injectedModel: config.injectedModel,
+				sessionId: cacheSessionId,
 
 				smartsStore: this._smarts,
 				sensorium: this._sensorium,
