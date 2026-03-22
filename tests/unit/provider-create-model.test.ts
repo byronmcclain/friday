@@ -8,6 +8,13 @@ describe("createModel", () => {
 		expect(model.provider).toContain("xai");
 	});
 
+	test("creates model with session-scoped provider when sessionId is given", () => {
+		const sessionId = "test-session-abc-123";
+		const model = createModel(GROK_DEFAULTS.model, sessionId);
+		expect(model.modelId).toContain("grok");
+		expect(model.provider).toContain("xai");
+	});
+
 	test("GROK_DEFAULTS has reasoning and fast model", () => {
 		expect(GROK_DEFAULTS.model).toBe("grok-4-1-fast-reasoning-latest");
 		expect(GROK_DEFAULTS.fastModel).toBe("grok-4-1-fast-non-reasoning");

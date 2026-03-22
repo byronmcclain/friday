@@ -28,6 +28,7 @@ function fmtDuration(ms: number): string {
 
 export interface CortexConfig extends Partial<FridayConfig> {
 	injectedModel?: LanguageModelV3;
+	sessionId?: string;
 	clearance?: ClearanceManager;
 	maxToolIterations?: number;
 	smartsStore?: SmartsStore;
@@ -76,7 +77,7 @@ export class Cortex {
 		this.maxTokens = config.maxTokens ?? 12288;
 		this.maxToolIterations = config.maxToolIterations ?? 10;
 
-		this.aiModel = config.injectedModel ?? createModel(this._modelName);
+		this.aiModel = config.injectedModel ?? createModel(this._modelName, config.sessionId);
 
 		this.historyManager = new HistoryManager({ maxTokens: 128000 });
 		this.clearance = config.clearance;
