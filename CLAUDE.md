@@ -55,7 +55,7 @@ src/
 │       ├── log-store.ts   # LogStore — state store for TUI debug log panel
 │       ├── log-types.ts   # LogEntry types for structured log display
 │       ├── components/    # UI components (Header, ChatArea, InputBar, Message, Splash, LogPanel, CommandTypeahead, Thinking, Welcome)
-│       └── lib/           # ANSI parser, color utils, chafa logo processor, usePulse hook
+│       └── lib/           # ANSI parser, color utils, chafa logo processor, usePulse hook, external editor launcher
 ├── core/
 │   ├── cortex.ts          # Cortex — LLM brain, chatStream() + chatStreamVoice() dual-mode
 │   ├── history-manager.ts # HistoryManager — token-budget conversation history with compaction
@@ -213,11 +213,12 @@ tests/
 - **ToolResult.error** is an optional field — tool-bridge falls back to `result.output || result.error || "Tool returned no output"`
 - **Forge template** imports `FridayModule, FridayTool, ToolContext, ToolResult` and includes commented usage examples with proper validation patterns
 - **Cortex inference audit**: `inference:start`, `inference:complete` (with duration), `inference:error` (with duration + error message) emitted per `chatStream()` call
+- **Input bar**: Multi-line `<textarea>` with dynamic height (1–10 rows). Enter submits, Shift+Enter inserts newline, Tab inserts tab (or accepts suggestion when dropdown showing), Ctrl+E opens vim (TUI suspends, resumes on editor exit). Up/Down navigates history when cursor is on first/last line, moves cursor otherwise.
 - **Prompt cache routing**: `createModel(modelId, sessionId?)` — when `sessionId` is provided, creates a session-scoped xAI provider with `x-grok-conv-id` header for cache routing. Runtime generates UUID at boot, reuses `_sessionId` when `dataDir` is configured. Fast/subsystem model intentionally omits session ID (one-shot calls don't benefit).
 
 ## Testing
 
-- 1129 tests across 106 files (as of 2026-03-27)
+- 1143 tests across 108 files (as of 2026-03-27)
 - Tests use `injectedModel: createMockModel()` (AI SDK `MockLanguageModelV3` from `ai/test` with call capture via `.doStreamCalls`/`.doGenerateCalls`)
 - Use `createErrorModel()` for models that throw on `doGenerate`/`doStream`
 - Shared test stubs live in `tests/helpers/stubs.ts`
