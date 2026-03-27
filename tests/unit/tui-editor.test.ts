@@ -1,17 +1,6 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { describe, test, expect } from "bun:test";
 import { openExternalEditor } from "../../src/cli/tui/lib/external-editor.ts";
-import { unlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
-
-// Collect temp files for cleanup
-const tempFiles: string[] = [];
-
-afterEach(async () => {
-	for (const f of tempFiles) {
-		try { await unlink(f); } catch {}
-	}
-	tempFiles.length = 0;
-});
 
 describe("openExternalEditor", () => {
 	test("writes initial content to temp file and reads it back", async () => {
@@ -57,7 +46,7 @@ describe("openExternalEditor", () => {
 			editorCommand: "true",
 			onTempPath: (p) => { capturedPath = p; },
 		});
-		expect(capturedPath).toMatch(/^\/tmp\/friday-editor-/);
+		expect(capturedPath).toMatch(/friday-editor-/);
 		expect(existsSync(capturedPath)).toBe(false);
 	});
 

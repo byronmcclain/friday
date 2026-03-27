@@ -1,4 +1,5 @@
 import { unlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
 
 export interface EditorOptions {
 	/** Override the editor binary (default: "vim", fallback "vi") */
@@ -18,13 +19,13 @@ export async function openExternalEditor(
 	options?: EditorOptions,
 ): Promise<string | null> {
 	const suffix = crypto.randomUUID().slice(0, 8);
-	const tempPath = `/tmp/friday-editor-${suffix}.txt`;
+	const tempPath = `${tmpdir()}/friday-editor-${suffix}.txt`;
 
 	try {
 		await Bun.write(tempPath, initialContent);
 		options?.onTempPath?.(tempPath);
 
-		const command = options?.editorCommand ?? (await resolveEditor());
+		const command = options?.editorCommand ?? resolveEditor();
 		const args = options?.editorArgs ? options.editorArgs(tempPath) : [tempPath];
 
 		const proc = Bun.spawn([command, ...args], {
@@ -56,17 +57,6 @@ export async function openExternalEditor(
 }
 
 /** Resolve vim → vi fallback chain */
-async function resolveEditor(): Promise<string> {
-	try {
-		const which = Bun.spawn(["which", "vim"], {
-			stdout: "pipe",
-			stderr: "pipe",
-		});
-		const code = await which.exited;
-		if (code === 0) return "vim";
-	} catch {
-		// vim not found
-	}
-
-	return "vi";
+function resolveEditor(): string {
+	return Bun.which("vim") !== null ? "vim" : "vi";
 }
