@@ -11,6 +11,14 @@ const VISIBLE_ROWS = 10;
 const MAX_HISTORY = 50;
 const CHAR_WARN = 1000;
 const CHAR_DANGER = 2000;
+const MAX_INPUT_LINES = 10;
+
+/** Compute textarea height (in rows) from content — capped at MAX_INPUT_LINES. */
+export function computeInputHeight(content: string): number {
+	if (content.length === 0) return 1;
+	const lineCount = content.split("\n").length;
+	return Math.min(lineCount, MAX_INPUT_LINES);
+}
 
 interface CommandTypeaheadProps {
 	commands: TypeaheadEntry[];
