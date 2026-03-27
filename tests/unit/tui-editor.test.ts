@@ -21,8 +21,8 @@ describe("openExternalEditor", () => {
 
 	test("returns edited content after editor modifies the file", async () => {
 		const result = await openExternalEditor("line one", {
-			editorCommand: "sed",
-			editorArgs: (path) => ["-i", "", "$a\\nline two", path],
+			editorCommand: "sh",
+			editorArgs: (path) => ["-c", `printf "\\nline two" >> "${path}"`],
 		});
 		expect(result).toBe("line one\nline two");
 	});
