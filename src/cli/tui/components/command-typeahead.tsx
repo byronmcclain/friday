@@ -5,6 +5,7 @@ import { PALETTE, BOLD, DIM } from "../theme.ts";
 import { filterCommands, type TypeaheadEntry } from "../filter-commands.ts";
 import { usePulse } from "../lib/use-pulse.ts";
 import { lerpColor } from "../lib/color-utils.ts";
+import { consumePendingEditorResult } from "../app.tsx";
 
 const MAX_SUGGESTIONS = 25;
 const VISIBLE_ROWS = 10;
@@ -144,6 +145,14 @@ export function CommandTypeahead({
 		setLineCount(computeInputHeight(value));
 		setCursorLine(0);
 		setInputKey((k) => k + 1);
+	}, []);
+
+	// On mount, check for a pending editor result (set before TUI re-mount)
+	useEffect(() => {
+		const pending = consumePendingEditorResult();
+		if (pending !== undefined && pending !== null) {
+			replaceInput(pending);
+		}
 	}, []);
 
 	useKeyboard((key) => {

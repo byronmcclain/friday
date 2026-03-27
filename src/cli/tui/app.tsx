@@ -21,6 +21,7 @@ import type { TypeaheadEntry } from "./filter-commands.ts";
 import { LogStore } from "./log-store.ts";
 import { LogPanel } from "./components/log-panel.tsx";
 import { LOG_ICONS, type LogEntry } from "./log-types.ts";
+import { openExternalEditor } from "./lib/external-editor.ts";
 
 // Module-level renderer reference so shutdown can call destroy()
 let activeRenderer: Awaited<ReturnType<typeof createCliRenderer>> | null =
@@ -39,6 +40,16 @@ function restoreTerminal(): void {
 			"\x1b[0m" +     // Reset all SGR attributes
 			"\x1b[?25h",    // Show cursor
 	);
+}
+
+// Module-level pending editor result — survives React tree re-mount
+let pendingEditorResult: string | null | undefined;
+
+/** Consume and clear the pending editor result (used by CommandTypeahead on mount). */
+export function consumePendingEditorResult(): string | null | undefined {
+	const result = pendingEditorResult;
+	pendingEditorResult = undefined;
+	return result;
 }
 
 // Project root — used for logo path resolution
@@ -305,6 +316,48 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 		}, 0);
 	}, [renderer]);
 
+	// Handle Ctrl+E — suspend TUI, open external editor, resume TUI
+	const handleOpenEditor = useCallback(
+		async (currentContent: string): Promise<string | null> => {
+			// Suspend TUI
+			activeRenderer?.destroy();
+			restoreTerminal();
+			activeRenderer = null;
+
+			let result: string | null = null;
+			try {
+				result = await openExternalEditor(currentContent);
+			} catch {
+				// Editor failed — will return null
+			}
+
+			// Store result for the new component tree to pick up
+			pendingEditorResult = result;
+
+			// Resume TUI — re-create renderer
+			const newRenderer = await createCliRenderer({ exitOnCtrlC: false, useMouse: true });
+			activeRenderer = newRenderer;
+
+			// Re-wire emergency cleanup signals
+			const emergencyCleanup = () => {
+				newRenderer.destroy();
+				restoreTerminal();
+				process.exit(0);
+			};
+			process.removeAllListeners("SIGTERM");
+			process.removeAllListeners("SIGINT");
+			process.on("SIGTERM", emergencyCleanup);
+			process.on("SIGINT", emergencyCleanup);
+
+			// Re-render the React tree into the new renderer
+			const root = createRoot(newRenderer);
+			root.render(<FridayApp options={options} renderer={newRenderer} />);
+
+			return result;
+		},
+		[options],
+	);
+
 	// Handle input submission
 	const handleSubmit = useCallback(
 		async (input: string) => {
@@ -430,6 +483,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 						placeholder={placeholder}
 						onSubmit={handleSubmit}
 						onExit={handleShutdown}
+						onOpenEditor={handleOpenEditor}
 						isThinking={state.isThinking}
 						isStreaming={state.isStreaming}
 					/>

@@ -17,6 +17,7 @@ interface InputBarProps {
 	placeholder: string;
 	onSubmit: (input: string) => void;
 	onExit: () => void;
+	onOpenEditor: (currentContent: string) => Promise<string | null>;
 	isThinking: boolean;
 	isStreaming: boolean;
 }
@@ -152,6 +153,7 @@ export function InputBar({
 	placeholder,
 	onSubmit,
 	onExit,
+	onOpenEditor,
 	isThinking,
 	isStreaming,
 }: InputBarProps) {
@@ -181,6 +183,7 @@ export function InputBar({
 					placeholder={placeholder}
 					onSubmit={onSubmit}
 					onExit={onExit}
+					onOpenEditor={onOpenEditor}
 					isThinking={isThinking}
 					isStreaming={isStreaming}
 				/>
