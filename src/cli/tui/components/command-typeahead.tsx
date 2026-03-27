@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useKeyboard } from "@opentui/react";
-import type { ScrollBoxRenderable } from "@opentui/core";
+import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core";
 import { PALETTE, BOLD, DIM } from "../theme.ts";
 import { filterCommands, type TypeaheadEntry } from "../filter-commands.ts";
 import { usePulse } from "../lib/use-pulse.ts";
@@ -26,6 +26,7 @@ interface CommandTypeaheadProps {
 	placeholder: string;
 	onSubmit: (input: string) => void;
 	onExit: () => void;
+	onOpenEditor: (currentContent: string) => Promise<string | null>;
 	isThinking: boolean;
 	isStreaming: boolean;
 }
@@ -73,21 +74,27 @@ export function CommandTypeahead({
 	placeholder,
 	onSubmit,
 	onExit,
+	onOpenEditor,
 	isThinking,
 	isStreaming,
 }: CommandTypeaheadProps) {
-	// Shadow copy of input value for suggestion filtering — the <input>
+	// Shadow copy of input value for suggestion filtering — the <textarea>
 	// element owns its own buffer; we never push value back via props.
 	const [shadow, setShadow] = useState("");
 	const [selectedIndex, setSelectedIndex] = useState(0);
-	// Bumped to remount <input> with a new initialValue (suggestion accept, submit clear)
+	// Bumped to remount <textarea> with a new initialValue (suggestion accept, submit clear)
 	const [inputKey, setInputKey] = useState(0);
-	// Holds the initialValue for the next <input> mount
+	// Holds the initialValue for the next <textarea> mount
 	const nextValueRef = useRef("");
 	const shadowRef = useRef(shadow);
 	shadowRef.current = shadow;
 	const [suggestionsBlocked, setSuggestionsBlocked] = useState(false);
 	const scrollRef = useRef<ScrollBoxRenderable>(null);
+
+	// Cursor tracking for multi-line navigation
+	const [cursorLine, setCursorLine] = useState(0);
+	const [lineCount, setLineCount] = useState(1);
+	const textareaRef = useRef<TextareaRenderable>(null);
 
 	// Scroll the suggestion list to keep the selected item visible
 	useEffect(() => {
@@ -112,18 +119,30 @@ export function CommandTypeahead({
 			: [];
 	const hasSuggestions = suggestions.length > 0;
 
-	// Track what the user types — only for suggestion filtering, never pushed back
-	const handleInput = useCallback((value: string) => {
+	// Track what the user types — only for suggestion filtering, never pushed back.
+	// ContentChangeEvent is empty; read the current text from the textarea ref.
+	const handleInput = useCallback(() => {
+		const value = textareaRef.current?.plainText ?? "";
 		setShadow(value);
 		setSelectedIndex(0);
 		setSuggestionsBlocked(false);
+		setLineCount(computeInputHeight(value));
 		historyIndexRef.current = -1;
 	}, []);
+
+	const handleCursorChange = useCallback(
+		(event: { line: number; visualColumn: number }) => {
+			setCursorLine(event.line);
+		},
+		[],
+	);
 
 	// Programmatically replace input content by remounting with new initialValue
 	const replaceInput = useCallback((value: string) => {
 		nextValueRef.current = value;
 		setShadow(value);
+		setLineCount(computeInputHeight(value));
+		setCursorLine(0);
 		setInputKey((k) => k + 1);
 	}, []);
 
@@ -137,8 +156,17 @@ export function CommandTypeahead({
 			return;
 		}
 
-		// Enter — accept suggestion or submit input
-		if (key.name === "return") {
+		// Ctrl+E — open external editor
+		if (key.ctrl && key.name === "e") {
+			key.preventDefault();
+			onOpenEditor(shadowRef.current).then((result) => {
+				if (result !== null) replaceInput(result);
+			});
+			return;
+		}
+
+		// Enter — accept suggestion or submit input (Shift+Enter falls through for newline)
+		if (key.name === "return" && !key.shift) {
 			key.preventDefault();
 			if (hasSuggestions) {
 				const selected = suggestions[selectedIndex];
@@ -164,14 +192,21 @@ export function CommandTypeahead({
 			return;
 		}
 
-		// Up — suggestion navigation or input history
+		// Up — suggestion navigation, history (only on first line), or let textarea handle
 		if (key.name === "up") {
-			key.preventDefault();
 			if (hasSuggestions) {
+				key.preventDefault();
 				setSelectedIndex((i) =>
 					i <= 0 ? suggestions.length - 1 : i - 1,
 				);
-			} else if (historyRef.current.length > 0) {
+				return;
+			}
+			// Multi-line: let textarea handle cursor movement unless on first line
+			if (lineCount > 1 && cursorLine > 0) {
+				return; // don't preventDefault — textarea moves cursor up
+			}
+			key.preventDefault();
+			if (historyRef.current.length > 0) {
 				if (historyIndexRef.current === -1) {
 					savedCurrentRef.current = shadowRef.current;
 				}
@@ -188,14 +223,21 @@ export function CommandTypeahead({
 			return;
 		}
 
-		// Down — suggestion navigation or input history
+		// Down — suggestion navigation, history (only on last line), or let textarea handle
 		if (key.name === "down") {
-			key.preventDefault();
 			if (hasSuggestions) {
+				key.preventDefault();
 				setSelectedIndex((i) =>
 					i >= suggestions.length - 1 ? 0 : i + 1,
 				);
-			} else if (historyIndexRef.current >= 0) {
+				return;
+			}
+			// Multi-line: let textarea handle cursor movement unless on last line
+			if (lineCount > 1 && cursorLine < lineCount - 1) {
+				return; // don't preventDefault — textarea moves cursor down
+			}
+			key.preventDefault();
+			if (historyIndexRef.current >= 0) {
 				if (historyIndexRef.current > 0) {
 					historyIndexRef.current--;
 					const entry =
@@ -209,7 +251,7 @@ export function CommandTypeahead({
 			return;
 		}
 
-		// Tab — accept selected suggestion
+		// Tab — accept selected suggestion (no suggestions: let textarea insert tab)
 		if (key.name === "tab" && hasSuggestions) {
 			key.preventDefault();
 			const selected = suggestions[selectedIndex];
@@ -307,15 +349,20 @@ export function CommandTypeahead({
 					isStreaming={isStreaming}
 					disabled={disabled}
 				/>
-				<input
+				<textarea
+					ref={textareaRef}
 					key={inputKey}
 					placeholder={placeholder}
-					value={nextValueRef.current}
-					onInput={handleInput}
+					initialValue={nextValueRef.current}
+					onContentChange={handleInput}
+					onCursorChange={handleCursorChange}
 					focused={!disabled}
 					flexGrow={1}
+					height={computeInputHeight(shadow)}
+					wrapMode="word"
 					textColor={PALETTE.textPrimary}
 					backgroundColor={PALETTE.background}
+					showCursor={!disabled}
 				/>
 				{charCount > 0 && (
 					<text fg={charCountColor} attributes={DIM}>
@@ -328,7 +375,7 @@ export function CommandTypeahead({
 			{showHints && (
 				<box paddingLeft={2}>
 					<text fg={PALETTE.textMuted} attributes={DIM}>
-						{"↑↓ history · Tab complete · ^L logs · ^C exit"}
+						{"↑↓ history · Tab complete · ⇧↵ newline · ^E vim · ^L logs · ^C exit"}
 					</text>
 				</box>
 			)}
