@@ -217,7 +217,7 @@ tests/
 
 ## Testing
 
-- 1129 tests across 105 files (as of 2026-03-12)
+- 1129 tests across 106 files (as of 2026-03-27)
 - Tests use `injectedModel: createMockModel()` (AI SDK `MockLanguageModelV3` from `ai/test` with call capture via `.doStreamCalls`/`.doGenerateCalls`)
 - Use `createErrorModel()` for models that throw on `doGenerate`/`doStream`
 - Shared test stubs live in `tests/helpers/stubs.ts`
@@ -272,7 +272,7 @@ docker run -e XAI_API_KEY=xai-... friday chat
 
 ## Design Documents
 
-All design docs live in `docs/plans/` with naming convention `YYYY-MM-DD-<topic>-design.md` (41 documents as of 2026-03-12). Key ones: `friday-agent-runtime-design`, `cortex-ai-sdk-migration-design`, `vox-voice-output-design`, `voice-web-integration-design`.
+All design docs live in `docs/plans/` with naming convention `YYYY-MM-DD-<topic>-design.md` (42 documents as of 2026-03-27). Key ones: `friday-agent-runtime-design`, `cortex-ai-sdk-migration-design`, `vox-voice-output-design`, `voice-web-integration-design`.
 
 **MCU concept mapping:** Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler, Genesis=identity template, Vox=voice
 

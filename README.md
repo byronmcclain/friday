@@ -673,7 +673,7 @@ flowchart TB
     F --> H[AuditLogger.log: blocked]
 ```
 
-**12 clearance types** control every capability boundary:
+**11 clearance types** control every capability boundary:
 
 | Clearance | What It Gates |
 |---|---|
@@ -1009,7 +1009,7 @@ Bun loads `.env` automatically — no dotenv needed.
 
 ```bash
 bun run dev              # Auto-restart on file changes
-bun test                 # Run all tests (1129 tests across 105 files)
+bun test                 # Run all tests (1129 tests across 106 files)
 bun test --watch         # Watch mode
 bun test tests/unit/cortex.test.ts  # Single test file
 bun run lint             # Lint check
@@ -1052,7 +1052,7 @@ src/
 │   ├── summarizer.ts      # Session summaries via fast model
 │   ├── runtime.ts         # Boot/shutdown orchestrator
 │   ├── events.ts          # SignalBus — typed event system
-│   ├── clearance.ts       # Permission gates (12 clearance types)
+│   ├── clearance.ts       # Permission gates (11 clearance types)
 │   ├── memory.ts          # SQLite persistence, FTS5 search, conversation indexing
 │   ├── recall-tool.ts     # recall_memory tool — conversation memory search (Deja Vu)
 │   ├── genesis.ts         # Identity prompt loader (~/.friday/GENESIS.md)

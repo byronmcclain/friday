@@ -73,7 +73,8 @@ export class RhythmExecutor {
 
 	private async executePrompt(rhythm: Rhythm): Promise<ExecutionResult> {
 		if (rhythm.action.type !== "prompt") throw new Error("Not a prompt action");
-		const response = await this.cortex.chat(rhythm.action.prompt);
+		const framedPrompt = `[ARC RHYTHM TASK: "${rhythm.name}"]\nThis is an autonomous scheduled task, not a direct request from Boss. Execute the task and report results concisely.\n\n${rhythm.action.prompt}`;
+		const response = await this.cortex.chat(framedPrompt);
 		this.audit.log({
 			action: "arc-rhythm:prompt",
 			source: "arc-rhythm",
