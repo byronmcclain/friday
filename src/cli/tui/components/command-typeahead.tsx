@@ -152,10 +152,14 @@ export function CommandTypeahead({
 		setInputKey((k) => k + 1);
 	}, []);
 
-	// After replaceInput remounts the textarea, move cursor to end of content
+	// After replaceInput remounts the textarea, move cursor to end of content.
+	// Deferred to next tick so the textarea has rendered with its new initialValue.
 	useEffect(() => {
-		if (textareaRef.current && nextValueRef.current.length > 0) {
-			textareaRef.current.gotoBufferEnd();
+		if (nextValueRef.current.length > 0) {
+			const timer = setTimeout(() => {
+				textareaRef.current?.gotoBufferEnd();
+			}, 0);
+			return () => clearTimeout(timer);
 		}
 	}, [inputKey]);
 
