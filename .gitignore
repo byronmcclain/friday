@@ -52,3 +52,6 @@ data
 
 # Forge-authored modules (AI-generated, user-specific)
 /forge
+
+# Superpowers plugin state
+.superpowers
