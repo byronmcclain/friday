@@ -6,6 +6,7 @@ import { filterCommands, type TypeaheadEntry } from "../filter-commands.ts";
 import { usePulse } from "../lib/use-pulse.ts";
 import { lerpColor } from "../lib/color-utils.ts";
 import { consumePendingEditorResult } from "../app.tsx";
+import { platform } from "node:os";
 
 const MAX_SUGGESTIONS = 25;
 const VISIBLE_ROWS = 10;
@@ -395,7 +396,7 @@ export function CommandTypeahead({
 			{showHints && (
 				<box paddingLeft={2}>
 					<text fg={PALETTE.textMuted} attributes={DIM}>
-						{"↑↓ history · Tab complete · ⌥↵ newline · ^E vim · ^L logs · ^C exit"}
+						{`↑↓ history · Tab complete · ${platform() === "darwin" ? "⌥" : "Alt+"}↵ newline · ^E vim · ^L logs · ^C exit`}
 					</text>
 				</box>
 			)}

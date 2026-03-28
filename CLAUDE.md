@@ -213,7 +213,7 @@ tests/
 - **ToolResult.error** is an optional field — tool-bridge falls back to `result.output || result.error || "Tool returned no output"`
 - **Forge template** imports `FridayModule, FridayTool, ToolContext, ToolResult` and includes commented usage examples with proper validation patterns
 - **Cortex inference audit**: `inference:start`, `inference:complete` (with duration), `inference:error` (with duration + error message) emitted per `chatStream()` call
-- **Input bar**: Multi-line `<textarea>` with dynamic height (1–10 rows). Enter submits, Alt+Enter (Option+Enter) inserts newline, Tab inserts tab (or accepts suggestion when dropdown showing), Ctrl+E opens vim (TUI suspends, resumes on editor exit). Up/Down navigates history when cursor is on first/last line, moves cursor otherwise.
+- **Input bar**: Multi-line `<textarea>` with dynamic height (1–10 rows). Enter submits, Alt+Enter (Option+Enter on macOS, Alt+Enter on Linux) inserts newline, Tab inserts tab (or accepts suggestion when dropdown showing), Ctrl+E opens vim (TUI suspends, resumes on editor exit). Up/Down navigates history when cursor is on first/last line, moves cursor otherwise. Hint bar shows platform-appropriate key symbols (`⌥↵` on macOS, `Alt+↵` on Linux). Kitty keyboard protocol enabled (`useKittyKeyboard: { disambiguate: true }`) in renderer for improved modifier key detection.
 - **Prompt cache routing**: `createModel(modelId, sessionId?)` — when `sessionId` is provided, creates a session-scoped xAI provider with `x-grok-conv-id` header for cache routing. Runtime generates UUID at boot, reuses `_sessionId` when `dataDir` is configured. Fast/subsystem model intentionally omits session ID (one-shot calls don't benefit).
 
 ## Testing
