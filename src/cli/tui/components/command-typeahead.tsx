@@ -152,6 +152,13 @@ export function CommandTypeahead({
 		setInputKey((k) => k + 1);
 	}, []);
 
+	// After replaceInput remounts the textarea, move cursor to end of content
+	useEffect(() => {
+		if (textareaRef.current && nextValueRef.current.length > 0) {
+			textareaRef.current.gotoBufferEnd();
+		}
+	}, [inputKey]);
+
 	// On mount, check for a pending editor result (set before TUI re-mount)
 	useEffect(() => {
 		const pending = consumePendingEditorResult();
