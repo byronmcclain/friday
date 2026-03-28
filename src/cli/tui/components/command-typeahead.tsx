@@ -237,8 +237,11 @@ export function CommandTypeahead({
 				);
 				return;
 			}
+			// Read cursor position directly from textarea ref — state may be stale
+			const currentLine = textareaRef.current?.logicalCursor.row ?? 0;
+			const currentLineCount = computeInputHeight(textareaRef.current?.plainText ?? "");
 			// Multi-line: let textarea handle cursor movement unless on first line
-			if (lineCount > 1 && cursorLine > 0) {
+			if (currentLineCount > 1 && currentLine > 0) {
 				return; // don't preventDefault — textarea moves cursor up
 			}
 			key.preventDefault();
@@ -268,8 +271,11 @@ export function CommandTypeahead({
 				);
 				return;
 			}
+			// Read cursor position directly from textarea ref — state may be stale
+			const currentLineDown = textareaRef.current?.logicalCursor.row ?? 0;
+			const currentLineCountDown = computeInputHeight(textareaRef.current?.plainText ?? "");
 			// Multi-line: let textarea handle cursor movement unless on last line
-			if (lineCount > 1 && cursorLine < lineCount - 1) {
+			if (currentLineCountDown > 1 && currentLineDown < currentLineCountDown - 1) {
 				return; // don't preventDefault — textarea moves cursor down
 			}
 			key.preventDefault();
