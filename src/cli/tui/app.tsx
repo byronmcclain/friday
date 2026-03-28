@@ -42,8 +42,9 @@ function restoreTerminal(): void {
 	);
 }
 
-// Module-level pending editor result — survives React tree re-mount
+// Module-level state that survives React tree re-mount after editor suspend/resume
 let pendingEditorResult: string | null | undefined;
+let skipSplashOnResume = false;
 
 /** Consume and clear the pending editor result (used by CommandTypeahead on mount). */
 export function consumePendingEditorResult(): string | null | undefined {
@@ -63,7 +64,13 @@ interface FridayAppProps {
 }
 
 function FridayApp({ options, renderer }: FridayAppProps) {
-	const [state, dispatch] = useReducer(appReducer, initialState);
+	const [state, dispatch] = useReducer(appReducer, undefined, () => {
+		if (skipSplashOnResume) {
+			skipSplashOnResume = false;
+			return { ...initialState, phase: "booting" as const };
+		}
+		return initialState;
+	});
 	const bridgeRef = useRef<RuntimeBridge | null>(null);
 	const commandsRef = useRef<TypeaheadEntry[]>([]);
 	const processingRef = useRef(false);
@@ -333,6 +340,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 
 			// Store result for the new component tree to pick up
 			pendingEditorResult = result;
+			skipSplashOnResume = true;
 
 			// Resume TUI — re-create renderer
 			const newRenderer = await createCliRenderer({ exitOnCtrlC: false, useMouse: true, useKittyKeyboard: { disambiguate: true } });
