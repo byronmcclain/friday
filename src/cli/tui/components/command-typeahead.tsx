@@ -331,6 +331,7 @@ export function CommandTypeahead({
 					borderStyle="rounded"
 					borderColor={PALETTE.copperAccent}
 					backgroundColor={PALETTE.surface}
+					width="100%"
 					height={Math.min(suggestions.length, VISIBLE_ROWS) + 2}
 				>
 					<scrollbox
@@ -348,6 +349,7 @@ export function CommandTypeahead({
 							return (
 								<box
 									key={entry.name}
+									width="100%"
 									backgroundColor={
 										selected
 											? PALETTE.surfaceLight
