@@ -349,6 +349,7 @@ export function CommandTypeahead({
 							return (
 								<box
 									key={entry.name}
+									flexDirection="row"
 									width="100%"
 									backgroundColor={
 										selected
