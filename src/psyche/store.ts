@@ -295,7 +295,7 @@ export class PsycheStore {
 		const rows = this.db
 			.query<
 				{ id: string; occurred_at: string; relevance_decay: number },
-				[]
+				[number]
 			>(
 				"SELECT id, occurred_at, relevance_decay FROM psyche_milestones WHERE relevance_decay > ?",
 			)
