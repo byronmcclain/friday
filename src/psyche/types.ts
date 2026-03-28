@@ -76,6 +76,14 @@ export const DIMENSION_NAMES = [
 
 export type DimensionName = (typeof DIMENSION_NAMES)[number];
 
+export const DIMENSION_LABELS: Record<DimensionName, string> = {
+	trust: "Trust",
+	banter: "Banter",
+	emotional_openness: "Emotional openness",
+	shared_history: "Shared history",
+	current_energy: "Current energy",
+};
+
 export const NEUTRAL_SEED_DIMENSIONS: Record<DimensionName, string> = {
 	trust:
 		"New relationship. No history yet — operating on default professional courtesy with warmth.",

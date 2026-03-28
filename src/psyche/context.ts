@@ -3,17 +3,10 @@ import type {
 	SessionMood,
 	EmotionalMilestone,
 } from "./types.ts";
+import { DIMENSION_LABELS } from "./types.ts";
 import { EMOTIONAL_GUARDRAILS } from "./guardrails.ts";
 
 const MAX_CONTEXT_CHARS = 4000;
-
-const LABEL: Record<string, string> = {
-	trust: "Trust",
-	banter: "Banter",
-	emotional_openness: "Emotional openness",
-	shared_history: "Shared history",
-	current_energy: "Current energy",
-};
 
 /**
  * Build the ## Emotional Context system prompt section.
@@ -31,7 +24,7 @@ export function buildEmotionalContext(
 
 	// How We Are — always present when dimensions exist
 	const dimLines = dimensions.map(
-		(d) => `${LABEL[d.name] ?? d.name}: ${d.description}`,
+		(d) => `${DIMENSION_LABELS[d.name as keyof typeof DIMENSION_LABELS] ?? d.name}: ${d.description}`,
 	);
 	const howWeAre = `### How We Are\n${dimLines.join("\n")}`;
 	sections.push(howWeAre);

@@ -10,6 +10,7 @@ import type {
 import {
 	PSYCHE_DEFAULTS,
 	DIMENSION_NAMES,
+	DIMENSION_LABELS,
 	NEUTRAL_SEED_DIMENSIONS,
 } from "./types.ts";
 
@@ -34,14 +35,6 @@ type SessionMoodRow = {
 	ended_mood: string;
 	arc_summary: string;
 	analyzed_at: string;
-};
-
-const LABEL: Record<string, string> = {
-	trust: "Trust",
-	banter: "Banter",
-	emotional_openness: "Emotional openness",
-	shared_history: "Shared history",
-	current_energy: "Current energy",
 };
 
 export class PsycheStore {
@@ -145,7 +138,7 @@ export class PsycheStore {
 	getDimensionSummary(): string {
 		const dims = this.getDimensions();
 		return dims
-			.map((d) => `${LABEL[d.name] ?? d.name}: ${d.description}`)
+			.map((d) => `${DIMENSION_LABELS[d.name as keyof typeof DIMENSION_LABELS] ?? d.name}: ${d.description}`)
 			.join("\n");
 	}
 
@@ -302,6 +295,7 @@ export class PsycheStore {
 			.all(this.config.decayFloor);
 
 		const now = Date.now();
+		const updates: Array<{ id: string; decay: number }> = [];
 		for (const row of rows) {
 			const ageMs = now - new Date(row.occurred_at).getTime();
 			const ageDays = ageMs / (24 * 60 * 60 * 1000);
@@ -312,11 +306,18 @@ export class PsycheStore {
 				this.config.decayFloor,
 				Math.exp(-decayRate * daysOverGrace),
 			);
-			this.db
-				.query(
-					"UPDATE psyche_milestones SET relevance_decay = ? WHERE id = ?",
-				)
-				.run(newDecay, row.id);
+			updates.push({ id: row.id, decay: newDecay });
+		}
+		if (updates.length > 0) {
+			this.db.transaction(() => {
+				for (const u of updates) {
+					this.db
+						.query(
+							"UPDATE psyche_milestones SET relevance_decay = ? WHERE id = ?",
+						)
+						.run(u.decay, u.id);
+				}
+			})();
 		}
 	}
 

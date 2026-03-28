@@ -5,14 +5,7 @@ import type {
 	ProtocolContext,
 } from "../modules/types.ts";
 import type { PsycheStore } from "./store.ts";
-
-const LABEL: Record<string, string> = {
-	trust: "Trust",
-	banter: "Banter",
-	emotional_openness: "Emotional openness",
-	shared_history: "Shared history",
-	current_energy: "Current energy",
-};
+import { DIMENSION_LABELS } from "./types.ts";
 
 export function createPsycheProtocol(store: PsycheStore): FridayProtocol {
 	return {
@@ -62,7 +55,7 @@ function handleStatus(store: PsycheStore): ProtocolResult {
 
 	const lines: string[] = ["**Relational Dimensions:**"];
 	for (const d of dims) {
-		const label = LABEL[d.name] ?? d.name;
+		const label = DIMENSION_LABELS[d.name as keyof typeof DIMENSION_LABELS] ?? d.name;
 		const desc =
 			d.description.length > 80
 				? `${d.description.slice(0, 80)}...`
@@ -91,7 +84,7 @@ function handleDimensions(store: PsycheStore): ProtocolResult {
 		return { success: true, summary: "No dimensions initialized yet." };
 	}
 	const lines = dims.map((d) => {
-		const label = LABEL[d.name] ?? d.name;
+		const label = DIMENSION_LABELS[d.name as keyof typeof DIMENSION_LABELS] ?? d.name;
 		return `**${label}:**\n${d.description}`;
 	});
 	return { success: true, summary: lines.join("\n\n") };
