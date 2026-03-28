@@ -26,6 +26,7 @@ export class Vox {
 	private _playerAvailable: boolean | null = null;
 	private _fastModel?: LanguageModelV3;
 	private _getRecentHistory?: () => string[];
+	private _psycheDimensionSummary?: () => string | undefined;
 
 	constructor(options: VoxOptions) {
 		this._config = options.config;
@@ -49,9 +50,11 @@ export class Vox {
 	setEmotionEngine(
 		fastModel: LanguageModelV3,
 		getRecentHistory: () => string[],
+		getPsycheDimensions?: () => string | undefined,
 	): void {
 		this._fastModel = fastModel;
 		this._getRecentHistory = getRecentHistory;
+		this._psycheDimensionSummary = getPsycheDimensions;
 	}
 
 	setMode(mode: VoiceMode): void {
@@ -120,11 +123,13 @@ export class Vox {
 		) {
 			try {
 				const history = this._getRecentHistory();
+				const psycheCtx = this._psycheDimensionSummary?.();
 				const result = await emotionalRewrite(
 					text,
 					history,
 					activeMode,
 					this._fastModel,
+					psycheCtx,
 				);
 				spokenText = result.text;
 				this.logAudit("vox:rewrite", `Emotional rewrite applied (mood: ${result.emotion?.mood ?? "neutral"})`, true);

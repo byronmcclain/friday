@@ -476,6 +476,9 @@ export class FridayRuntime {
 				this._vox.setEmotionEngine(
 					subsystemModel,
 					() => this._cortex!.getRecentHistory(5),
+					this._psyche
+						? () => this._psyche!.getDimensionSummary()
+						: undefined,
 				);
 			}
 

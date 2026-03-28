@@ -120,6 +120,7 @@ export async function emotionalRewrite(
 	recentMessages: string[],
 	mode: "on" | "whisper",
 	fastModel: LanguageModelV3,
+	psycheContext?: string,
 ): Promise<EmotionalRewriteResult> {
 	try {
 		const historyBlock =
@@ -127,7 +128,10 @@ export async function emotionalRewrite(
 				? `RECENT CONVERSATION:\n${recentMessages.join("\n")}\n`
 				: "RECENT CONVERSATION:\n(no prior messages)\n";
 
-		const prompt = `${EMOTION_REWRITE_PROMPT}\n\n${MODE_GUIDANCE[mode]}\n\n${historyBlock}\nTEXT TO REWRITE:\n${text}`;
+		const psycheBlock = psycheContext
+			? `\nRELATIONAL CONTEXT:\n${psycheContext}\n`
+			: "";
+		const prompt = `${EMOTION_REWRITE_PROMPT}\n\n${MODE_GUIDANCE[mode]}\n${psycheBlock}\n${historyBlock}\nTEXT TO REWRITE:\n${text}`;
 
 		const result = await withTimeout(
 			generateText({
