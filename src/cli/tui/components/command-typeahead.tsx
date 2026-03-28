@@ -174,8 +174,19 @@ export function CommandTypeahead({
 			return;
 		}
 
-		// Enter — accept suggestion or submit input (Shift+Enter falls through for newline)
-		if (key.name === "return" && !key.shift) {
+		// Alt+Enter (Option+Enter) — insert newline
+		if (key.name === "return" && (key.meta || key.option)) {
+			key.preventDefault();
+			textareaRef.current?.insertText("\n");
+			// Sync shadow state after programmatic insert
+			const value = textareaRef.current?.plainText ?? "";
+			setShadow(value);
+			setLineCount(computeInputHeight(value));
+			return;
+		}
+
+		// Enter — accept suggestion or submit input
+		if (key.name === "return") {
 			key.preventDefault();
 			if (hasSuggestions) {
 				const selected = suggestions[selectedIndex];
@@ -384,7 +395,7 @@ export function CommandTypeahead({
 			{showHints && (
 				<box paddingLeft={2}>
 					<text fg={PALETTE.textMuted} attributes={DIM}>
-						{"↑↓ history · Tab complete · ⇧↵ newline · ^E vim · ^L logs · ^C exit"}
+						{"↑↓ history · Tab complete · ⌥↵ newline · ^E vim · ^L logs · ^C exit"}
 					</text>
 				</box>
 			)}
