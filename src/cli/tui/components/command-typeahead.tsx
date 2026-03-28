@@ -272,14 +272,21 @@ export function CommandTypeahead({
 			return;
 		}
 
-		// Tab — accept selected suggestion (no suggestions: let textarea insert tab)
-		if (key.name === "tab" && hasSuggestions) {
+		// Tab — accept selected suggestion, or insert tab character
+		if (key.name === "tab") {
 			key.preventDefault();
-			const selected = suggestions[selectedIndex];
-			if (selected) {
-				replaceInput(`/${selected.name} `);
-				setSelectedIndex(0);
+			if (hasSuggestions) {
+				const selected = suggestions[selectedIndex];
+				if (selected) {
+					replaceInput(`/${selected.name} `);
+					setSelectedIndex(0);
+				}
+				return;
 			}
+			// No suggestions — insert tab character
+			textareaRef.current?.insertText("\t");
+			const value = textareaRef.current?.plainText ?? "";
+			setShadow(value);
 			return;
 		}
 
