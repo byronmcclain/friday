@@ -10,8 +10,8 @@ import type {
 import {
 	PSYCHE_DEFAULTS,
 	DIMENSION_NAMES,
-	DIMENSION_LABELS,
 	NEUTRAL_SEED_DIMENSIONS,
+	getDimensionLabel,
 } from "./types.ts";
 
 type DimensionRow = {
@@ -40,11 +40,15 @@ type SessionMoodRow = {
 export class PsycheStore {
 	private db: Database;
 	private config: PsycheStoreConfig;
+	private _hasDimensions: boolean;
 
 	constructor(db: Database, config: PsycheStoreConfig = PSYCHE_DEFAULTS) {
 		this.db = db;
 		this.config = config;
 		this.migrate();
+		this._hasDimensions = (this.db
+			.query<{ cnt: number }, []>("SELECT COUNT(*) as cnt FROM psyche_dimensions")
+			.get()?.cnt ?? 0) > 0;
 	}
 
 	private migrate(): void {
@@ -113,12 +117,7 @@ export class PsycheStore {
 	}
 
 	hasDimensions(): boolean {
-		const row = this.db
-			.query<{ cnt: number }, []>(
-				"SELECT COUNT(*) as cnt FROM psyche_dimensions",
-			)
-			.get();
-		return (row?.cnt ?? 0) > 0;
+		return this._hasDimensions;
 	}
 
 	setDimension(name: string, description: string): void {
@@ -127,6 +126,7 @@ export class PsycheStore {
 				"INSERT OR REPLACE INTO psyche_dimensions (name, description, updated_at) VALUES (?, ?, datetime('now'))",
 			)
 			.run(name, description);
+		this._hasDimensions = true;
 	}
 
 	seedNeutralDefaults(): void {
@@ -138,7 +138,7 @@ export class PsycheStore {
 	getDimensionSummary(): string {
 		const dims = this.getDimensions();
 		return dims
-			.map((d) => `${DIMENSION_LABELS[d.name as keyof typeof DIMENSION_LABELS] ?? d.name}: ${d.description}`)
+			.map((d) => `${getDimensionLabel(d.name)}: ${d.description}`)
 			.join("\n");
 	}
 
@@ -192,28 +192,23 @@ export class PsycheStore {
 	findRelevantMilestones(query: string, limit = 3): EmotionalMilestone[] {
 		const sanitized = query.replace(/['"*()]/g, " ").trim();
 		if (!sanitized) return [];
-		const ftsRows = this.db
-			.query<{ rowid: number; rank: number }, [string, number]>(
-				"SELECT rowid, rank FROM psyche_milestones_fts WHERE summary MATCH ? ORDER BY rank LIMIT ?",
+		const rows = this.db
+			.query<MilestoneRow & { rank: number }, [string, number]>(
+				`SELECT m.id, m.occurred_at, m.summary, m.emotional_type, m.session_id, m.relevance_decay, fts.rank
+				 FROM psyche_milestones_fts fts
+				 JOIN psyche_milestones m ON m.rowid = fts.rowid
+				 WHERE fts.summary MATCH ?
+				 ORDER BY fts.rank
+				 LIMIT ?`,
 			)
 			.all(sanitized, limit * 3);
-		if (ftsRows.length === 0) return [];
+		if (rows.length === 0) return [];
 
-		const milestones: (EmotionalMilestone & { score: number })[] = [];
-		for (const fts of ftsRows) {
-			const row = this.db
-				.query<MilestoneRow, [number]>(
-					"SELECT id, occurred_at, summary, emotional_type, session_id, relevance_decay FROM psyche_milestones WHERE rowid = ?",
-				)
-				.get(fts.rowid);
-			if (row) {
-				milestones.push({
-					...this.mapMilestone(row),
-					score: Math.abs(fts.rank) * row.relevance_decay,
-				});
-			}
-		}
-		return milestones
+		return rows
+			.map((r) => ({
+				...this.mapMilestone(r),
+				score: Math.abs(r.rank) * r.relevance_decay,
+			}))
 			.sort((a, b) => b.score - a.score)
 			.slice(0, limit);
 	}
@@ -338,6 +333,7 @@ export class PsycheStore {
 			this.db.run("DELETE FROM psyche_dimensions");
 			this.db.run("DELETE FROM psyche_session_moods");
 		})();
+		this._hasDimensions = false;
 	}
 
 	private mapMilestone(row: MilestoneRow): EmotionalMilestone {

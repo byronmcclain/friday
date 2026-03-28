@@ -84,6 +84,10 @@ export const DIMENSION_LABELS: Record<DimensionName, string> = {
 	current_energy: "Current energy",
 };
 
+export function getDimensionLabel(name: string): string {
+	return DIMENSION_LABELS[name as DimensionName] ?? name;
+}
+
 export const NEUTRAL_SEED_DIMENSIONS: Record<DimensionName, string> = {
 	trust:
 		"New relationship. No history yet — operating on default professional courtesy with warmth.",

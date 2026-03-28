@@ -1,6 +1,6 @@
 import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { generateText } from "ai";
-import type { ConversationMessage } from "../core/types.ts";
+import { type ConversationMessage, getTextContent } from "../core/types.ts";
 import type { PsycheStore } from "./store.ts";
 import type { PsycheCuratorResult, EmotionalType } from "./types.ts";
 import { DIMENSION_NAMES } from "./types.ts";
@@ -71,13 +71,7 @@ export class PsycheCurator {
 
 		try {
 			let conversationText = messages
-				.map((m) => {
-					const content =
-						typeof m.content === "string"
-							? m.content
-							: JSON.stringify(m.content);
-					return `${m.role}: ${content}`;
-				})
+				.map((m) => `${m.role}: ${getTextContent(m.content)}`)
 				.join("\n\n");
 
 			if (conversationText.length > MAX_CONVERSATION_CHARS) {
@@ -135,13 +129,7 @@ export class PsycheCurator {
 					if (c.summary) return `Session ${i + 1}: ${c.summary}`;
 					const content = c.messages
 						.slice(0, 20)
-						.map((m) => {
-							const text =
-								typeof m.content === "string"
-									? m.content
-									: JSON.stringify(m.content);
-							return `${m.role}: ${text}`;
-						})
+						.map((m) => `${m.role}: ${getTextContent(m.content)}`)
 						.join("\n");
 					return `Session ${i + 1}:\n${content}`;
 				})

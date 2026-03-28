@@ -3,7 +3,7 @@ import type {
 	SessionMood,
 	EmotionalMilestone,
 } from "./types.ts";
-import { DIMENSION_LABELS } from "./types.ts";
+import { getDimensionLabel } from "./types.ts";
 import { EMOTIONAL_GUARDRAILS } from "./guardrails.ts";
 
 const MAX_CONTEXT_CHARS = 4000;
@@ -24,7 +24,7 @@ export function buildEmotionalContext(
 
 	// How We Are — always present when dimensions exist
 	const dimLines = dimensions.map(
-		(d) => `${DIMENSION_LABELS[d.name as keyof typeof DIMENSION_LABELS] ?? d.name}: ${d.description}`,
+		(d) => `${getDimensionLabel(d.name)}: ${d.description}`,
 	);
 	const howWeAre = `### How We Are\n${dimLines.join("\n")}`;
 	sections.push(howWeAre);
