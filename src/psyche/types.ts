@@ -1,5 +1,3 @@
-import type { Database } from "bun:sqlite";
-
 export interface RelationalDimension {
 	name: string;
 	description: string;
