@@ -716,6 +716,7 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 | "I remember when..." | **Deja Vu** | Conversational memory recall — FTS5 search across past sessions |
 | Heartbeat / scheduler | **Arc Rhythm** | Autonomous scheduled task execution — cron-driven, headless |
 | Friday's voice | **Vox** | Voice output via Grok Voice Agent API — fire-and-forget TTS, content-aware prompts, emotional rewriting |
+| Emotional core | **Psyche** | Emotional intelligence — relational dimensions, milestone memory, session mood, system prompt enrichment |
 
 ---
 
@@ -738,6 +739,7 @@ graph TB
     RT --> DE["DirectiveEngine"]
     RT --> MEM["SQLiteMemory"]
     RT --> SM["SmartsStore"]
+    RT --> PSY["Psyche"]
     RT --> SEN["Sensorium"]
     RT --> GEN["Genesis"]
     RT --> VOX2["Vox"]
@@ -793,7 +795,8 @@ flowchart LR
     E --> F["DirectiveStore +<br/>DirectiveEngine"]
     F --> G[SQLiteMemory]
     G --> H[SmartsStore]
-    H --> I[Sensorium]
+    H --> PSY[Psyche]
+    PSY --> I[Sensorium]
     I --> GEN[Genesis]
     GEN --> VOX[Vox]
     VOX --> J[Cortex]
@@ -1110,6 +1113,13 @@ src/
 │   ├── scheduler.ts       # Polling loop, reentrant guard, auto-pause
 │   ├── protocol.ts        # /arc protocol handler
 │   └── tool.ts            # manage_rhythm FridayTool for Cortex
+├── psyche/
+│   ├── types.ts           # RelationalDimension, EmotionalMilestone, SessionMood, PsycheState
+│   ├── store.ts           # PsycheStore — SQLite tables, FTS5, CRUD, decay, seeding
+│   ├── curator.ts         # PsycheCurator — session-end emotional analysis, bootstrap
+│   ├── context.ts         # buildEmotionalContext() — system prompt injection
+│   ├── guardrails.ts      # EMOTIONAL_GUARDRAILS constant
+│   └── protocol.ts        # /psyche protocol (status, dimensions, milestones, reset)
 ├── history/
 │   └── protocol.ts        # /history protocol (list, show, clear)
 ├── server/

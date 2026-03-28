@@ -134,6 +134,13 @@ src/
 │   ├── scheduler.ts       # RhythmScheduler — polling loop, reentrant guard, auto-pause
 │   ├── protocol.ts        # /arc protocol (list, show, create, pause, resume, delete, history, run)
 │   └── tool.ts            # manage_rhythm FridayTool for Cortex
+├── psyche/
+│   ├── types.ts           # RelationalDimension, EmotionalMilestone, SessionMood, PsycheState
+│   ├── store.ts           # PsycheStore — SQLite tables, FTS5, CRUD, decay, seeding
+│   ├── curator.ts         # PsycheCurator — session-end emotional analysis, bootstrap
+│   ├── context.ts         # buildEmotionalContext() — system prompt injection
+│   ├── guardrails.ts      # EMOTIONAL_GUARDRAILS constant
+│   └── protocol.ts        # /psyche protocol (status, dimensions, milestones, reset)
 ├── history/
 │   └── protocol.ts        # /history protocol (list, show, clear) — session persistence
 ├── server/
@@ -189,12 +196,13 @@ tests/
 | **VoiceSessionManager** | `src/core/voice/session-manager.ts` | Thin audio I/O + lifecycle. Manages Grok WebSocket, VAD, routes transcripts through `cortex.chatStreamVoice()`. |
 | **Recall (Deja Vu)** | `src/core/recall-tool.ts` | `search` (FTS5 summaries) → `recall` (full transcript). Registered in Cortex at boot. |
 | **Arc Rhythm** | `src/arc-rhythm/` | 60s scheduler tick. Auto-pause after 5 failures. Shares Memory's SQLite via `memory.database`. |
+| **Psyche** | `src/psyche/` | Emotional intelligence. Boot + session-end analysis. Shares Memory's SQLite. 5 relational dimensions (natural language), milestones with FTS5 + relevance decay, session mood tracking. |
 | **The Forge** | `src/modules/forge/` | Self-improvement. Failed modules don't crash boot. Filesystem module + Forge are core-protected. Validate sanitizes LLM HTML entities before typecheck. |
 | **Bridges** | `src/core/bridges/` | Singleton mode IPC. `SocketBridge` (Unix socket to server). `friday chat` requires a running `friday serve`. |
 | **SessionHub** | `src/server/session-hub.ts` | Session lifecycle for singleton. Hydrates clients on connect, saves on last disconnect, reconnect guard. Unified ClientRegistry across transports. |
 | **Server** | `src/server/` | HTTP + WebSocket + Unix socket. SessionHub coordinates session lifecycle. ttyd for terminal-in-browser. |
 
-**Boot order:** SignalBus → ClearanceManager → AuditLogger → NotificationManager → ProtocolRegistry → DirectiveStore/Engine → Memory → SmartsStore → Sensorium → Genesis → Vox → Cortex → Recall Tool → Arc Rhythm → Modules → `session:start`
+**Boot order:** SignalBus → ClearanceManager → AuditLogger → NotificationManager → ProtocolRegistry → DirectiveStore/Engine → Memory → SmartsStore → Psyche → Sensorium → Genesis → Vox → Cortex → Recall Tool → Arc Rhythm → Modules → `session:start`
 
 ### Patterns & Gotchas
 
@@ -215,6 +223,7 @@ tests/
 - **Cortex inference audit**: `inference:start`, `inference:complete` (with duration), `inference:error` (with duration + error message) emitted per `chatStream()` call
 - **Input bar**: Multi-line `<textarea>` with dynamic height (1–10 rows). Enter submits, Alt+Enter (Option+Enter on macOS, Alt+Enter on Linux) inserts newline, Tab inserts tab (or accepts suggestion when dropdown showing), Ctrl+E opens vim (TUI suspends, resumes on editor exit). Up/Down navigates history when cursor is on first/last line, moves cursor otherwise. Hint bar shows platform-appropriate key symbols (`⌥↵` on macOS, `Alt+↵` on Linux). Kitty keyboard protocol enabled (`useKittyKeyboard: { disambiguate: true }`) in renderer for improved modifier key detection.
 - **Prompt cache routing**: `createModel(modelId, sessionId?)` — when `sessionId` is provided, creates a session-scoped xAI provider with `x-grok-conv-id` header for cache routing. Runtime generates UUID at boot, reuses `_sessionId` when `dataDir` is configured. Fast/subsystem model intentionally omits session ID (one-shot calls don't benefit).
+- **Psyche emotional context**: `buildEmotionalContext()` injects `## Emotional Context` into system prompt with dimensions, session mood, FTS5-matched milestones, and guardrails. PsycheCurator runs at session end alongside SmartsCurator. Milestones decay with exponential half-life (30 days, floor 0.1). Smart seeding bootstraps from last 3 conversations + SMARTS on first activation.
 
 ## Testing
 
@@ -275,7 +284,7 @@ docker run -e XAI_API_KEY=xai-... friday chat
 
 All design docs live in `docs/plans/` with naming convention `YYYY-MM-DD-<topic>-design.md` (42 documents as of 2026-03-27). Key ones: `friday-agent-runtime-design`, `cortex-ai-sdk-migration-design`, `vox-voice-output-design`, `voice-web-integration-design`.
 
-**MCU concept mapping:** Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler, Genesis=identity template, Vox=voice
+**MCU concept mapping:** Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler, Genesis=identity template, Vox=voice, Psyche=emotional core
 
 ## Worktrees
 
