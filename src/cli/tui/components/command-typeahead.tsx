@@ -121,22 +121,26 @@ export function CommandTypeahead({
 			: [];
 	const hasSuggestions = suggestions.length > 0;
 
-	// Track what the user types — only for suggestion filtering, never pushed back.
-	// ContentChangeEvent is empty; read the current text from the textarea ref.
-	const handleInput = useCallback(() => {
+	// Sync shadow state from textarea ref — called on content change AND cursor change.
+	// onContentChange may not fire for all edit operations (e.g., deletions after remount),
+	// so we also sync on cursor changes since the cursor moves on every edit.
+	const syncShadow = useCallback(() => {
 		const value = textareaRef.current?.plainText ?? "";
-		setShadow(value);
-		setSelectedIndex(0);
-		setSuggestionsBlocked(false);
-		setLineCount(computeInputHeight(value));
-		historyIndexRef.current = -1;
+		if (value !== shadowRef.current) {
+			setShadow(value);
+			setSelectedIndex(0);
+			setSuggestionsBlocked(false);
+			setLineCount(computeInputHeight(value));
+			historyIndexRef.current = -1;
+		}
 	}, []);
 
 	const handleCursorChange = useCallback(
 		(event: { line: number; visualColumn: number }) => {
 			setCursorLine(event.line);
+			syncShadow();
 		},
-		[],
+		[syncShadow],
 	);
 
 	// Programmatically replace input content by remounting with new initialValue
@@ -382,7 +386,7 @@ export function CommandTypeahead({
 					key={inputKey}
 					placeholder={placeholder}
 					initialValue={nextValueRef.current}
-					onContentChange={handleInput}
+					onContentChange={syncShadow}
 					onCursorChange={handleCursorChange}
 					focused={!disabled}
 					flexGrow={1}
