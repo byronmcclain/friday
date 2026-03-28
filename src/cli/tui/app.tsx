@@ -335,7 +335,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			pendingEditorResult = result;
 
 			// Resume TUI — re-create renderer
-			const newRenderer = await createCliRenderer({ exitOnCtrlC: false, useMouse: true });
+			const newRenderer = await createCliRenderer({ exitOnCtrlC: false, useMouse: true, useKittyKeyboard: { disambiguate: true } });
 			activeRenderer = newRenderer;
 
 			// Re-wire emergency cleanup signals
@@ -508,7 +508,7 @@ export async function launchTui(options: {
 	}
 
 	try {
-		const renderer = await createCliRenderer({ exitOnCtrlC: false, useMouse: true });
+		const renderer = await createCliRenderer({ exitOnCtrlC: false, useMouse: true, useKittyKeyboard: { disambiguate: true } });
 		activeRenderer = renderer;
 
 		// Ensure terminal state is restored on unexpected signals
