@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { useKeyboard } from "@opentui/react";
+import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core";
 import { PALETTE, BOLD, DIM } from "../theme.ts";
 import { filterCommands, type TypeaheadEntry } from "../filter-commands.ts";
@@ -15,11 +15,19 @@ const CHAR_WARN = 1000;
 const CHAR_DANGER = 2000;
 const MAX_INPUT_LINES = 10;
 
-/** Compute textarea height (in rows) from content — capped at MAX_INPUT_LINES. */
-export function computeInputHeight(content: string): number {
+/** Compute textarea height (in visual rows) from content — accounts for soft wrapping. */
+export function computeInputHeight(content: string, availableWidth?: number): number {
 	if (content.length === 0) return 1;
-	const lineCount = content.split("\n").length;
-	return Math.min(lineCount, MAX_INPUT_LINES);
+	const lines = content.split("\n");
+	let totalRows = 0;
+	for (const line of lines) {
+		if (!availableWidth || availableWidth <= 0 || line.length <= availableWidth) {
+			totalRows += 1;
+		} else {
+			totalRows += Math.ceil(line.length / availableWidth);
+		}
+	}
+	return Math.min(totalRows, MAX_INPUT_LINES);
 }
 
 interface CommandTypeaheadProps {
@@ -80,6 +88,12 @@ export function CommandTypeahead({
 	isThinking,
 	isStreaming,
 }: CommandTypeaheadProps) {
+	const { width: termWidth } = useTerminalDimensions();
+	// Textarea available width: terminal minus InputBar padding (2+1), glyph (1), gap (1)
+	const textareaWidth = Math.max(1, termWidth - 5);
+	const textareaWidthRef = useRef(textareaWidth);
+	textareaWidthRef.current = textareaWidth;
+
 	// Shadow copy of input value for suggestion filtering — the <textarea>
 	// element owns its own buffer; we never push value back via props.
 	const [shadow, setShadow] = useState("");
@@ -130,7 +144,7 @@ export function CommandTypeahead({
 			setShadow(value);
 			setSelectedIndex(0);
 			setSuggestionsBlocked(false);
-			setLineCount(computeInputHeight(value));
+			setLineCount(computeInputHeight(value, textareaWidthRef.current));
 			historyIndexRef.current = -1;
 		}
 	}, []);
@@ -147,7 +161,7 @@ export function CommandTypeahead({
 	const replaceInput = useCallback((value: string) => {
 		nextValueRef.current = value;
 		setShadow(value);
-		setLineCount(computeInputHeight(value));
+		setLineCount(computeInputHeight(value, textareaWidthRef.current));
 		setCursorLine(0);
 		setInputKey((k) => k + 1);
 	}, []);
@@ -197,7 +211,7 @@ export function CommandTypeahead({
 			// Sync shadow state after programmatic insert
 			const value = textareaRef.current?.plainText ?? "";
 			setShadow(value);
-			setLineCount(computeInputHeight(value));
+			setLineCount(computeInputHeight(value, textareaWidthRef.current));
 			return;
 		}
 
@@ -239,7 +253,7 @@ export function CommandTypeahead({
 			}
 			// Read cursor position directly from textarea ref — state may be stale
 			const currentLine = textareaRef.current?.logicalCursor.row ?? 0;
-			const currentLineCount = computeInputHeight(textareaRef.current?.plainText ?? "");
+			const currentLineCount = computeInputHeight(textareaRef.current?.plainText ?? "", textareaWidthRef.current);
 			// Multi-line: let textarea handle cursor movement unless on first line
 			if (currentLineCount > 1 && currentLine > 0) {
 				return; // don't preventDefault — textarea moves cursor up
@@ -273,7 +287,7 @@ export function CommandTypeahead({
 			}
 			// Read cursor position directly from textarea ref — state may be stale
 			const currentLineDown = textareaRef.current?.logicalCursor.row ?? 0;
-			const currentLineCountDown = computeInputHeight(textareaRef.current?.plainText ?? "");
+			const currentLineCountDown = computeInputHeight(textareaRef.current?.plainText ?? "", textareaWidthRef.current);
 			// Multi-line: let textarea handle cursor movement unless on last line
 			if (currentLineCountDown > 1 && currentLineDown < currentLineCountDown - 1) {
 				return; // don't preventDefault — textarea moves cursor down
@@ -410,7 +424,7 @@ export function CommandTypeahead({
 					onCursorChange={handleCursorChange}
 					focused={!disabled}
 					flexGrow={1}
-					height={computeInputHeight(shadow)}
+					height={computeInputHeight(shadow, textareaWidth)}
 					wrapMode="word"
 					textColor={PALETTE.textPrimary}
 					backgroundColor={PALETTE.background}
