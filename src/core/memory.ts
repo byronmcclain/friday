@@ -25,6 +25,13 @@ export interface ScopedMemory {
   list(): Promise<string[]>;
 }
 
+export const NOOP_SCOPED_MEMORY: ScopedMemory = {
+  get: async () => undefined,
+  set: async () => {},
+  delete: async () => {},
+  list: async () => [],
+};
+
 type ConversationRow = {
   id: string;
   started_at: string;

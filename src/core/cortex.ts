@@ -36,6 +36,8 @@ export interface CortexConfig extends Partial<FridayConfig> {
 	audit?: AuditLogger;
 	signals?: SignalBus;
 	toolMemory?: ScopedMemory;
+	/** Per-tool memory scoping — maps tool name → module-scoped memory */
+	toolMemoryMap?: Map<string, ScopedMemory>;
 	notifications?: NotificationManager;
 	genesisPrompt?: string;
 	vox?: Vox;
@@ -60,6 +62,7 @@ export class Cortex {
 	private audit?: AuditLogger;
 	private signals?: SignalBus;
 	private toolMemory?: ScopedMemory;
+	private toolMemoryMap?: Map<string, ScopedMemory>;
 	private notifications?: NotificationManager;
 	private pinnedSmarts = new Set<string>();
 	private genesisPrompt?: string;
@@ -86,6 +89,7 @@ export class Cortex {
 		this.audit = config.audit;
 		this.signals = config.signals;
 		this.toolMemory = config.toolMemory;
+		this.toolMemoryMap = config.toolMemoryMap;
 		this.notifications = config.notifications;
 		this.genesisPrompt = config.genesisPrompt;
 		this.vox = config.vox;
@@ -347,6 +351,7 @@ export class Cortex {
 			audit: this.audit,
 			signals: this.signals,
 			toolMemory: this.toolMemory,
+			toolMemoryMap: this.toolMemoryMap,
 			notifications: this.notifications,
 		}));
 

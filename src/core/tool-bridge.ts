@@ -2,7 +2,7 @@ import type { FridayTool } from "../modules/types.ts";
 import type { ClearanceManager } from "./clearance.ts";
 import type { AuditLogger } from "../audit/logger.ts";
 import type { SignalBus, SignalEmitter } from "./events.ts";
-import type { ScopedMemory } from "./memory.ts";
+import { NOOP_SCOPED_MEMORY, type ScopedMemory } from "./memory.ts";
 import type { NotificationManager } from "./notifications.ts";
 
 /** Portable tool definition — works for AI SDK, Grok realtime, or any LLM API */
@@ -36,6 +36,8 @@ export interface ToolExecutorConfig {
 	audit?: AuditLogger;
 	signals?: SignalBus;
 	toolMemory?: ScopedMemory;
+	/** Per-tool memory scoping — maps tool name → module-scoped memory. Falls back to toolMemory. */
+	toolMemoryMap?: Map<string, ScopedMemory>;
 	notifications?: NotificationManager;
 }
 
@@ -88,19 +90,15 @@ export function toGrokTools(defs: ToolDefinition[]): GrokToolDefinition[] {
  * (via AI SDK tool wrappers) and VoiceWorker (via Grok function calls).
  */
 export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
-	// Pre-build context once — all fields are stable for executor lifetime
-	const context = {
+	// Pre-build stable context fields — memory is resolved per-tool
+	const baseContext = {
 		workingDirectory: process.cwd(),
 		audit: config.audit ?? ({ log: () => {} } as unknown as AuditLogger),
 		signal: config.signals ?? ({ emit: async () => {} } as SignalEmitter),
-		memory: config.toolMemory ?? {
-			get: async () => undefined,
-			set: async () => {},
-			delete: async () => {},
-			list: async () => [],
-		},
 		notifications: config.notifications,
 	};
+
+	const fallbackMemory = config.toolMemory ?? NOOP_SCOPED_MEMORY;
 
 	return async (name: string, args: Record<string, unknown>): Promise<string> => {
 		const fridayTool = config.tools.get(name);
@@ -140,7 +138,10 @@ export function createToolExecutor(config: ToolExecutorConfig): ToolExecutor {
 		});
 		config.signals?.emit("tool:executing", name, { args });
 
-		// Execute with pre-built context
+		// Resolve per-tool memory: module-scoped map takes priority, then fallback
+		const memory = config.toolMemoryMap?.get(name) ?? fallbackMemory;
+		const context = { ...baseContext, memory };
+
 		try {
 			const result = await fridayTool.execute(args, context);
 			config.signals?.emit("tool:completed", name);

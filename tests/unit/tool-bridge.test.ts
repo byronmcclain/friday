@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test";
 import { buildToolDefinitions, createToolExecutor, toGrokTools } from "../../src/core/tool-bridge.ts";
 import type { FridayTool } from "../../src/modules/types.ts";
+import type { ScopedMemory } from "../../src/core/memory.ts";
 import { ClearanceManager } from "../../src/core/clearance.ts";
 import { AuditLogger } from "../../src/audit/logger.ts";
 import { SignalBus } from "../../src/core/events.ts";
@@ -188,6 +189,95 @@ describe("createToolExecutor", () => {
 		await executor("test-tool", { input: "x" });
 
 		expect(entries.some((e) => e.action === "tool:error")).toBe(true);
+	});
+});
+
+describe("createToolExecutor — toolMemoryMap", () => {
+	function createMapMemory(): ScopedMemory & { store: Map<string, unknown> } {
+		const store = new Map<string, unknown>();
+		return {
+			store,
+			get: async <T>(key: string) => store.get(key) as T | undefined,
+			set: async <T>(key: string, value: T) => { store.set(key, value); },
+			delete: async (key: string) => { store.delete(key); },
+			list: async () => [...store.keys()],
+		};
+	}
+
+	test("tool gets module-scoped memory from toolMemoryMap", async () => {
+		const moduleMemory = createMapMemory();
+		await moduleMemory.set("api_key", "secret123");
+
+		const tool = mockTool({
+			name: "my-tool",
+			execute: async (_args, ctx) => {
+				const key = await ctx.memory.get<string>("api_key");
+				return { success: true, output: key ?? "NOT FOUND" };
+			},
+		});
+
+		const toolMemoryMap = new Map<string, ScopedMemory>();
+		toolMemoryMap.set("my-tool", moduleMemory);
+
+		const executor = createToolExecutor({
+			tools: new Map([["my-tool", tool]]),
+			toolMemoryMap,
+		});
+
+		const result = await executor("my-tool", {});
+		expect(result).toBe("secret123");
+	});
+
+	test("tool without map entry falls back to toolMemory", async () => {
+		const fallbackMemory = createMapMemory();
+		await fallbackMemory.set("fallback_key", "fallback_val");
+
+		const tool = mockTool({
+			name: "standalone-tool",
+			execute: async (_args, ctx) => {
+				const key = await ctx.memory.get<string>("fallback_key");
+				return { success: true, output: key ?? "NOT FOUND" };
+			},
+		});
+
+		const executor = createToolExecutor({
+			tools: new Map([["standalone-tool", tool]]),
+			toolMemory: fallbackMemory,
+			toolMemoryMap: new Map(), // empty — no entry for this tool
+		});
+
+		const result = await executor("standalone-tool", {});
+		expect(result).toBe("fallback_val");
+	});
+
+	test("different tools get different scoped memories", async () => {
+		const memA = createMapMemory();
+		const memB = createMapMemory();
+		await memA.set("who", "module-a");
+		await memB.set("who", "module-b");
+
+		const toolA = mockTool({
+			name: "tool-a",
+			execute: async (_args, ctx) => {
+				return { success: true, output: (await ctx.memory.get<string>("who")) ?? "" };
+			},
+		});
+		const toolB = mockTool({
+			name: "tool-b",
+			execute: async (_args, ctx) => {
+				return { success: true, output: (await ctx.memory.get<string>("who")) ?? "" };
+			},
+		});
+
+		const toolMemoryMap = new Map<string, ScopedMemory>();
+		toolMemoryMap.set("tool-a", memA);
+		toolMemoryMap.set("tool-b", memB);
+
+		const tools = new Map<string, FridayTool>([["tool-a", toolA], ["tool-b", toolB]]);
+		const executor = createToolExecutor({ tools, toolMemoryMap });
+
+		expect(await executor("tool-a", {})).toBe("module-a");
+		expect(await executor("tool-b", {})).toBe("module-b");
 	});
 });
 

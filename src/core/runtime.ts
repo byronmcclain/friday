@@ -12,7 +12,7 @@ import { NotificationManager, TerminalChannel, AuditLogChannel, type Notificatio
 import { discoverModules, discoverForgeModules } from "../modules/loader.ts";
 import type { FridayModule } from "../modules/types.ts";
 import { SmartsStore } from "../smarts/store.ts";
-import { SQLiteMemory } from "./memory.ts";
+import { SQLiteMemory, NOOP_SCOPED_MEMORY, type ScopedMemory } from "./memory.ts";
 import { SMARTS_DEFAULTS } from "../smarts/types.ts";
 import { createSmartProtocol } from "../smarts/protocol.ts";
 import { SmartsCurator } from "../smarts/curator.ts";
@@ -370,6 +370,10 @@ export class FridayRuntime {
 
 			const cacheSessionId = this._sessionId ?? crypto.randomUUID();
 
+			// Per-tool memory map — shared by reference with Cortex so entries
+			// added during module registration are visible when the executor is created.
+			const toolMemoryMap = new Map<string, ScopedMemory>();
+
 			this._cortex = new Cortex({
 				model: reasoningModel,
 				maxTokens: config.maxTokens,
@@ -382,6 +386,7 @@ export class FridayRuntime {
 				audit: this._audit,
 				signals: this._signals,
 				toolMemory: this._memory?.scoped("tools"),
+				toolMemoryMap,
 				notifications: this._notifications,
 				genesisPrompt,
 				vox: this._vox,
@@ -451,7 +456,9 @@ export class FridayRuntime {
 			if (config.modulesDir) {
 				this._modules = await discoverModules(config.modulesDir);
 				for (const mod of this._modules) {
+					const modMemory = this._memory?.scoped(mod.name);
 					for (const tool of mod.tools) {
+						if (modMemory) toolMemoryMap.set(tool.name, modMemory);
 						this._cortex.registerTool(tool);
 					}
 					for (const protocol of mod.protocols) {
@@ -485,7 +492,9 @@ export class FridayRuntime {
 				};
 
 				for (const mod of forgeResult.loaded) {
+					const modMemory = this._memory?.scoped(mod.name);
 					for (const tool of mod.tools) {
+						if (modMemory) toolMemoryMap.set(tool.name, modMemory);
 						this._cortex.registerTool(tool);
 					}
 					for (const protocol of mod.protocols) {
