@@ -16,6 +16,10 @@ import { SQLiteMemory, NOOP_SCOPED_MEMORY, type ScopedMemory } from "./memory.ts
 import { SMARTS_DEFAULTS } from "../smarts/types.ts";
 import { createSmartProtocol } from "../smarts/protocol.ts";
 import { SmartsCurator } from "../smarts/curator.ts";
+import { PsycheStore } from "../psyche/store.ts";
+import { PsycheCurator } from "../psyche/curator.ts";
+import { createPsycheProtocol } from "../psyche/protocol.ts";
+import { PSYCHE_DEFAULTS } from "../psyche/types.ts";
 import { ConversationSummarizer } from "./summarizer.ts";
 import { createHistoryProtocol } from "../history/protocol.ts";
 import { Sensorium } from "../sensorium/sensorium.ts";
@@ -61,11 +65,11 @@ export interface ProcessResult {
 }
 
 export type BootStep =
-	| "signals" | "memory" | "smarts" | "sensorium"
+	| "signals" | "memory" | "smarts" | "psyche" | "sensorium"
 	| "genesis" | "vox" | "cortex" | "arc-rhythm"
 	| "modules" | "ready";
 
-export type ShutdownStep = "arc-rhythm" | "vox" | "sensorium" | "conversation" | "knowledge" | "modules" | "cleanup";
+export type ShutdownStep = "arc-rhythm" | "vox" | "sensorium" | "conversation" | "psyche" | "knowledge" | "modules" | "cleanup";
 
 export class FridayRuntime {
 	private _cortex!: Cortex;
@@ -81,6 +85,8 @@ export class FridayRuntime {
 	private _smartsMemory?: SQLiteMemory;
 	private _curator?: SmartsCurator;
 	private _summarizer?: ConversationSummarizer;
+	private _psyche?: PsycheStore;
+	private _psycheCurator?: PsycheCurator;
 	private _sensorium?: Sensorium;
 	private _memory?: SQLiteMemory;
 	private _rhythmStore?: RhythmStore;
@@ -320,6 +326,14 @@ export class FridayRuntime {
 				onProgress?.("smarts", "SMARTS knowledge indexed");
 			}
 
+			// Psyche — emotional intelligence (shares Memory's database)
+			if (this._memory) {
+				this._psyche = new PsycheStore(this._memory.database, PSYCHE_DEFAULTS);
+				this._psyche.decayMilestones();
+				this._protocols.register(createPsycheProtocol(this._psyche));
+				onProgress?.("psyche", "Psyche emotional state loaded");
+			}
+
 			// Resolve dual models: CLI flag > env var > default
 			const reasoningModel = config.model ?? process.env.FRIDAY_REASONING_MODEL ?? GROK_DEFAULTS.model;
 			this._fastModel = config.fastModel ?? process.env.FRIDAY_FAST_MODEL ?? GROK_DEFAULTS.fastModel;
@@ -381,6 +395,7 @@ export class FridayRuntime {
 				sessionId: cacheSessionId,
 
 				smartsStore: this._smarts,
+				psyche: this._psyche,
 				sensorium: this._sensorium,
 				clearance: this._clearance,
 				audit: this._audit,
@@ -438,11 +453,32 @@ export class FridayRuntime {
 			}
 			this._summarizer = new ConversationSummarizer(subsystemModel);
 
+			if (this._psyche) {
+				this._psycheCurator = new PsycheCurator(this._psyche, subsystemModel);
+				// Bootstrap from history if Psyche has no existing state
+				if (!this._psyche.hasDimensions() && this._memory) {
+					const recent = await this._memory.getConversationHistory(3);
+					const smartsEntries = this._smarts?.all() ?? [];
+					const smartsSummary = smartsEntries
+						.map((e) => `[${e.domain}] ${e.name}: ${e.content.slice(0, 200)}`)
+						.join("\n");
+					if (recent.length > 0 || smartsSummary.length > 0) {
+						await this._psycheCurator.bootstrapFromHistory(recent, smartsSummary);
+						onProgress?.("psyche", "Psyche bootstrapped from conversation history");
+					} else {
+						this._psyche.seedNeutralDefaults();
+					}
+				}
+			}
+
 			// Wire emotion engine into Vox for dynamic voice
 			if (this._vox && this._cortex) {
 				this._vox.setEmotionEngine(
 					subsystemModel,
 					() => this._cortex!.getRecentHistory(5),
+					this._psyche
+						? () => this._psyche!.getDimensionSummary()
+						: undefined,
 				);
 			}
 
@@ -726,6 +762,12 @@ export class FridayRuntime {
 					})
 				: undefined;
 
+			const psychePromise = this._psycheCurator && this._sessionId
+				? this._psycheCurator.analyzeSession(this._sessionId, history).catch((err) => {
+						console.warn("Psyche analysis failed:", err instanceof Error ? err.message : err);
+					})
+				: undefined;
+
 			try {
 				if (this._memory && this._sessionId && this._sessionStartedAt && history.length > 0) {
 					onProgress?.("conversation", "Saving conversation history...");
@@ -745,6 +787,11 @@ export class FridayRuntime {
 				}
 			} catch (err) {
 				console.warn("Conversation save failed:", err instanceof Error ? err.message : err);
+			}
+
+			if (psychePromise) {
+				onProgress?.("psyche", "Analyzing emotional context...");
+				await psychePromise;
 			}
 
 			if (curatorPromise) {

@@ -11,6 +11,8 @@ import type { SignalBus } from "./events.ts";
 import type { ScopedMemory } from "./memory.ts";
 import type { NotificationManager } from "./notifications.ts";
 import type { Vox } from "./voice/vox.ts";
+import type { PsycheStore } from "../psyche/store.ts";
+import { buildEmotionalContext } from "../psyche/context.ts";
 import { HistoryManager } from "./history-manager.ts";
 import type { ChatStream, VoiceChatStream } from "./stream-types.ts";
 import { appendInferenceLog } from "../providers/debug-log.ts";
@@ -41,6 +43,7 @@ export interface CortexConfig extends Partial<FridayConfig> {
 	notifications?: NotificationManager;
 	genesisPrompt?: string;
 	vox?: Vox;
+	psyche?: PsycheStore;
 	debug?: boolean;
 	projectRoot?: string;
 	/** Per-step inference timeout in ms (default: 120000 = 2 min) */
@@ -67,6 +70,7 @@ export class Cortex {
 	private pinnedSmarts = new Set<string>();
 	private genesisPrompt?: string;
 	private vox?: Vox;
+	private psyche?: PsycheStore;
 	private _debug: boolean;
 	private debugPayloadPath?: string;
 	private debugResponsePath?: string;
@@ -93,6 +97,7 @@ export class Cortex {
 		this.notifications = config.notifications;
 		this.genesisPrompt = config.genesisPrompt;
 		this.vox = config.vox;
+		this.psyche = config.psyche;
 		this._debug = config.debug ?? false;
 		if (this._debug && config.projectRoot) {
 			this.debugPayloadPath = `${config.projectRoot}/last-inference-payload.log`;
@@ -444,6 +449,18 @@ export class Cortex {
 
 			if (sections.length > 0) {
 				prompt = `${prompt}\n\n## Active Knowledge\n\nThe following domain knowledge is available for this conversation.\nUse it to inform your responses when relevant.\n\n${sections.join("\n\n")}`;
+			}
+		}
+
+		// Psyche emotional context
+		if (this.psyche && this.psyche.hasDimensions()) {
+			const emotionalContext = buildEmotionalContext(
+				this.psyche.getDimensions(),
+				this.psyche.getLastSessionMood(),
+				this.psyche.findRelevantMilestones(userMessage),
+			);
+			if (emotionalContext) {
+				prompt = `${prompt}\n\n${emotionalContext}`;
 			}
 		}
 

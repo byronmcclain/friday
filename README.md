@@ -16,7 +16,7 @@ TUI-first. Module-driven. Built to think, remember, and adapt.
 
 [![Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1?logo=bun)](https://bun.sh)
 [![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tests](https://img.shields.io/badge/tests-1129%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-1197%20passing-brightgreen)]()
 [![Biome](https://img.shields.io/badge/lint-Biome-60a5fa?logo=biome)](https://biomejs.dev)
 
 <br />
@@ -53,6 +53,54 @@ Friday's server starts first, then the TUI connects to it. Type natural language
 ---
 
 ## What's Inside
+
+### 🪪 Genesis — Identity Prompt
+
+Genesis is Friday's **identity** — the personality prompt that defines who she is. Unlike hardcoded system prompts, Genesis lives as an editable file at `~/.friday/GENESIS.md`, loaded at boot and injected into every Cortex conversation. The BOSS controls it; Friday cannot modify it.
+
+```mermaid
+flowchart TB
+    subgraph Boot ["Boot Sequence"]
+        A[FridayRuntime.boot] --> B[resolveGenesisPath]
+        B --> C{File exists?}
+        C -->|Yes| D[loadGenesis: read file content]
+        C -->|No| E["seedGenesis: write GENESIS_TEMPLATE"]
+        E --> F["chmod 600 file, chmod 700 dir"]
+        F --> D
+        D --> G[Pass genesisPrompt to Cortex]
+    end
+
+    subgraph Protection ["Protected Path System"]
+        H[setProtectedPaths at boot]
+        H --> I[fs.write checks isProtectedPath]
+        H --> J[fs.delete checks isProtectedPath]
+        H --> K[Forge apply checks isProtectedPath]
+        I --> L[Denied + audit log]
+        J --> L
+        K --> L
+    end
+
+    subgraph CLI ["Genesis CLI"]
+        M["genesis init"] --> N[Seed from GENESIS_TEMPLATE]
+        O["genesis show"] --> P[Display current content]
+        Q["genesis edit"] --> R["Open in $EDITOR"]
+        S["genesis update"] --> T[Overwrite with latest template]
+        U["genesis check"] --> V[Validate file + permissions]
+        W["genesis path"] --> X[Print resolved path]
+    end
+```
+
+| Feature | Detail |
+|---|---|
+| Location | `~/.friday/GENESIS.md` (override: `FRIDAY_GENESIS_PATH`) |
+| Permissions | Directory: 700, File: 600 — enforced on seed and every boot |
+| Seed template | `GENESIS_TEMPLATE` in `src/core/prompts.ts` |
+| Protection | `isProtectedPath()` blocks writes from filesystem tools and Forge |
+| Audit | `genesis:write-denied` logged on blocked write attempts |
+
+`friday genesis show` · `friday genesis init` · `friday genesis edit` · `friday genesis update` · `friday genesis check` · `friday genesis path`
+
+---
 
 ### 🧠 Cortex — The Brain
 
@@ -155,6 +203,204 @@ Volatile content (system stats, tool counts, port listings, test counts) is filt
 
 ---
 
+### 💜 Psyche — Emotional Intelligence
+
+Psyche is Friday's **emotional core** — the subsystem that gives her genuine emotional continuity across sessions. Without Psyche, Friday's personality resets every conversation: she's warm because the prompt says to be, not because she remembers that last session ended on a high note. With Psyche, she carries forward how things *felt* — not just what happened.
+
+The system tracks three layers of emotional state, all persisted to SQLite and loaded at boot:
+
+```mermaid
+flowchart TB
+    subgraph State ["Emotional State (SQLite)"]
+        DIM["Relational Dimensions\n(natural language, not numbers)"]
+        MILE["Emotional Milestones\n(rare significant moments)"]
+        MOOD["Session Mood\n(how last session ended)"]
+    end
+
+    subgraph PerMessage ["Per-Message Enrichment"]
+        A[User sends message] --> B[Cortex.buildSystemPrompt]
+        B --> C[Load cached dimensions]
+        B --> D["FTS5 search: milestones relevant to this message"]
+        B --> E[Load last session mood]
+        C --> F["Build ## Emotional Context section"]
+        D --> F
+        E --> F
+        F --> G["Inject into system prompt\n(after SMARTS, before Sensorium)"]
+        G --> H[LLM sees emotional context + guardrails]
+    end
+
+    subgraph SessionEnd ["Session Shutdown"]
+        I[Conversation ends] --> J[PsycheCurator receives history]
+        J --> K[Fast model analyzes emotional arc]
+        K --> L{Noteworthy?}
+        L -->|"Usually no"| M["Save session mood only\n(most sessions)"]
+        L -->|"Rarely yes"| N[Create milestone + update dimensions]
+        M --> O[State ready for next session]
+        N --> O
+    end
+
+    subgraph Boot ["First Activation"]
+        P{Existing dimensions?} -->|No, but history exists| Q["Bootstrap from last 3 conversations + SMARTS"]
+        P -->|No history| R[Seed neutral defaults]
+        P -->|Yes| S[Load existing state]
+    end
+
+    O --> State
+    State --> PerMessage
+```
+
+**Relational Dimensions** are natural-language descriptors — not numbers. Five dimensions track the relationship:
+
+| Dimension | What it captures |
+|-----------|-----------------|
+| **Trust** | Does the Boss rely on Friday's judgment? Has she earned the right to push back? |
+| **Banter** | Is dry humor safe? How far can Friday push with teasing? |
+| **Emotional openness** | Does the Boss show stress indirectly? Does Friday read between the lines? |
+| **Shared history** | What have they built together, debugged together, celebrated together? |
+| **Current energy** | Present relational temperature — warm, focused, tense, playful? |
+
+Example dimension value: *"Deep trust built through months of honest collaboration. Boss values directness; I deliver it. He trusts my judgment on technical calls and I've earned the right to push back."*
+
+**Emotional Milestones** are rare, significant moments — most sessions produce zero. Only moments that would genuinely stand out in a month of daily conversations become milestones. Each carries an emotional type (`triumph`, `tension`, `breakthrough`, `warmth`, `frustration`, `growth`) and a relevance decay that halves every 30 days (floor 0.1) so recent milestones weigh more in context selection.
+
+**Emotional Guardrails** are injected alongside the context to prevent Friday from over-performing emotion:
+
+- **Restraint over expression** — the emotion lives in the understatement
+- **Never manufacture** — neutral is a valid and common state
+- **Match the register** — quick question gets a quick answer, no injected warmth
+- **Earned moments only** — "Missed this, Boss" only lands after genuine absence
+- **Callbacks are rare** — referencing shared milestones is powerful precisely because it's infrequent
+
+The **PsycheCurator** runs at session end alongside SmartsCurator. It aggressively discourages inflation — the prompt explicitly states that most sessions produce zero milestones and zero dimension updates. Emotional state evolves slowly, the way trust actually builds between people.
+
+`/psyche status` · `/psyche dimensions` · `/psyche milestones` · `/psyche reset`
+
+---
+
+### 🧩 Deja Vu — Conversational Memory Recall
+
+Deja Vu gives Friday **long-term conversational memory**. She doesn't just remember the current session — she can search across all past conversations, find when something was discussed, and pull up the full transcript. The `recall_memory` tool is registered in Cortex at boot, so the LLM can autonomously decide to search its memory when a user references something from a prior session.
+
+```mermaid
+flowchart TB
+    subgraph Save ["Session Save (shutdown)"]
+        A[Conversation ends] --> B[ConversationSummarizer]
+        B --> C[Fast model generates 1-3 sentence summary]
+        C --> D[Save to SQLite conversations table]
+        D --> E[memory.indexConversation]
+        E --> F[Summary indexed into FTS5]
+    end
+
+    subgraph Search ["recall_memory: search mode"]
+        G[LLM calls recall_memory] --> H{mode?}
+        H -->|search| I[FTS5 query across summaries]
+        I --> J[Returns: session IDs + dates + snippets]
+    end
+
+    subgraph Recall ["recall_memory: recall mode"]
+        H -->|recall| K[Retrieve by session ID]
+        K --> L[Full message transcript]
+        L --> M[Truncated to 50 msgs / 8KB max]
+    end
+
+    subgraph Maintenance ["Automatic Maintenance"]
+        N[Boot] --> O[Prune deleted sessions from FTS5 index]
+    end
+
+    F --> I
+```
+
+The two-step flow is intentional: **search** finds relevant sessions cheaply (just FTS5 over summaries), then **recall** retrieves the full transcript only for the sessions that matter. This keeps token usage low while giving Friday genuine long-term memory.
+
+---
+
+### 📁 Modules — Capabilities
+
+Modules are Friday's **hands on the keyboard** — each one bundles tools, protocols, knowledge, signal triggers, and clearance requirements into a discoverable unit. They're auto-loaded from the filesystem at boot, validated against the manifest contract, and given scoped memory instances for persistent state.
+
+```mermaid
+flowchart TB
+    subgraph Module ["FridayModule Anatomy"]
+        direction TB
+        M[Module Manifest] --> TOOLS[Tools: executable actions]
+        M --> PROTO[Protocols: slash commands]
+        M --> KNOW[Knowledge: static entries]
+        M --> TRIG[Triggers: signal subscriptions]
+        M --> CLEAR[Clearance: required permissions]
+        M --> LC[Lifecycle: onLoad&#40;context&#41; / onUnload]
+    end
+
+    subgraph Validation ["Shared Validation Layer"]
+        V1[Path traversal guard]
+        V2[SSRF protection: private IP blocking]
+        V3[Flag injection detection: rejects args starting with dash]
+        V4[Protocol allowlist: http/https only]
+        V5[Integer coercion: prevents type confusion from LLM args]
+    end
+
+    TOOLS --> Validation
+```
+
+Eight operational modules ship with Friday:
+
+| Module | Tools | Clearance | Security |
+|---|---|---|---|
+| **Filesystem** | read, write, list, delete, exec | `read-fs`, `write-fs`, `delete-fs`, `exec-shell` | Path traversal guard |
+| **Git** | status, diff, log, commit, branch, stash, push, pull | `git-read`, `git-write` | Flag injection protection |
+| **Docker** | ps, logs, inspect, stats, exec | `exec-shell` | Command injection guards |
+| **Code Exec** | run (sandboxed script execution) | `exec-shell` | Timeout enforcement |
+| **Web Fetch** | fetch (HTTP requests) | `network` | SSRF protection (private IP blocking) |
+| **Notify** | send (multi-channel dispatch) | -- | Channel validation |
+| **Forge** | propose, apply, validate, restart, status | `write-fs`, `read-fs`, `exec-shell`, `system`, `forge-modify` | Core module protection, LLM artifact sanitization |
+| **Telegram** | send | `network` | Owner-only filtering, webhook secret validation |
+
+Every tool call flows through the same pipeline: Cortex receives a `tool_use` from the LLM → checks clearance via `ClearanceManager.checkAll()` → calls `tool.execute()` with a `ToolContext` (working directory, audit logger, signal emitter, scoped memory) → returns the result to the LLM.
+
+---
+
+### 🔨 The Forge — Self-Improvement
+
+The Forge is Friday's **workshop** — where she can author entirely new modules, patch existing forge-authored modules, validate them through a multi-stage pipeline, and gracefully restart to load the changes. Every step requires human approval, and core modules (filesystem, the Forge itself) are protected from modification.
+
+```mermaid
+flowchart TB
+    A[Friday proposes new module] --> B[forge_propose tool]
+    B --> C[Write module to forge/ directory]
+    C --> D[forge_validate tool]
+
+    subgraph Validation ["Multi-Stage Validation"]
+        D --> V1[Import test: can Bun load it?]
+        V1 --> V2[Manifest check: valid FridayModule?]
+        V2 --> V3[TypeScript typecheck: tsc --noEmit]
+        V3 --> V4[Lint check: Biome]
+    end
+
+    V4 -->|All pass| E{Human approval}
+    V4 -->|Any fail| F[Errors reported back to Friday]
+    F --> G[Friday iterates on fixes]
+    G --> D
+
+    E -->|Approved| H[forge_apply tool]
+    H --> I[forge_restart tool]
+    I --> J[Graceful runtime restart]
+    J --> K[New module loaded at next boot]
+
+    E -->|Denied| L[Module shelved]
+
+    style Validation fill:#1a1a2e,stroke:#e2b340
+```
+
+Key safety properties:
+- **Failed modules don't crash boot** — if a forge module fails to load, the error is captured and reported through `forge_status`, but the rest of the runtime continues normally
+- **Core protection** — the filesystem module and the Forge module itself cannot be modified via the Forge
+- **Human-in-the-loop** — every apply step requires explicit approval
+- **Iterative** — when validation fails, errors flow back to Friday so she can fix and retry
+- **LLM artifact sanitization** — `forge_validate` auto-fixes HTML entities (`&lt;` → `<`, `&gt;` → `>`, etc.) that LLMs emit in generated TypeScript before running typecheck and lint
+
+`/forge list` · `/forge status <name>` · `/forge history <name>` · `/forge protect <name>` · `/forge manifest` · `/forge rollback <name>` · `/forge help`
+
+---
+
 ### 🌡️ Sensorium — Environmental Awareness
 
 Sensorium is Friday's **sensory nervous system** — she always knows what machine she's running on, what's happening with resources, which Docker containers are up, and what the git state looks like. This context is injected into every system prompt so Friday can make informed decisions without being asked.
@@ -225,127 +471,56 @@ When a state transition occurs, Sensorium emits a typed signal on the SignalBus 
 
 ---
 
-### 📁 Modules — Capabilities
+### ⏱️ Arc Rhythm — Autonomous Scheduling
 
-Modules are Friday's **hands on the keyboard** — each one bundles tools, protocols, knowledge, signal triggers, and clearance requirements into a discoverable unit. They're auto-loaded from the filesystem at boot, validated against the manifest contract, and given scoped memory instances for persistent state.
-
-```mermaid
-flowchart TB
-    subgraph Module ["FridayModule Anatomy"]
-        direction TB
-        M[Module Manifest] --> TOOLS[Tools: executable actions]
-        M --> PROTO[Protocols: slash commands]
-        M --> KNOW[Knowledge: static entries]
-        M --> TRIG[Triggers: signal subscriptions]
-        M --> CLEAR[Clearance: required permissions]
-        M --> LC[Lifecycle: onLoad&#40;context&#41; / onUnload]
-    end
-
-    subgraph Validation ["Shared Validation Layer"]
-        V1[Path traversal guard]
-        V2[SSRF protection: private IP blocking]
-        V3[Flag injection detection: rejects args starting with dash]
-        V4[Protocol allowlist: http/https only]
-        V5[Integer coercion: prevents type confusion from LLM args]
-    end
-
-    TOOLS --> Validation
-```
-
-Eight operational modules ship with Friday:
-
-| Module | Tools | Clearance | Security |
-|---|---|---|---|
-| **Filesystem** | read, write, list, delete, exec | `read-fs`, `write-fs`, `delete-fs`, `exec-shell` | Path traversal guard |
-| **Git** | status, diff, log, branch, stash, push, pull | `git-read`, `git-write` | Flag injection protection |
-| **Docker** | ps, logs, inspect, stats, exec | `exec-shell` | Command injection guards |
-| **Code Exec** | run (sandboxed script execution) | `exec-shell` | Timeout enforcement |
-| **Web Fetch** | fetch (HTTP requests) | `network` | SSRF protection (private IP blocking) |
-| **Notify** | send (multi-channel dispatch) | -- | Channel validation |
-| **Forge** | propose, apply, validate, restart, status | `write-fs`, `read-fs`, `exec-shell`, `system`, `forge-modify` | Core module protection, LLM artifact sanitization |
-| **Telegram** | send | `network` | Owner-only filtering, webhook secret validation |
-
-Every tool call flows through the same pipeline: Cortex receives a `tool_use` from the LLM → checks clearance via `ClearanceManager.checkAll()` → calls `tool.execute()` with a `ToolContext` (working directory, audit logger, signal emitter, scoped memory) → returns the result to the LLM.
-
----
-
-### 🧩 Deja Vu — Conversational Memory Recall
-
-Deja Vu gives Friday **long-term conversational memory**. She doesn't just remember the current session — she can search across all past conversations, find when something was discussed, and pull up the full transcript. The `recall_memory` tool is registered in Cortex at boot, so the LLM can autonomously decide to search its memory when a user references something from a prior session.
+Arc Rhythm is Friday's **heartbeat** — the autonomous scheduling subsystem that lets her execute recurring tasks headlessly. Define a rhythm with a cron expression, and Friday will execute it through Cortex (LLM reasoning), tool calls (direct execution), or protocol dispatches (slash commands) — all persisted to SQLite with full execution history.
 
 ```mermaid
 flowchart TB
-    subgraph Save ["Session Save (shutdown)"]
-        A[Conversation ends] --> B[ConversationSummarizer]
-        B --> C[Fast model generates 1-3 sentence summary]
-        C --> D[Save to SQLite conversations table]
-        D --> E[memory.indexConversation]
-        E --> F[Summary indexed into FTS5]
+    subgraph Scheduler ["RhythmScheduler (ticks every 60s)"]
+        TICK[Tick] --> FIND[Find due rhythms]
+        FIND --> GUARD{In inflight Set?}
+        GUARD -->|Yes| SKIP[Skip: already running]
+        GUARD -->|No| ADD[Add to inflight Set]
+        ADD --> EXEC[RhythmExecutor.execute]
     end
 
-    subgraph Search ["recall_memory: search mode"]
-        G[LLM calls recall_memory] --> H{mode?}
-        H -->|search| I[FTS5 query across summaries]
-        I --> J[Returns: session IDs + dates + snippets]
+    subgraph Executor ["RhythmExecutor: Action Dispatch"]
+        EXEC --> CL{Clearance check}
+        CL -->|Denied| FAIL1[failure: clearance denied]
+
+        CL -->|Granted| TYPE{action.type?}
+        TYPE -->|prompt| PROMPT[Cortex.chat: full LLM reasoning]
+        TYPE -->|tool| TOOL[Tool registry lookup + execute]
+        TYPE -->|protocol| PROTO[ProtocolRegistry.get + execute]
+
+        PROMPT --> RES[ExecutionResult]
+        TOOL --> RES
+        PROTO --> RES
     end
 
-    subgraph Recall ["recall_memory: recall mode"]
-        H -->|recall| K[Retrieve by session ID]
-        K --> L[Full message transcript]
-        L --> M[Truncated to 50 msgs / 8KB max]
+    subgraph PostExec ["Post-Execution"]
+        RES --> RECORD[Record in execution history]
+        RECORD --> NEXT[Calculate next occurrence from cron]
+        NEXT --> SIG{Status?}
+        SIG -->|success| EMIT1["Emit custom:arc-rhythm-executed"]
+        SIG -->|failure| EMIT2["Emit custom:arc-rhythm-failed"]
+        EMIT2 --> CHECK{failures >= 5?}
+        CHECK -->|Yes| PAUSE["Auto-pause + emit custom:arc-rhythm-paused"]
+        CHECK -->|No| DONE[Done]
+        EMIT1 --> DONE
     end
-
-    subgraph Maintenance ["Automatic Maintenance"]
-        N[Boot] --> O[Prune deleted sessions from FTS5 index]
-    end
-
-    F --> I
 ```
 
-The two-step flow is intentional: **search** finds relevant sessions cheaply (just FTS5 over summaries), then **recall** retrieves the full transcript only for the sessions that matter. This keeps token usage low while giving Friday genuine long-term memory.
+The built-in **cron parser** is zero-dependency and supports: 5-field expressions, ranges (`1-5`), lists (`MON,WED,FRI`), steps (`*/15`), named days/months (`JAN`, `MON`), and shorthands (`@hourly`, `@daily`, `@weekly`, `@monthly`).
 
----
+**Dual access pattern:**
+- **Humans** use the `/arc` protocol: `/arc create "0 9 * * MON-FRI" run morning standup`
+- **Friday herself** uses the `manage_rhythm` tool — she can self-schedule recurring tasks through Cortex
 
-### 🔨 The Forge — Self-Improvement
+The **reentrant guard** (inflight `Set`) prevents a slow-running rhythm from being double-dispatched on the next tick. **Auto-pause** disables a rhythm after 5 consecutive failures and emits a signal + notification so both the directive system and the user are informed.
 
-The Forge is Friday's **workshop** — where she can author entirely new modules, patch existing forge-authored modules, validate them through a multi-stage pipeline, and gracefully restart to load the changes. Every step requires human approval, and core modules (filesystem, the Forge itself) are protected from modification.
-
-```mermaid
-flowchart TB
-    A[Friday proposes new module] --> B[forge_propose tool]
-    B --> C[Write module to forge/ directory]
-    C --> D[forge_validate tool]
-
-    subgraph Validation ["Multi-Stage Validation"]
-        D --> V1[Import test: can Bun load it?]
-        V1 --> V2[Manifest check: valid FridayModule?]
-        V2 --> V3[TypeScript typecheck: tsc --noEmit]
-        V3 --> V4[Lint check: Biome]
-    end
-
-    V4 -->|All pass| E{Human approval}
-    V4 -->|Any fail| F[Errors reported back to Friday]
-    F --> G[Friday iterates on fixes]
-    G --> D
-
-    E -->|Approved| H[forge_apply tool]
-    H --> I[forge_restart tool]
-    I --> J[Graceful runtime restart]
-    J --> K[New module loaded at next boot]
-
-    E -->|Denied| L[Module shelved]
-
-    style Validation fill:#1a1a2e,stroke:#e2b340
-```
-
-Key safety properties:
-- **Failed modules don't crash boot** — if a forge module fails to load, the error is captured and reported through `forge_status`, but the rest of the runtime continues normally
-- **Core protection** — the filesystem module and the Forge module itself cannot be modified via the Forge
-- **Human-in-the-loop** — every apply step requires explicit approval
-- **Iterative** — when validation fails, errors flow back to Friday so she can fix and retry
-- **LLM artifact sanitization** — `forge_validate` auto-fixes HTML entities (`&lt;` → `<`, `&gt;` → `>`, etc.) that LLMs emit in generated TypeScript before running typecheck and lint
-
-`/forge list` · `/forge status <name>` · `/forge history <name>` · `/forge protect <name>` · `/forge manifest` · `/forge help`
+`/arc list` · `/arc create "cron" description` · `/arc show <id>` · `/arc pause <id>` · `/arc resume <id>` · `/arc history [id]` · `/arc delete <id>` · `/arc run`
 
 ---
 
@@ -390,6 +565,52 @@ The `SignalName` type uses a **template literal union** — 10 well-known signal
 - **Dynamic subscriptions** — the DirectiveEngine syncs its subscriptions whenever the DirectiveStore changes, automatically subscribing to signals needed by new directives
 
 The DirectiveEngine is the primary consumer. It watches the DirectiveStore for enabled directives, subscribes to exactly the signals they need, and when a signal fires: finds matching directives → checks clearance → executes the action → logs to audit → increments execution count. **No subsystem imports another.** The bus carries the signal, the engine matches it, the action fires.
+
+---
+
+### 🗣️ Vox — Voice Output
+
+Vox is Friday's **voice** — her mouth. Using the xAI TTS REST API, she can speak responses aloud. This isn't text-to-speech bolted on as an afterthought — it's an integrated subsystem with content-aware prompting, emotional rewriting, and four operational modes. Each `speak()` call is a stateless fire-and-forget HTTP request — no persistent connections, no session state.
+
+```mermaid
+flowchart TB
+    subgraph Modes ["Voice Modes"]
+        OFF["Off (default)"]
+        ON["On — speak all responses"]
+        WHISPER["Whisper — reduced volume"]
+        FLAT["Flat — literal TTS, no emotional rewrite"]
+    end
+
+    subgraph Pipeline ["TTS Pipeline"]
+        A[Cortex returns response] --> B{Vox mode?}
+        B -->|Off| SKIP[No audio]
+        B -->|On / Whisper| C[emotionalRewrite]
+        C --> D["Fast model injects auditory cues\n([laugh], [sigh], [pause])"]
+        D --> E[classifyContent + buildTtsPrompt]
+        B -->|Flat| E
+        E --> F["REST POST to TTS API\n(fetch → VOX_TTS_URL)"]
+        F --> G[WAV audio response]
+        G --> H[Write to temp file]
+        H --> I[detectPlayer: afplay / paplay / PowerShell]
+        I --> J[Play audio + cleanup temp file]
+    end
+```
+
+The **dynamic TTS prompt system** is the key innovation: `classifyContent()` detects what kind of content Friday is about to speak (tables, code blocks, bullet lists, URLs) and `buildTtsPrompt()` injects specific instructions for that utterance. A table gets "summarize the data verbally", while code gets "describe the code's purpose, don't read syntax aloud". The voice identity (`FRIDAY_VOICE_IDENTITY`) specifies a Kerry Condon-inspired County Tipperary Irish accent.
+
+**VoiceSessionManager** (`src/core/voice/session-manager.ts`) provides a separate conversational voice interface — connecting to the Grok Realtime API via `ws.ts` for bidirectional audio conversations, with a state machine (idle → listening → thinking → speaking → error). Routes transcripts through `cortex.chatStreamVoice()` with barge-in support (cancels in-flight responses on VAD speech detection).
+
+| Feature | Detail |
+|---|---|
+| Fire-and-forget | `vox.speak(text).catch(() => {})` — never blocks Cortex response |
+| REST API | Stateless fire-and-forget — each `speak()` is an independent POST to `/v1/tts` |
+| Content classification | Tables, code, lists, URLs get tailored TTS instructions |
+| Emotional rewrite | Fast model rewrites text with mood-appropriate auditory cues ([laugh], [sigh], [pause]) |
+| Platform audio | `afplay` (macOS), `paplay` (Linux), PowerShell (Windows) |
+| VoiceChannel | Bridges NotificationManager into speech |
+| 5 voices | Ara, Eve (default), Rex, Sal, Leo — override with `FRIDAY_VOICE` |
+
+`/voice on` · `/voice off` · `/voice whisper` · `/voice test` · `/voice status`
 
 ---
 
@@ -477,62 +698,9 @@ flowchart LR
     SOCK <-->|"Unix socket IPC"| TUI["friday chat (singleton mode)"]
 ```
 
-The WebSocket protocol supports: `session:boot`, `session:shutdown`, `chat`, `protocol`, `history:list`, `history:load`, `smarts:list`, `smarts:search`, `voice:start`, `voice:stop`, `voice:mode`, and `session:identify` for client-type registration. The server is the **single source of truth** — `friday chat` requires a running server and connects via `SocketBridge` over `~/.friday/friday.sock`. If no server is running, `friday chat` exits with a helpful error.
+The WebSocket protocol supports: `session:boot`, `session:shutdown`, `chat`, `protocol`, `history:list`, `history:load`, `smarts:list`, `smarts:search`, `voice:start`, `voice:stop`, `voice:mode`, `session:identify`, and `session:list-protocols` for client-type registration and protocol discovery. The server is the **single source of truth** — `friday chat` requires a running server and connects via `SocketBridge` over `~/.friday/friday.sock`. If no server is running, `friday chat` exits with a helpful error.
 
 `bun run serve` · `bun run web:dev`
-
----
-
-### ⏱️ Arc Rhythm — Autonomous Scheduling
-
-Arc Rhythm is Friday's **heartbeat** — the autonomous scheduling subsystem that lets her execute recurring tasks headlessly. Define a rhythm with a cron expression, and Friday will execute it through Cortex (LLM reasoning), tool calls (direct execution), or protocol dispatches (slash commands) — all persisted to SQLite with full execution history.
-
-```mermaid
-flowchart TB
-    subgraph Scheduler ["RhythmScheduler (ticks every 60s)"]
-        TICK[Tick] --> FIND[Find due rhythms]
-        FIND --> GUARD{In inflight Set?}
-        GUARD -->|Yes| SKIP[Skip: already running]
-        GUARD -->|No| ADD[Add to inflight Set]
-        ADD --> EXEC[RhythmExecutor.execute]
-    end
-
-    subgraph Executor ["RhythmExecutor: Action Dispatch"]
-        EXEC --> CL{Clearance check}
-        CL -->|Denied| FAIL1[failure: clearance denied]
-
-        CL -->|Granted| TYPE{action.type?}
-        TYPE -->|prompt| PROMPT[Cortex.chat: full LLM reasoning]
-        TYPE -->|tool| TOOL[Tool registry lookup + execute]
-        TYPE -->|protocol| PROTO[ProtocolRegistry.get + execute]
-
-        PROMPT --> RES[ExecutionResult]
-        TOOL --> RES
-        PROTO --> RES
-    end
-
-    subgraph PostExec ["Post-Execution"]
-        RES --> RECORD[Record in execution history]
-        RECORD --> NEXT[Calculate next occurrence from cron]
-        NEXT --> SIG{Status?}
-        SIG -->|success| EMIT1["Emit custom:arc-rhythm-executed"]
-        SIG -->|failure| EMIT2["Emit custom:arc-rhythm-failed"]
-        EMIT2 --> CHECK{failures >= 5?}
-        CHECK -->|Yes| PAUSE["Auto-pause + emit custom:arc-rhythm-paused"]
-        CHECK -->|No| DONE[Done]
-        EMIT1 --> DONE
-    end
-```
-
-The built-in **cron parser** is zero-dependency and supports: 5-field expressions, ranges (`1-5`), lists (`MON,WED,FRI`), steps (`*/15`), named days/months (`JAN`, `MON`), and shorthands (`@hourly`, `@daily`, `@weekly`, `@monthly`).
-
-**Dual access pattern:**
-- **Humans** use the `/arc` protocol: `/arc create "0 9 * * MON-FRI" run morning standup`
-- **Friday herself** uses the `manage_rhythm` tool — she can self-schedule recurring tasks through Cortex
-
-The **reentrant guard** (inflight `Set`) prevents a slow-running rhythm from being double-dispatched on the next tick. **Auto-pause** disables a rhythm after 5 consecutive failures and emits a signal + notification so both the directive system and the user are informed.
-
-`/arc list` · `/arc create "cron" description` · `/arc show <id>` · `/arc pause <id>` · `/arc resume <id>` · `/arc history [id]` · `/arc delete <id>` · `/arc run`
 
 ---
 
@@ -553,108 +721,6 @@ flowchart LR
 The conversation table is capped at 500 sessions with oldest-first eviction. Summaries are generated by the **fast model** (not the reasoning model) to keep shutdown snappy.
 
 `/history list` · `/history show <id>` · `/history clear`
-
----
-
-### 🗣️ Vox — Voice Output
-
-Vox is Friday's **voice** — her mouth. Using the xAI Grok Voice Agent API via persistent WebSocket, she can speak responses aloud. This isn't text-to-speech bolted on as an afterthought — it's an integrated subsystem with content-aware prompting, idle eviction, emotional rewriting, and four operational modes.
-
-```mermaid
-flowchart TB
-    subgraph Modes ["Voice Modes"]
-        OFF["Off (default)"]
-        ON["On — speak all responses"]
-        WHISPER["Whisper — reduced volume"]
-        FLAT["Flat — literal TTS, no emotional rewrite"]
-    end
-
-    subgraph Pipeline ["TTS Pipeline"]
-        A[Cortex returns response] --> B{Vox mode?}
-        B -->|Off| SKIP[No audio]
-        B -->|On / Whisper| C[classifyContent]
-        C --> D["Detect: code, tables, lists, URLs"]
-        D --> E[buildTtsPrompt]
-        E --> F["Dynamic TTS instructions per utterance"]
-        F --> G[WebSocket to Grok Voice API]
-        G --> H[PCM16 audio chunks]
-        H --> I[pcmToWav: 44-byte WAV header]
-        I --> J[detectPlayer: afplay / paplay / PowerShell]
-        J --> K[Play audio]
-    end
-
-    subgraph Lifecycle ["WebSocket Lifecycle"]
-        L[First speak call] --> M[Open WebSocket]
-        M --> N[60s idle timer starts]
-        N --> O{New speak?}
-        O -->|Yes| P[Reset idle timer]
-        O -->|No, timeout| Q[Close WebSocket]
-    end
-```
-
-The **dynamic TTS prompt system** is the key innovation: `classifyContent()` detects what kind of content Friday is about to speak (tables, code blocks, bullet lists, URLs) and `buildTtsPrompt()` injects specific instructions for that utterance. A table gets "summarize the data verbally", while code gets "describe the code's purpose, don't read syntax aloud". The voice identity (`FRIDAY_VOICE_IDENTITY`) specifies a Kerry Condon-inspired County Tipperary Irish accent.
-
-**VoiceSessionManager** (`src/core/voice/session-manager.ts`) provides a separate conversational voice interface — connecting to the Grok Realtime API via `ws.ts` for bidirectional audio conversations, with a state machine (idle → listening → thinking → speaking → error). Routes transcripts through `cortex.chatStreamVoice()` with barge-in support (cancels in-flight responses on VAD speech detection).
-
-| Feature | Detail |
-|---|---|
-| Fire-and-forget | `vox.speak(text).catch(() => {})` — never blocks Cortex response |
-| Persistent WebSocket | Stays open between utterances, 60s idle eviction |
-| Content classification | Tables, code, lists, URLs get tailored TTS instructions |
-| Emotional rewrite | Fast model rewrites text with mood-appropriate auditory cues ([laugh], [sigh], [pause]) |
-| Platform audio | `afplay` (macOS), `paplay` (Linux), PowerShell (Windows) |
-| VoiceChannel | Bridges NotificationManager into speech |
-| 5 voices | Ara, Eve (default), Rex, Sal, Leo — override with `FRIDAY_VOICE` |
-
-`/voice on` · `/voice off` · `/voice whisper` · `/voice test` · `/voice status`
-
----
-
-### 🪪 Genesis — Identity Prompt
-
-Genesis is Friday's **identity** — the personality prompt that defines who she is. Unlike hardcoded system prompts, Genesis lives as an editable file at `~/.friday/GENESIS.md`, loaded at boot and injected into every Cortex conversation. The BOSS controls it; Friday cannot modify it.
-
-```mermaid
-flowchart TB
-    subgraph Boot ["Boot Sequence"]
-        A[FridayRuntime.boot] --> B[resolveGenesisPath]
-        B --> C{File exists?}
-        C -->|Yes| D[loadGenesis: read file content]
-        C -->|No| E["seedGenesis: write GENESIS_TEMPLATE"]
-        E --> F["chmod 600 file, chmod 700 dir"]
-        F --> D
-        D --> G[Pass genesisPrompt to Cortex]
-    end
-
-    subgraph Protection ["Protected Path System"]
-        H[setProtectedPaths at boot]
-        H --> I[fs.write checks isProtectedPath]
-        H --> J[fs.delete checks isProtectedPath]
-        H --> K[Forge apply checks isProtectedPath]
-        I --> L[Denied + audit log]
-        J --> L
-        K --> L
-    end
-
-    subgraph CLI ["Genesis CLI"]
-        M["genesis init"] --> N[Seed from GENESIS_TEMPLATE]
-        O["genesis show"] --> P[Display current content]
-        Q["genesis edit"] --> R["Open in $EDITOR"]
-        S["genesis update"] --> T[Overwrite with latest template]
-        U["genesis check"] --> V[Validate file + permissions]
-        W["genesis path"] --> X[Print resolved path]
-    end
-```
-
-| Feature | Detail |
-|---|---|
-| Location | `~/.friday/GENESIS.md` (override: `FRIDAY_GENESIS_PATH`) |
-| Permissions | Directory: 700, File: 600 — enforced on seed and every boot |
-| Seed template | `GENESIS_TEMPLATE` in `src/core/prompts.ts` |
-| Protection | `isProtectedPath()` blocks writes from filesystem tools and Forge |
-| Audit | `genesis:write-denied` logged on blocked write attempts |
-
-`friday genesis show` · `friday genesis init` · `friday genesis edit` · `friday genesis update` · `friday genesis check` · `friday genesis path`
 
 ---
 
@@ -716,6 +782,7 @@ The architecture borrows its vocabulary from the MCU. Each subsystem maps to som
 | "I remember when..." | **Deja Vu** | Conversational memory recall — FTS5 search across past sessions |
 | Heartbeat / scheduler | **Arc Rhythm** | Autonomous scheduled task execution — cron-driven, headless |
 | Friday's voice | **Vox** | Voice output via Grok Voice Agent API — fire-and-forget TTS, content-aware prompts, emotional rewriting |
+| Emotional core | **Psyche** | Emotional intelligence — relational dimensions, milestone memory, session mood, system prompt enrichment |
 
 ---
 
@@ -738,6 +805,7 @@ graph TB
     RT --> DE["DirectiveEngine"]
     RT --> MEM["SQLiteMemory"]
     RT --> SM["SmartsStore"]
+    RT --> PSY["Psyche"]
     RT --> SEN["Sensorium"]
     RT --> GEN["Genesis"]
     RT --> VOX2["Vox"]
@@ -793,7 +861,8 @@ flowchart LR
     E --> F["DirectiveStore +<br/>DirectiveEngine"]
     F --> G[SQLiteMemory]
     G --> H[SmartsStore]
-    H --> I[Sensorium]
+    H --> PSY[Psyche]
+    PSY --> I[Sensorium]
     I --> GEN[Genesis]
     GEN --> VOX[Vox]
     VOX --> J[Cortex]
@@ -885,6 +954,7 @@ friday --debug serve           # Debug mode — logs inference payloads and resp
 | `/forge protect <name>` | Mark a forge module as immutable |
 | `/forge unprotect <name>` | Remove protection from a forge module |
 | `/forge manifest` | Dump raw forge manifest.json |
+| `/forge rollback <name>` | Restore from backup |
 | `/forge help` | Show forge subcommand reference |
 | `/arc list` | List all scheduled rhythms |
 | `/arc create "cron" desc` | Create a new scheduled rhythm |
@@ -899,6 +969,10 @@ friday --debug serve           # Debug mode — logs inference payloads and resp
 | `/voice flat` | Literal TTS — no emotional rewrite |
 | `/voice test` | Speak a test phrase |
 | `/voice status` | Show voice system status |
+| `/psyche status` | Compact emotional state overview |
+| `/psyche dimensions` | Full relational dimension descriptions |
+| `/psyche milestones` | Recent emotional milestones |
+| `/psyche reset` | Clear all emotional state and re-seed |
 | `exit`, `quit`, `bye` | Ends the session |
 
 ### Model Defaults
@@ -1009,7 +1083,7 @@ Bun loads `.env` automatically — no dotenv needed.
 
 ```bash
 bun run dev              # Auto-restart on file changes
-bun test                 # Run all tests (1129 tests across 106 files)
+bun test                 # Run all tests (1197 tests across 113 files)
 bun test --watch         # Watch mode
 bun test tests/unit/cortex.test.ts  # Single test file
 bun run lint             # Lint check
@@ -1064,9 +1138,9 @@ src/
 │   │   ├── socket.ts      # SocketBridge — Unix socket IPC to running server
 │   │   └── types.ts       # RuntimeBridge interface
 │   └── voice/             # Vox — voice output and realtime conversational voice
-│       ├── vox.ts         # Vox class — fire-and-forget TTS, idle eviction
+│       ├── vox.ts         # Vox class — REST TTS, fire-and-forget speak/cancel
 │       ├── session-manager.ts # VoiceSessionManager — thin audio I/O + lifecycle (replaces VoiceBridge)
-│       ├── audio.ts       # pcmToWav, detectPlayer, playAudio
+│       ├── audio.ts       # detectPlayer, playAudio, cleanupTempFile
 │       ├── prompt.ts      # classifyContent, buildTtsPrompt, FRIDAY_VOICE_IDENTITY
 │       ├── narration.ts   # NarrationPicker, ACK_PHRASES, TOOL_NARRATIONS — Vox notification TTS phrases
 │       ├── channel.ts     # VoiceChannel — notification bridge
@@ -1080,7 +1154,7 @@ src/
 │   ├── loader.ts          # Module discovery and validation
 │   ├── validation.ts      # Shared argument validation (SSRF protection, flag injection guards)
 │   ├── filesystem/        # Read, write, list, delete, exec tools
-│   ├── git/               # Git operations (status, diff, log, branch, stash, push, pull)
+│   ├── git/               # Git operations (status, diff, log, commit, branch, stash, push, pull)
 │   ├── docker/            # Docker management (ps, logs, inspect, stats, exec)
 │   ├── code-exec/         # Sandboxed script execution
 │   ├── web-fetch/         # HTTP requests with SSRF protection
@@ -1110,6 +1184,13 @@ src/
 │   ├── scheduler.ts       # Polling loop, reentrant guard, auto-pause
 │   ├── protocol.ts        # /arc protocol handler
 │   └── tool.ts            # manage_rhythm FridayTool for Cortex
+├── psyche/
+│   ├── types.ts           # RelationalDimension, EmotionalMilestone, SessionMood, PsycheState
+│   ├── store.ts           # PsycheStore — SQLite tables, FTS5, CRUD, decay, seeding
+│   ├── curator.ts         # PsycheCurator — session-end emotional analysis, bootstrap
+│   ├── context.ts         # buildEmotionalContext() — system prompt injection
+│   ├── guardrails.ts      # EMOTIONAL_GUARDRAILS constant
+│   └── protocol.ts        # /psyche protocol (status, dimensions, milestones, reset)
 ├── history/
 │   └── protocol.ts        # /history protocol (list, show, clear)
 ├── server/
