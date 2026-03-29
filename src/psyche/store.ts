@@ -190,27 +190,34 @@ export class PsycheStore {
 	}
 
 	findRelevantMilestones(query: string, limit = 3): EmotionalMilestone[] {
-		const sanitized = query.replace(/['"*()]/g, " ").trim();
-		if (!sanitized) return [];
-		const rows = this.db
-			.query<MilestoneRow & { rank: number }, [string, number]>(
-				`SELECT m.id, m.occurred_at, m.summary, m.emotional_type, m.session_id, m.relevance_decay, fts.rank
-				 FROM psyche_milestones_fts fts
-				 JOIN psyche_milestones m ON m.rowid = fts.rowid
-				 WHERE fts.summary MATCH ?
-				 ORDER BY fts.rank
-				 LIMIT ?`,
-			)
-			.all(sanitized, limit * 3);
-		if (rows.length === 0) return [];
+		// Same FTS5 sanitization strategy as SQLiteMemory.search()
+		const terms = query.split(/\s+/).filter((t) => /\w/.test(t));
+		if (terms.length === 0) return [];
+		const ftsQuery = terms.map((t) => `"${t.replace(/"/g, '""')}"*`).join(" OR ");
 
-		return rows
-			.map((r) => ({
-				...this.mapMilestone(r),
-				score: Math.abs(r.rank) * r.relevance_decay,
-			}))
-			.sort((a, b) => b.score - a.score)
-			.slice(0, limit);
+		try {
+			const rows = this.db
+				.query<MilestoneRow & { rank: number }, [string, number]>(
+					`SELECT m.id, m.occurred_at, m.summary, m.emotional_type, m.session_id, m.relevance_decay, fts.rank
+					 FROM psyche_milestones_fts fts
+					 JOIN psyche_milestones m ON m.rowid = fts.rowid
+					 WHERE fts.summary MATCH ?
+					 ORDER BY fts.rank
+					 LIMIT ?`,
+				)
+				.all(ftsQuery, limit * 3);
+			if (rows.length === 0) return [];
+
+			return rows
+				.map((r) => ({
+					...this.mapMilestone(r),
+					score: Math.abs(r.rank) * r.relevance_decay,
+				}))
+				.sort((a, b) => b.score - a.score)
+				.slice(0, limit);
+		} catch {
+			return [];
+		}
 	}
 
 	pruneMilestones(): void {
