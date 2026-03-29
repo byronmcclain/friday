@@ -3,11 +3,13 @@ import type { ServerMessage } from "./protocol.ts";
 import type { FridayRuntime } from "../core/runtime.ts";
 import type { ConversationSummarizer } from "../core/summarizer.ts";
 import type { SmartsCurator } from "../smarts/curator.ts";
+import type { PsycheCurator } from "../psyche/curator.ts";
 
 export interface SessionHubConfig {
 	runtime: FridayRuntime;
 	summarizer?: ConversationSummarizer;
 	curator?: SmartsCurator;
+	psycheCurator?: PsycheCurator;
 }
 
 export class SessionHub {
@@ -15,6 +17,7 @@ export class SessionHub {
 	private runtime: FridayRuntime;
 	private summarizer?: ConversationSummarizer;
 	private curator?: SmartsCurator;
+	private psycheCurator?: PsycheCurator;
 	private sessionId: string | null = null;
 	private sessionStartedAt: Date | null = null;
 	private _saving = false;
@@ -24,6 +27,7 @@ export class SessionHub {
 		this.runtime = config.runtime;
 		this.summarizer = config.summarizer;
 		this.curator = config.curator;
+		this.psycheCurator = config.psycheCurator;
 	}
 
 	get clientCount(): number {
@@ -107,10 +111,14 @@ export class SessionHub {
 		const history = this.runtime.cortex.getHistory();
 		if (history.length === 0) return;
 
-		// Curator extraction is independent of summarization — start it early
-		// and await at the end so both LLM calls overlap.
+		// Curator + Psyche extraction are independent of summarization — start early
+		// and await at the end so LLM calls overlap with conversation save.
 		const curatorPromise = this.curator
 			? this.curator.extractFromConversation(history).catch(() => {})
+			: undefined;
+
+		const psychePromise = this.psycheCurator && this.sessionId
+			? this.psycheCurator.analyzeSession(this.sessionId, history).catch(() => {})
 			: undefined;
 
 		let summary: string | undefined;
@@ -145,6 +153,7 @@ export class SessionHub {
 			});
 		}
 
+		await psychePromise;
 		await curatorPromise;
 	}
 

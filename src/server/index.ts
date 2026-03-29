@@ -42,6 +42,7 @@ export async function createFridayServer(config: FridayServerConfig) {
 		runtime,
 		summarizer: runtime.summarizer,
 		curator: runtime.curator,
+		psycheCurator: runtime.psycheCurator,
 	});
 	// Wire Telegram listener broadcast to SessionHub so TUI/web clients see Telegram messages
 	const telegramListener = getTelegramListener();

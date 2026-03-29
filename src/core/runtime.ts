@@ -172,6 +172,10 @@ export class FridayRuntime {
 		return this._curator;
 	}
 
+	get psycheCurator(): PsycheCurator | undefined {
+		return this._psycheCurator;
+	}
+
 	async boot(
 		config: RuntimeConfig = {},
 		onProgress?: (step: BootStep, label: string) => void,
