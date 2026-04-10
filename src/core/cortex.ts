@@ -14,15 +14,21 @@ import type { Vox } from "./voice/vox.ts";
 import type { PsycheStore } from "../psyche/store.ts";
 import { buildEmotionalContext } from "../psyche/context.ts";
 import { HistoryManager } from "./history-manager.ts";
-import type { ChatStream, VoiceChatStream } from "./stream-types.ts";
+import type { ChatStream, TokenUsage, VoiceChatStream } from "./stream-types.ts";
 import { appendInferenceLog } from "../providers/debug-log.ts";
 import { buildToolDefinitions, createToolExecutor } from "./tool-bridge.ts";
 import { TextWorker } from "./workers/text-worker.ts";
 import { VoiceWorker } from "./workers/voice-worker.ts";
+import { createPushIterable, type PushIterable } from "./workers/push-iterable.ts";
 import { buildVoiceSystemPrompt } from "./voice/prompt.ts";
 
 /** Max retries when LLM returns an empty response */
 const MAX_EMPTY_RETRIES = 2;
+
+const EMPTY_TOKEN_USAGE: TokenUsage = {
+	inputTokens: undefined,
+	outputTokens: undefined,
+};
 
 function fmtDuration(ms: number): string {
 	return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
@@ -176,8 +182,7 @@ export class Cortex {
 			});
 		}
 
-		// Delegate to TextWorker
-		const workerResult = this.textWorker.process({
+		const workerOptions = {
 			systemPrompt,
 			messages: this.historyManager.toMessages(),
 			tools: defs,
@@ -185,61 +190,38 @@ export class Cortex {
 			maxToolIterations: this.maxToolIterations,
 			maxOutputTokens: this.maxTokens,
 			stepTimeoutMs: this.inferenceTimeout,
-		});
+		};
 
-		const fullTextPromise = workerResult.fullText.then(
-			async (text: string) => {
-				let finalText = text;
-				let finalUsage = workerResult.usage;
+		// Wrap the underlying worker stream so retries can push chunks into
+		// the same textStream exposed to callers. Without this, a retry's
+		// chunks are dropped and the conversation UI renders empty while
+		// fullText carries the retry text out-of-band.
+		const wrapped = createPushIterable<string>({ collect: true });
+		const { promise: usagePromise, resolve: resolveUsage } =
+			Promise.withResolvers<TokenUsage>();
 
-				// Guard: empty LLM response — retry silently before giving up
-				if (!finalText.trim()) {
-					this.audit?.log({
-						action: "inference:empty",
-						source: "cortex",
-						detail: `Empty response from ${this._modelName}, retrying`,
-						success: false,
-					});
-
-					for (let attempt = 1; attempt <= MAX_EMPTY_RETRIES; attempt++) {
-						const retry = this.textWorker.process({
-							systemPrompt,
-							messages: this.historyManager.toMessages(),
-							tools: defs,
-							executeTool: executor,
-							maxToolIterations: this.maxToolIterations,
-							maxOutputTokens: this.maxTokens,
-							stepTimeoutMs: this.inferenceTimeout,
-						});
-
-						try {
-							finalText = await retry.fullText;
-							if (finalText.trim()) {
-								finalUsage = retry.usage;
-								this.audit?.log({
-									action: "inference:retry-success",
-									source: "cortex",
-									detail: `Retry ${attempt}/${MAX_EMPTY_RETRIES} succeeded, ${finalText.length} chars`,
-									success: true,
-								});
-								break;
-							}
-						} catch {
-							// Retry failed — continue to next attempt
-						}
-					}
-
-					if (!finalText.trim()) {
-						finalText = "Apologies — I received an empty response. Could you try again?";
-						this.audit?.log({
-							action: "inference:empty-fallback",
-							source: "cortex",
-							detail: `${MAX_EMPTY_RETRIES} retries all empty, using fallback`,
-							success: false,
-						});
-					}
+		const drainAttempt = async () => {
+			const workerResult = this.textWorker.process(workerOptions);
+			try {
+				for await (const chunk of workerResult.textStream) {
+					wrapped.push(chunk);
 				}
+			} catch (err) {
+				// Swallow the mirrored fullText rejection to avoid an unhandled promise.
+				void Promise.resolve(workerResult.fullText).catch(() => {});
+				throw err;
+			}
+			const text = await workerResult.fullText;
+			return { text, usage: workerResult.usage };
+		};
 
+		this.runInferenceWithRetry(wrapped, drainAttempt).then(
+			resolveUsage,
+			() => resolveUsage(EMPTY_TOKEN_USAGE),
+		);
+
+		const fullTextPromise = wrapped.fullValue.then(
+			async (finalText: string) => {
 				const duration = fmtDuration(Date.now() - inferenceStart);
 				this.audit?.log({
 					action: "inference:complete",
@@ -254,7 +236,7 @@ export class Cortex {
 					appendInferenceLog(this.debugResponsePath, 1, { text: finalText });
 				}
 
-				const usage = await finalUsage;
+				const usage = await usagePromise;
 				if (usage?.inputTokens != null && usage?.outputTokens != null) {
 					this.historyManager.recordUsage(
 						usage.inputTokens + usage.outputTokens,
@@ -279,10 +261,75 @@ export class Cortex {
 		);
 
 		return {
-			textStream: workerResult.textStream,
+			textStream: wrapped.iterable,
 			fullText: fullTextPromise,
-			usage: workerResult.usage,
+			usage: usagePromise,
 		};
+	}
+
+	private async runInferenceWithRetry(
+		wrapped: PushIterable<string>,
+		drainAttempt: () => Promise<{
+			text: string;
+			usage: PromiseLike<TokenUsage | undefined>;
+		}>,
+	): Promise<TokenUsage> {
+		let finalText: string;
+		let finalUsageSource: PromiseLike<TokenUsage | undefined>;
+
+		try {
+			({ text: finalText, usage: finalUsageSource } = await drainAttempt());
+
+			if (!finalText.trim()) {
+				this.audit?.log({
+					action: "inference:empty",
+					source: "cortex",
+					detail: `Empty response from ${this._modelName}, retrying`,
+					success: false,
+				});
+
+				for (let attempt = 1; attempt <= MAX_EMPTY_RETRIES; attempt++) {
+					try {
+						const retry = await drainAttempt();
+						if (retry.text.trim()) {
+							finalText = retry.text;
+							finalUsageSource = retry.usage;
+							this.audit?.log({
+								action: "inference:retry-success",
+								source: "cortex",
+								detail: `Retry ${attempt}/${MAX_EMPTY_RETRIES} succeeded, ${finalText.length} chars`,
+								success: true,
+							});
+							break;
+						}
+					} catch {
+						// Retry failed — continue to next attempt
+					}
+				}
+
+				if (!finalText.trim()) {
+					finalText = "Apologies — I received an empty response. Could you try again?";
+					wrapped.push(finalText);
+					this.audit?.log({
+						action: "inference:empty-fallback",
+						source: "cortex",
+						detail: `${MAX_EMPTY_RETRIES} retries all empty, using fallback`,
+						success: false,
+					});
+				}
+			}
+		} catch (err) {
+			const error = err instanceof Error ? err : new Error(String(err));
+			wrapped.error(error);
+			throw error;
+		}
+
+		wrapped.done();
+		try {
+			return (await Promise.resolve(finalUsageSource)) ?? EMPTY_TOKEN_USAGE;
+		} catch {
+			return EMPTY_TOKEN_USAGE;
+		}
 	}
 
 	async chatStreamVoice(

@@ -208,4 +208,35 @@ describe("Cortex — empty response guard", () => {
 		const result = await cortex.chat("test");
 		expect(result).toBe("Normal response");
 	});
+
+	test("chatStream.textStream yields retry text when first attempt is empty", async () => {
+		const model = createSequencingModel(["", "Retry text flows through stream"]);
+		const cortex = new Cortex({ injectedModel: model });
+		const stream = await cortex.chatStream("test");
+
+		let streamed = "";
+		for await (const chunk of stream.textStream) {
+			streamed += chunk;
+		}
+		const full = await stream.fullText;
+
+		expect(streamed).toBe("Retry text flows through stream");
+		expect(full).toBe("Retry text flows through stream");
+	});
+
+	test("chatStream.textStream yields fallback when all retries fail", async () => {
+		const model = createSequencingModel(["", "", "", ""]);
+		const cortex = new Cortex({ injectedModel: model });
+		const stream = await cortex.chatStream("test");
+
+		let streamed = "";
+		for await (const chunk of stream.textStream) {
+			streamed += chunk;
+		}
+		const full = await stream.fullText;
+
+		expect(streamed).toContain("empty response");
+		expect(full).toContain("empty response");
+		expect(streamed).toBe(full);
+	});
 });
