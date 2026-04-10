@@ -981,8 +981,8 @@ Friday uses a **dual-model architecture**: a reasoning model for conversations a
 
 | Role | Default Model |
 |---|---|
-| Reasoning | `grok-4-1-fast-reasoning-latest` |
-| Fast | `grok-4-1-fast-non-reasoning` |
+| Reasoning | `grok-4.20-reasoning` |
+| Fast | `grok-4.20-non-reasoning` |
 
 Resolution priority: CLI flag (`--model` / `--fast-model`) > env var (`FRIDAY_REASONING_MODEL` / `FRIDAY_FAST_MODEL`) > `GROK_DEFAULTS`.
 
@@ -1048,10 +1048,10 @@ cp .env.example .env
 XAI_API_KEY=xai-...
 
 # Optional: Override reasoning model (CLI: --model)
-FRIDAY_REASONING_MODEL=grok-4-1-fast-reasoning-latest
+FRIDAY_REASONING_MODEL=grok-4.20-reasoning
 
 # Optional: Override fast model for utility tasks (CLI: --fast-model)
-FRIDAY_FAST_MODEL=grok-4-1-fast-non-reasoning
+FRIDAY_FAST_MODEL=grok-4.20-non-reasoning
 
 # Optional: Fallback master key for SecretStore (when OS keychain unavailable)
 FRIDAY_SECRET_KEY=...

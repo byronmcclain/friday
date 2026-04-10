@@ -1,6 +1,6 @@
 /** Configuration for Cortex */
 export interface FridayConfig {
-  /** Model identifier (e.g., "grok-4-1-fast-reasoning-latest") */
+  /** Model identifier (e.g., "grok-4.20-reasoning") */
   model: string;
   /** Fast model for utility tasks (summarization, knowledge extraction) */
   fastModel?: string;
