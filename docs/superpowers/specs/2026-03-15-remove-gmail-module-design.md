@@ -40,7 +40,7 @@
 
 ### Preserve (historical design docs)
 
-Design docs in `docs/plans/` stay as historical snapshots per project convention.
+Design docs in `docs/superpowers/specs/` stay as historical snapshots per project convention.
 `ModuleContext` spec/plan stays — it's about the interface, not Gmail.
 
 ### Post-removal

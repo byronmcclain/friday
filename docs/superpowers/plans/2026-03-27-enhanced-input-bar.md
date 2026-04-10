@@ -8,7 +8,7 @@
 
 **Tech Stack:** OpenTUI (`@opentui/core`, `@opentui/react`), Bun APIs (`Bun.spawn`, `Bun.file`, `Bun.write`), `bun:test`
 
-**Spec:** `docs/plans/2026-03-27-enhanced-input-bar-design.md`
+**Spec:** `docs/superpowers/specs/2026-03-27-enhanced-input-bar-design.md`
 
 ---
 

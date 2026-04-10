@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, @ai-sdk/xai, Bun, bun:test
 
-**Spec:** `docs/plans/2026-03-22-prompt-cache-routing-design.md`
+**Spec:** `docs/superpowers/specs/2026-03-22-prompt-cache-routing-design.md`
 
 ---
 

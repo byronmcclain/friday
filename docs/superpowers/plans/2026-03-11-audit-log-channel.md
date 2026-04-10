@@ -164,7 +164,7 @@ git commit -m "feat: wire AuditLogChannel as default notification channel at boo
 ### Task 3: Update documentation reference
 
 **Files:**
-- Modify: `docs/plans/2026-02-27-inference-payload-logging-design.md`
+- Modify: `docs/superpowers/specs/2026-02-27-inference-payload-logging-design.md`
 
 **Step 1: Update LogChannel reference**
 
@@ -180,6 +180,6 @@ to:
 **Step 2: Commit**
 
 ```bash
-git add docs/plans/2026-02-27-inference-payload-logging-design.md
+git add docs/superpowers/specs/2026-02-27-inference-payload-logging-design.md
 git commit -m "docs: update LogChannel reference to AuditLogChannel"
 ```

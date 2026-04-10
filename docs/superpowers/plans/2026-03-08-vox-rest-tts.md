@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, Bun, Fetch API, xAI TTS REST API
 
-**Design Doc:** `docs/plans/2026-03-08-vox-rest-tts-design.md`
+**Design Doc:** `docs/superpowers/specs/2026-03-08-vox-rest-tts-design.md`
 
 **Scope:** All changes are within `src/core/voice/` and its tests. No changes outside the Vox subsystem.
 

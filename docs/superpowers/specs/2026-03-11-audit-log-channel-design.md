@@ -49,4 +49,4 @@ Queryable via `audit.entries({ action: "notification:alert" })`.
 | `src/core/notifications.ts` | Delete `LogChannel`, add `AuditLogChannel`, remove `appendFile` import |
 | `src/core/runtime.ts` | Import `AuditLogChannel`, add to default channels array |
 | `tests/unit/notifications.test.ts` | Replace `LogChannel` tests with `AuditLogChannel` tests |
-| `docs/plans/2026-02-27-inference-payload-logging-design.md` | Update `LogChannel` reference |
+| `docs/superpowers/specs/2026-02-27-inference-payload-logging-design.md` | Update `LogChannel` reference |

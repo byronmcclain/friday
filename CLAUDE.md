@@ -282,7 +282,7 @@ docker run -e XAI_API_KEY=xai-... friday chat
 
 ## Design Documents
 
-All design docs live in `docs/plans/` with naming convention `YYYY-MM-DD-<topic>-design.md` (45 documents as of 2026-03-28). Key ones: `friday-agent-runtime-design`, `cortex-ai-sdk-migration-design`, `vox-voice-output-design`, `voice-web-integration-design`.
+Design docs live in `docs/superpowers/specs/` with naming convention `YYYY-MM-DD-<topic>-design.md`. Implementation plans live in `docs/superpowers/plans/` with naming convention `YYYY-MM-DD-<topic>.md` (no `-design` suffix). Key specs: `friday-agent-runtime-design`, `cortex-ai-sdk-migration-design`, `vox-voice-output-design`, `voice-web-integration-design`.
 
 **MCU concept mapping:** Cortex=brain, Protocol=slash command, Directive=standing order, Module=suit upgrade, Signal=event, Clearance=permission, SMARTS=dynamic knowledge, Sensorium=sensor suite, Deja Vu=recall, Arc Rhythm=heartbeat/scheduler, Genesis=identity template, Vox=voice, Psyche=emotional core
 

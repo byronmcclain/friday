@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript, Bun, bun:test, AI SDK v6 (streamText), Grok Realtime API (OpenAI-compatible WebSocket)
 
-**Design Doc:** `docs/plans/2026-03-01-voice-cortex-narration-design.md`
+**Design Doc:** `docs/superpowers/specs/2026-03-01-voice-cortex-narration-design.md`
 
 ---
 

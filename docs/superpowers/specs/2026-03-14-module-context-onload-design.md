@@ -123,7 +123,7 @@ The generated module itself does not define `onLoad()` (unchanged).
 | `CLAUDE.md` | Note `ModuleContext` in module pattern description, update `FridayModule` interface notes |
 | `README.md` | Update module anatomy diagram label, update example `onLoad(context)` signature |
 
-Design docs in `docs/plans/` are historical snapshots — left as-is.
+Design docs in `docs/superpowers/specs/` are historical snapshots — left as-is.
 
 ## What does NOT change
 
