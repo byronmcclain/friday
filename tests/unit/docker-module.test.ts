@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { AuditLogger } from "../../src/audit/logger.ts";
-import dockerModule from "../../src/modules/docker/index.ts";
-import { dockerPs } from "../../src/modules/docker/ps.ts";
 import { dockerBuild } from "../../src/modules/docker/build.ts";
+import dockerModule from "../../src/modules/docker/index.ts";
+import { dockerLogs } from "../../src/modules/docker/logs.ts";
+import { dockerPs } from "../../src/modules/docker/ps.ts";
 import { dockerRun } from "../../src/modules/docker/run.ts";
 import { dockerStop } from "../../src/modules/docker/stop.ts";
-import { dockerLogs } from "../../src/modules/docker/logs.ts";
 import type { ToolContext } from "../../src/modules/types.ts";
 
 const ctx: ToolContext = {

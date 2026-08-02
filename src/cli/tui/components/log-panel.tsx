@@ -1,6 +1,6 @@
-import { PALETTE } from "../theme.ts";
-import type { LogLevel, LogEntry } from "../log-types.ts";
+import type { LogEntry, LogLevel } from "../log-types.ts";
 import { LOG_ICONS } from "../log-types.ts";
+import { PALETTE } from "../theme.ts";
 
 export function formatTimestamp(date: Date): string {
 	const h = String(date.getHours()).padStart(2, "0");
@@ -54,11 +54,11 @@ export function LogPanel({ entries, width }: LogPanelProps) {
 				{entries.map((entry) => (
 					<text key={entry.id}>
 						<span fg={PALETTE.textMuted}>{formatTimestamp(entry.timestamp)}</span>
-						<span>{" "}</span>
+						<span> </span>
 						<span fg={PALETTE.amberDim}>{`[${entry.source}]`}</span>
-						<span>{" "}</span>
+						<span> </span>
 						<span fg={levelColor(entry.level)}>{levelIcon(entry.level)}</span>
-						<span>{" "}</span>
+						<span> </span>
 						<span fg={PALETTE.textPrimary}>{entry.message}</span>
 						{entry.detail ? <span fg={PALETTE.textMuted}>{` — ${entry.detail}`}</span> : null}
 					</text>

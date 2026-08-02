@@ -1,14 +1,9 @@
 import type { SignalBus } from "../core/events.ts";
 import type { NotificationManager } from "../core/notifications.ts";
-import type { SystemSnapshot, SensorConfig } from "./types.ts";
-import { AlertState } from "./types.ts";
-import {
-	gatherMachine,
-	gatherContainers,
-	gatherDev,
-	type CpuTimes,
-} from "./sensors.ts";
 import { formatBytes } from "./format.ts";
+import { type CpuTimes, gatherContainers, gatherDev, gatherMachine } from "./sensors.ts";
+import type { SensorConfig, SystemSnapshot } from "./types.ts";
+import { AlertState } from "./types.ts";
 
 /**
  * Formats the current date/time as a compact string with both local and UTC.
@@ -83,10 +78,7 @@ export class Sensorium {
 
 			const { cpuTimes: _, ...machine } = machineResult;
 
-			const [containers, dev] = await Promise.all([
-				gatherContainers(),
-				gatherDev(),
-			]);
+			const [containers, dev] = await Promise.all([gatherContainers(), gatherDev()]);
 
 			this._snapshot = {
 				timestamp: new Date(),
@@ -138,14 +130,8 @@ export class Sensorium {
 		if (!this._snapshot) {
 			void this.poll();
 		}
-		this._fastTimer = setInterval(
-			() => this.pollFast(),
-			this.config.fastPollInterval,
-		);
-		this._slowTimer = setInterval(
-			() => this.poll(),
-			this.config.slowPollInterval,
-		);
+		this._fastTimer = setInterval(() => this.pollFast(), this.config.fastPollInterval);
+		this._slowTimer = setInterval(() => this.poll(), this.config.slowPollInterval);
 	}
 
 	stop(): void {
@@ -197,10 +183,7 @@ export class Sensorium {
 		// CPU alerts (requires 2 consecutive high readings)
 		if (snapshot.machine.cpus.usage >= thresholds.cpuHigh) {
 			this._cpuHighCount++;
-			if (
-				this._cpuHighCount >= 2 &&
-				this._alertStates.cpu !== AlertState.High
-			) {
+			if (this._cpuHighCount >= 2 && this._alertStates.cpu !== AlertState.High) {
 				this._alertStates.cpu = AlertState.High;
 				this.signals.emit("custom:env-cpu-high", "sensorium", {
 					usage: snapshot.machine.cpus.usage,
@@ -221,14 +204,9 @@ export class Sensorium {
 
 		// Container down alerts
 		if (thresholds.watchContainers.length > 0) {
-			const runningNames = new Set(
-				snapshot.containers.running.map((c) => c.name),
-			);
+			const runningNames = new Set(snapshot.containers.running.map((c) => c.name));
 			for (const name of thresholds.watchContainers) {
-				if (
-					!runningNames.has(name) &&
-					!this._alertStates.containers.has(name)
-				) {
+				if (!runningNames.has(name) && !this._alertStates.containers.has(name)) {
 					this._alertStates.containers.add(name);
 					this.signals.emit("custom:env-container-down", "sensorium", {
 						container: name,
@@ -239,10 +217,7 @@ export class Sensorium {
 						body: `Watched container "${name}" is not running`,
 						source: "sensorium",
 					});
-				} else if (
-					runningNames.has(name) &&
-					this._alertStates.containers.has(name)
-				) {
+				} else if (runningNames.has(name) && this._alertStates.containers.has(name)) {
 					this._alertStates.containers.delete(name);
 				}
 			}
@@ -256,9 +231,7 @@ export class Sensorium {
 		const memTotal = formatBytes(s.machine.memory.total);
 		const memPercent =
 			s.machine.memory.total > 0
-				? Math.round(
-						(s.machine.memory.used / s.machine.memory.total) * 100,
-					)
+				? Math.round((s.machine.memory.used / s.machine.memory.total) * 100)
 				: 0;
 
 		const parts: string[] = [
@@ -270,9 +243,7 @@ export class Sensorium {
 
 		if (s.containers.runtime !== "none" && s.containers.running.length > 0) {
 			const names = s.containers.running.map((c) => c.name).join(", ");
-			parts.push(
-				`Docker: ${s.containers.running.length} running (${names})`,
-			);
+			parts.push(`Docker: ${s.containers.running.length} running (${names})`);
 		}
 
 		if (s.dev.git) {
@@ -288,4 +259,3 @@ export class Sensorium {
 		return `[ENVIRONMENT] ${parts.join(" | ")}`;
 	}
 }
-

@@ -16,10 +16,7 @@ export const forgeStatus: FridayTool = {
 	],
 	clearance: ["read-fs"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const forgeDir = (args.forgeDir as string) ?? resolve(context.workingDirectory, "forge");
 		const moduleName = args.moduleName as string | undefined;
 
@@ -35,10 +32,7 @@ export const forgeStatus: FridayTool = {
 			}
 
 			const historyLines = entry.history
-				.map(
-					(h) =>
-						`  v${h.version} [${h.action}] ${h.date} — ${h.reason}`,
-				)
+				.map((h) => `  v${h.version} [${h.action}] ${h.date} — ${h.reason}`)
 				.join("\n");
 
 			return {
@@ -66,9 +60,7 @@ export const forgeStatus: FridayTool = {
 			const entry = await manifest.getEntry(name);
 			if (entry) {
 				const prot = entry.protected ? " [protected]" : "";
-				lines.push(
-					`  ${name} v${entry.version} (${entry.status})${prot} — ${entry.description}`,
-				);
+				lines.push(`  ${name} v${entry.version} (${entry.status})${prot} — ${entry.description}`);
 			}
 		}
 

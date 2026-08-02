@@ -1,14 +1,16 @@
-import type { LanguageModelV3 } from "@ai-sdk/provider";
-import { streamText, tool as aiTool, stepCountIs } from "ai";
+import type { LanguageModelV4 } from "@ai-sdk/provider";
+import { tool as aiTool, isStepCount, streamText, type ToolSet } from "ai";
 import { toZodSchema } from "../../providers/schemas.ts";
-import type { WorkerRequest, WorkerResult, ToolEvent, CortexWorker } from "./types.ts";
 import type { ToolDefinition, ToolExecutor } from "../tool-bridge.ts";
+import type { CortexWorker, ToolEvent, WorkerRequest, WorkerResult } from "./types.ts";
 
 /** Empty async iterable — TextWorker delegates tool event signaling to createToolExecutor */
 const EMPTY_TOOL_EVENTS: AsyncIterable<ToolEvent> = {
 	[Symbol.asyncIterator]() {
 		return {
-			async next() { return { done: true, value: undefined }; },
+			async next() {
+				return { done: true, value: undefined };
+			},
 		};
 	},
 };
@@ -23,22 +25,21 @@ const EMPTY_TOOL_EVENTS: AsyncIterable<ToolEvent> = {
 export class TextWorker implements CortexWorker {
 	private _lastDefs: ToolDefinition[] | null = null;
 	private _lastExecutor: ToolExecutor | null = null;
-	private _cachedAiTools: Record<string, ReturnType<typeof aiTool<any, any>>> | null = null;
+	private _cachedAiTools: ToolSet | null = null;
 	private _cachedHasTools = false;
 
-	constructor(private readonly model: LanguageModelV3) {}
+	constructor(private readonly model: LanguageModelV4) {}
 
 	process(request: WorkerRequest): WorkerResult {
 		// Cache AI SDK tools — rebuild only when defs or executor change
 		if (request.tools !== this._lastDefs || request.executeTool !== this._lastExecutor) {
 			const executeTool = request.executeTool;
-			const aiTools: Record<string, ReturnType<typeof aiTool<any, any>>> = {};
+			const aiTools: ToolSet = {};
 			for (const def of request.tools) {
 				aiTools[def.name] = aiTool({
 					description: def.description,
 					inputSchema: toZodSchema(def.parameters),
-					execute: async (args: Record<string, unknown>) =>
-						executeTool(def.name, args),
+					execute: async (args: Record<string, unknown>) => executeTool(def.name, args),
 				});
 			}
 			this._cachedAiTools = aiTools;
@@ -65,22 +66,22 @@ export class TextWorker implements CortexWorker {
 
 		const result = streamText({
 			model: this.model,
-			system: request.systemPrompt,
+			instructions: request.systemPrompt,
 			messages: request.messages,
 			...(hasTools ? { tools: this._cachedAiTools! } : {}),
-			...(hasTools ? { stopWhen: stepCountIs(request.maxToolIterations) } : {}),
+			...(hasTools ? { stopWhen: isStepCount(request.maxToolIterations) } : {}),
 			maxOutputTokens: request.maxOutputTokens,
 			...(stepMs !== undefined ? { timeout: { stepMs, chunkMs: 60_000 } } : {}),
 			...(hardAbort ? { abortSignal: hardAbort.signal } : {}),
 		});
 
 		const fullText = result.text;
-		const usage = Promise.resolve(result.usage).then(
-			(u: { inputTokens?: number; outputTokens?: number }) => ({
+		const usage = Promise.resolve(result.usage)
+			.then((u: { inputTokens?: number; outputTokens?: number }) => ({
 				inputTokens: u?.inputTokens,
 				outputTokens: u?.outputTokens,
-			}),
-		).catch(() => ({ inputTokens: undefined, outputTokens: undefined }));
+			}))
+			.catch(() => ({ inputTokens: undefined, outputTokens: undefined }));
 
 		// Clear hard timeout when stream finishes (success or error)
 		if (hardTimeoutId !== undefined) {

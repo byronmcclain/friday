@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { createModel, GROK_DEFAULTS } from "../../src/providers/index.ts";
 
 describe("createModel", () => {

@@ -1,9 +1,7 @@
 import type { ModelMessage } from "ai";
 
 /** Function signature for the summarize callback */
-export type SummarizeFn = (
-	messages: ModelMessage[],
-) => Promise<string | undefined>;
+export type SummarizeFn = (messages: ModelMessage[]) => Promise<string | undefined>;
 
 export interface HistoryManagerConfig {
 	/** Token budget — compact() triggers when tokenEstimate exceeds this */
@@ -38,10 +36,7 @@ export class HistoryManager {
 	pop(): ModelMessage | undefined {
 		const removed = this.messages.pop();
 		if (removed) {
-			this._tokenEstimate = Math.max(
-				0,
-				this._tokenEstimate - this.estimateTokens(removed),
-			);
+			this._tokenEstimate = Math.max(0, this._tokenEstimate - this.estimateTokens(removed));
 		}
 		return removed;
 	}
@@ -54,10 +49,7 @@ export class HistoryManager {
 
 	setHistory(messages: ModelMessage[]): void {
 		this.messages = [...messages];
-		this._tokenEstimate = messages.reduce(
-			(sum, m) => sum + this.estimateTokens(m),
-			0,
-		);
+		this._tokenEstimate = messages.reduce((sum, m) => sum + this.estimateTokens(m), 0);
 		this.summaryPrefix = undefined;
 	}
 
@@ -69,9 +61,7 @@ export class HistoryManager {
 	truncateTo(length: number): void {
 		if (length < this.messages.length) {
 			this.messages.length = length;
-			this._tokenEstimate = this.messages.reduce(
-				(sum, m) => sum + this.estimateTokens(m), 0,
-			);
+			this._tokenEstimate = this.messages.reduce((sum, m) => sum + this.estimateTokens(m), 0);
 		}
 	}
 
@@ -97,10 +87,7 @@ export class HistoryManager {
 		}
 
 		this.messages = recent;
-		this._tokenEstimate = recent.reduce(
-			(sum, m) => sum + this.estimateTokens(m),
-			0,
-		);
+		this._tokenEstimate = recent.reduce((sum, m) => sum + this.estimateTokens(m), 0);
 		if (this.summaryPrefix) {
 			this._tokenEstimate += Math.ceil(this.summaryPrefix.length / 4);
 		}
@@ -127,9 +114,7 @@ export class HistoryManager {
 	private estimateTokens(message: ModelMessage | string): number {
 		if (typeof message === "string") return Math.ceil(message.length / 4);
 		const content =
-			typeof message.content === "string"
-				? message.content
-				: JSON.stringify(message.content);
+			typeof message.content === "string" ? message.content : JSON.stringify(message.content);
 		return Math.ceil(content.length / 4);
 	}
 }

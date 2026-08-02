@@ -1,15 +1,11 @@
-import type { FridayRuntime } from "../core/runtime.ts";
-import {
-	parseClientMessage,
-	type ClientMessage,
-	type ServerMessage,
-} from "./protocol.ts";
-import type { SessionHub } from "./session-hub.ts";
-import { PushNotificationChannel } from "./push-channel.ts";
-import { VoiceSessionManager, type VoiceSessionConfig } from "../core/voice/session-manager.ts";
-import { FRIDAY_VOICE_IDENTITY } from "../core/voice/prompt.ts";
-import { isGrokVoice, type GrokVoice } from "../core/voice/types.ts";
 import type { SignalHandler } from "../core/events.ts";
+import type { FridayRuntime } from "../core/runtime.ts";
+import { FRIDAY_VOICE_IDENTITY } from "../core/voice/prompt.ts";
+import { type VoiceSessionConfig, VoiceSessionManager } from "../core/voice/session-manager.ts";
+import { type GrokVoice, isGrokVoice, resolveVoiceSilenceMs } from "../core/voice/types.ts";
+import { type ClientMessage, parseClientMessage, type ServerMessage } from "./protocol.ts";
+import { PushNotificationChannel } from "./push-channel.ts";
+import type { SessionHub } from "./session-hub.ts";
 
 export type SendFn = (msg: ServerMessage) => void;
 
@@ -108,11 +104,7 @@ export class WebSocketHandler {
 						total: snapshot.machine.memory.total,
 						percent:
 							snapshot.machine.memory.total > 0
-								? Math.round(
-										(snapshot.machine.memory.used /
-											snapshot.machine.memory.total) *
-											100,
-									)
+								? Math.round((snapshot.machine.memory.used / snapshot.machine.memory.total) * 100)
 								: 0,
 					},
 					containers: snapshot.containers,
@@ -205,10 +197,7 @@ export class WebSocketHandler {
 		});
 	}
 
-	private async handleRuntimeMessage(
-		msg: ClientMessage,
-		send: SendFn,
-	): Promise<void> {
+	private async handleRuntimeMessage(msg: ClientMessage, send: SendFn): Promise<void> {
 		if (!this.runtime.isBooted) {
 			send({
 				type: "error",
@@ -283,10 +272,7 @@ export class WebSocketHandler {
 						this.clientId,
 					);
 				} catch (streamErr) {
-					const message =
-						streamErr instanceof Error
-							? streamErr.message
-							: String(streamErr);
+					const message = streamErr instanceof Error ? streamErr.message : String(streamErr);
 					send({
 						type: "error",
 						requestId: msg.id,
@@ -317,74 +303,77 @@ export class WebSocketHandler {
 				}
 
 				const requestedVoice = msg.voice;
-				const voice: GrokVoice = requestedVoice && isGrokVoice(requestedVoice)
-					? requestedVoice
-					: "Eve";
+				const voice: GrokVoice =
+					requestedVoice && isGrokVoice(requestedVoice) ? requestedVoice : "Eve";
 
 				const sessionConfig: VoiceSessionConfig = {
 					voice,
 					sampleRate: 48000,
 					instructions: FRIDAY_VOICE_IDENTITY,
+					silenceDurationMs: resolveVoiceSilenceMs(),
 				};
 
-				this.voiceSession = new VoiceSessionManager(
-					this.runtime.cortex,
-					sessionConfig,
-					{
-						onAudioDelta: (base64) =>
-							send({ type: "voice:audio", delta: base64 }),
-						onTranscriptDelta: (delta, done) => {
-							send({
-								type: "voice:transcript",
-								role: "assistant",
-								delta,
-								done,
-							});
-						},
-						onStateChange: (state) =>
-							send({ type: "voice:state", state }),
-						onUserTranscript: (text) => {
-							send({
-								type: "voice:transcript",
-								role: "user",
-								delta: text,
-								done: true,
-							});
-							this.hub.broadcast(
-								{
-									type: "conversation:message",
-									role: "user",
-									content: text,
-									source: "voice",
-								},
-								this.clientId,
-							);
-						},
-						onAssistantMessage: (text) => {
-							this.hub.broadcast(
-								{
-									type: "conversation:message",
-									role: "assistant",
-									content: text,
-									source: "voice",
-								},
-								this.clientId,
-							);
-						},
+				this.voiceSession = new VoiceSessionManager(this.runtime.cortex, sessionConfig, {
+					onAudioDelta: (base64) => send({ type: "voice:audio", delta: base64 }),
+					onTranscriptDelta: (delta, done) => {
+						send({
+							type: "voice:transcript",
+							role: "assistant",
+							delta,
+							done,
+						});
 					},
-				);
+					onStateChange: (state) => send({ type: "voice:state", state }),
+					onUserTranscript: (text) => {
+						send({
+							type: "voice:transcript",
+							role: "user",
+							delta: text,
+							done: true,
+						});
+						this.hub.broadcast(
+							{
+								type: "conversation:message",
+								role: "user",
+								content: text,
+								source: "voice",
+							},
+							this.clientId,
+						);
+					},
+					onAssistantMessage: (text) => {
+						this.hub.broadcast(
+							{
+								type: "conversation:message",
+								role: "assistant",
+								content: text,
+								source: "voice",
+							},
+							this.clientId,
+						);
+					},
+					onSessionError: (code, message) => {
+						send({ type: "voice:error", code, message });
+						this.voiceSession = null;
+					},
+				});
 
 				try {
 					await this.voiceSession.start();
 					send({ type: "voice:started", requestId: msg.id });
 				} catch (err) {
+					// start() may have set active=true before the socket opened.
+					// Tear down so a retry doesn't hit SESSION_IN_USE on a zombie.
+					try {
+						await this.voiceSession.stop();
+					} catch {
+						/* ignore stop errors during failed start cleanup */
+					}
+					this.voiceSession = null;
 					send({
 						type: "voice:error",
 						code: "START_FAILED",
-						message:
-							err instanceof Error
-								? err.message
-								: "Failed to start voice",
+						message: err instanceof Error ? err.message : "Failed to start voice",
 					});
 				}
 				break;
@@ -403,7 +392,12 @@ export class WebSocketHandler {
 			}
 			case "history:list": {
 				if (!this.runtime.memory) {
-					send({ type: "error", requestId: msg.id, code: "NO_MEMORY", message: "Memory not configured" });
+					send({
+						type: "error",
+						requestId: msg.id,
+						code: "NO_MEMORY",
+						message: "Memory not configured",
+					});
 					return;
 				}
 				const sessions = await this.runtime.memory.getConversationHistory(msg.count ?? 20);
@@ -412,7 +406,12 @@ export class WebSocketHandler {
 			}
 			case "history:load": {
 				if (!this.runtime.memory) {
-					send({ type: "error", requestId: msg.id, code: "NO_MEMORY", message: "Memory not configured" });
+					send({
+						type: "error",
+						requestId: msg.id,
+						code: "NO_MEMORY",
+						message: "Memory not configured",
+					});
 					return;
 				}
 				const session = await this.runtime.memory.getConversationById(msg.sessionId);
@@ -421,7 +420,12 @@ export class WebSocketHandler {
 			}
 			case "smarts:list": {
 				if (!this.runtime.smarts) {
-					send({ type: "error", requestId: msg.id, code: "NO_SMARTS", message: "SMARTS not configured" });
+					send({
+						type: "error",
+						requestId: msg.id,
+						code: "NO_SMARTS",
+						message: "SMARTS not configured",
+					});
 					return;
 				}
 				const entries = this.runtime.smarts.all();
@@ -430,7 +434,12 @@ export class WebSocketHandler {
 			}
 			case "smarts:search": {
 				if (!this.runtime.smarts) {
-					send({ type: "error", requestId: msg.id, code: "NO_SMARTS", message: "SMARTS not configured" });
+					send({
+						type: "error",
+						requestId: msg.id,
+						code: "NO_SMARTS",
+						message: "SMARTS not configured",
+					});
 					return;
 				}
 				const results = await this.runtime.smarts.findRelevant(msg.query);

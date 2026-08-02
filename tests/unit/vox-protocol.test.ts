@@ -1,9 +1,9 @@
-import { describe, test, expect, beforeEach } from "bun:test";
-import { createVoiceProtocol } from "../../src/core/voice/protocol.ts";
-import { Vox } from "../../src/core/voice/vox.ts";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { SignalBus } from "../../src/core/events.ts";
 import { NotificationManager } from "../../src/core/notifications.ts";
+import { createVoiceProtocol } from "../../src/core/voice/protocol.ts";
 import { VOX_DEFAULTS } from "../../src/core/voice/types.ts";
+import { Vox } from "../../src/core/voice/vox.ts";
 import type { FridayProtocol } from "../../src/modules/types.ts";
 
 const stubContext = {

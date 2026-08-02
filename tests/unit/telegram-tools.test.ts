@@ -1,6 +1,6 @@
-import { describe, test, expect } from "bun:test";
-import { telegramSend } from "../../src/modules/telegram/tools/send.ts";
+import { describe, expect, test } from "bun:test";
 import { setTelegramClient } from "../../src/modules/telegram/state.ts";
+import { telegramSend } from "../../src/modules/telegram/tools/send.ts";
 import type { ToolContext } from "../../src/modules/types.ts";
 
 const stubContext: ToolContext = {
@@ -29,10 +29,7 @@ describe("telegram.send tool", () => {
 
 	test("fails when client not initialized", async () => {
 		setTelegramClient(null);
-		const result = await telegramSend.execute(
-			{ message: "Hello" },
-			stubContext,
-		);
+		const result = await telegramSend.execute({ message: "Hello" }, stubContext);
 		expect(result.success).toBe(false);
 		expect(result.output).toContain("not active");
 	});
@@ -43,10 +40,7 @@ describe("telegram.send tool", () => {
 			sendMessage: async () => {},
 		} as any;
 		setTelegramClient(mockClient);
-		const result = await telegramSend.execute(
-			{ message: "Hello" },
-			stubContext,
-		);
+		const result = await telegramSend.execute({ message: "Hello" }, stubContext);
 		expect(result.success).toBe(false);
 		expect(result.output).toContain("owner");
 		setTelegramClient(null);
@@ -61,10 +55,7 @@ describe("telegram.send tool", () => {
 			},
 		} as any;
 		setTelegramClient(mockClient);
-		const result = await telegramSend.execute(
-			{ message: "Hello Boss" },
-			stubContext,
-		);
+		const result = await telegramSend.execute({ message: "Hello Boss" }, stubContext);
 		expect(result.success).toBe(true);
 		expect(sentMsg).toBe("Hello Boss");
 		setTelegramClient(null);

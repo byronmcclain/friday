@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-
-type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "error";
+import type { VoiceState } from "../components/voice/types.ts";
 
 interface UseVoiceSessionOptions {
   wsUrl: string;
@@ -88,6 +87,15 @@ export function useVoiceSession({ wsUrl }: UseVoiceSessionOptions): UseVoiceSess
         } else if (msg.state === "thinking") {
           setStatusText("Processing...");
           setIsTyping(false);
+        } else if (msg.state === "reconnecting") {
+          setStatusText("Reconnecting\u2026");
+          setIsTyping(false);
+        } else if (msg.state === "error") {
+          // Soft/transient failures may still emit this state while the server
+          // session remains alive. Do not clear sessionActive here — terminal
+          // death is signaled via voice:error (RECONNECT_FAILED / START_FAILED).
+          setStatusText("Something went wrong. Still listening\u2026");
+          setIsTyping(false);
         }
         break;
 
@@ -124,6 +132,11 @@ export function useVoiceSession({ wsUrl }: UseVoiceSessionOptions): UseVoiceSess
       case "voice:error":
         setState("error");
         setStatusText(msg.message ?? "Error.");
+        // Only terminal session death should clear the client session.
+        // SESSION_IN_USE (and any future soft codes) must leave it alone.
+        if (msg.code === "RECONNECT_FAILED" || msg.code === "START_FAILED") {
+          setSessionActive(false);
+        }
         break;
     }
   }, []);

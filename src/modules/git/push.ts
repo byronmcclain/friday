@@ -16,25 +16,20 @@ export const gitPush: FridayTool = {
 		{
 			name: "branch",
 			type: "string",
-			description:
-				"Branch to push (default: current branch)",
+			description: "Branch to push (default: current branch)",
 			required: false,
 		},
 		{
 			name: "setUpstream",
 			type: "boolean",
-			description:
-				"Set upstream tracking reference with -u (default: false)",
+			description: "Set upstream tracking reference with -u (default: false)",
 			required: false,
 			default: false,
 		},
 	],
 	clearance: ["git-write", "network"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		try {
 			const remote = (args.remote as string) ?? "origin";
 			const setUpstream = (args.setUpstream as boolean) ?? false;
@@ -62,12 +57,7 @@ export const gitPush: FridayTool = {
 				branch = branchResult.stdout.toString().trim();
 			}
 
-			const cmdParts = [
-				"git",
-				"-C",
-				context.workingDirectory,
-				"push",
-			];
+			const cmdParts = ["git", "-C", context.workingDirectory, "push"];
 			if (setUpstream) cmdParts.push("-u");
 			cmdParts.push(remote);
 			if (branch) cmdParts.push(branch);

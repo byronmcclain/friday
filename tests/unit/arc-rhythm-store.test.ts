@@ -1,8 +1,9 @@
 // tests/unit/arc-rhythm-store.test.ts
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { RhythmStore } from "../../src/arc-rhythm/store.ts";
+
 import { Database } from "bun:sqlite";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { unlink } from "node:fs/promises";
+import { RhythmStore } from "../../src/arc-rhythm/store.ts";
 
 const TEST_DB = "/tmp/friday-test-arc-rhythm.db";
 
@@ -17,11 +18,7 @@ beforeEach(() => {
 
 afterEach(async () => {
 	db.close();
-	await Promise.allSettled([
-		unlink(TEST_DB),
-		unlink(`${TEST_DB}-wal`),
-		unlink(`${TEST_DB}-shm`),
-	]);
+	await Promise.allSettled([unlink(TEST_DB), unlink(`${TEST_DB}-wal`), unlink(`${TEST_DB}-shm`)]);
 });
 
 describe("RhythmStore CRUD", () => {
@@ -64,27 +61,90 @@ describe("RhythmStore CRUD", () => {
 	});
 
 	test("list() returns all rhythms", () => {
-		store.create({ name: "A", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
-		store.create({ name: "B", description: "", cron: "0 0 * * *", enabled: false, origin: "friday", action: { type: "prompt", prompt: "b" }, nextRun: new Date(), clearance: [] });
+		store.create({
+			name: "A",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
+		store.create({
+			name: "B",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: false,
+			origin: "friday",
+			action: { type: "prompt", prompt: "b" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		expect(store.list().length).toBe(2);
 	});
 
 	test("list() filters by enabled", () => {
-		store.create({ name: "A", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
-		store.create({ name: "B", description: "", cron: "0 0 * * *", enabled: false, origin: "friday", action: { type: "prompt", prompt: "b" }, nextRun: new Date(), clearance: [] });
+		store.create({
+			name: "A",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
+		store.create({
+			name: "B",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: false,
+			origin: "friday",
+			action: { type: "prompt", prompt: "b" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		expect(store.list({ enabled: true }).length).toBe(1);
 		expect(store.list({ enabled: false }).length).toBe(1);
 	});
 
 	test("list() filters by origin", () => {
-		store.create({ name: "A", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
-		store.create({ name: "B", description: "", cron: "0 0 * * *", enabled: true, origin: "friday", action: { type: "prompt", prompt: "b" }, nextRun: new Date(), clearance: [] });
+		store.create({
+			name: "A",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
+		store.create({
+			name: "B",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "friday",
+			action: { type: "prompt", prompt: "b" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		expect(store.list({ origin: "user" }).length).toBe(1);
 		expect(store.list({ origin: "friday" }).length).toBe(1);
 	});
 
 	test("update() modifies rhythm fields", () => {
-		const created = store.create({ name: "Old", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
+		const created = store.create({
+			name: "Old",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		const updated = store.update(created.id, { name: "New", enabled: false });
 		expect(updated.name).toBe("New");
 		expect(updated.enabled).toBe(false);
@@ -95,7 +155,16 @@ describe("RhythmStore CRUD", () => {
 	});
 
 	test("remove() deletes a rhythm", () => {
-		const created = store.create({ name: "A", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
+		const created = store.create({
+			name: "A",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		store.remove(created.id);
 		expect(store.get(created.id)).toBeUndefined();
 	});
@@ -103,7 +172,16 @@ describe("RhythmStore CRUD", () => {
 
 describe("RhythmStore execution tracking", () => {
 	test("logExecution() creates an execution record", () => {
-		const rhythm = store.create({ name: "A", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
+		const rhythm = store.create({
+			name: "A",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		const exec = store.logExecution({
 			rhythmId: rhythm.id,
 			startedAt: new Date(),
@@ -114,8 +192,21 @@ describe("RhythmStore execution tracking", () => {
 	});
 
 	test("completeExecution() updates status and timestamps", () => {
-		const rhythm = store.create({ name: "A", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
-		const exec = store.logExecution({ rhythmId: rhythm.id, startedAt: new Date(), status: "running" });
+		const rhythm = store.create({
+			name: "A",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
+		const exec = store.logExecution({
+			rhythmId: rhythm.id,
+			startedAt: new Date(),
+			status: "running",
+		});
 		store.completeExecution(exec.id, "success", "All clear");
 		const history = store.getHistory(rhythm.id);
 		expect(history[0]!.status).toBe("success");
@@ -124,25 +215,73 @@ describe("RhythmStore execution tracking", () => {
 	});
 
 	test("getHistory() returns executions in reverse chronological order", () => {
-		const rhythm = store.create({ name: "A", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
-		store.logExecution({ rhythmId: rhythm.id, startedAt: new Date("2026-02-24T10:00:00Z"), status: "success" });
-		store.logExecution({ rhythmId: rhythm.id, startedAt: new Date("2026-02-24T11:00:00Z"), status: "failure" });
+		const rhythm = store.create({
+			name: "A",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
+		store.logExecution({
+			rhythmId: rhythm.id,
+			startedAt: new Date("2026-02-24T10:00:00Z"),
+			status: "success",
+		});
+		store.logExecution({
+			rhythmId: rhythm.id,
+			startedAt: new Date("2026-02-24T11:00:00Z"),
+			status: "failure",
+		});
 		const history = store.getHistory(rhythm.id);
 		expect(history.length).toBe(2);
 		expect(history[0]!.startedAt.getTime()).toBeGreaterThan(history[1]!.startedAt.getTime());
 	});
 
 	test("getHistory() respects limit", () => {
-		const rhythm = store.create({ name: "A", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
+		const rhythm = store.create({
+			name: "A",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		for (let i = 0; i < 5; i++) {
-			store.logExecution({ rhythmId: rhythm.id, startedAt: new Date(Date.now() + i * 1000), status: "success" });
+			store.logExecution({
+				rhythmId: rhythm.id,
+				startedAt: new Date(Date.now() + i * 1000),
+				status: "success",
+			});
 		}
 		expect(store.getHistory(rhythm.id, 3).length).toBe(3);
 	});
 
 	test("getHistory() without rhythmId returns all executions", () => {
-		const r1 = store.create({ name: "A", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
-		const r2 = store.create({ name: "B", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "b" }, nextRun: new Date(), clearance: [] });
+		const r1 = store.create({
+			name: "A",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
+		const r2 = store.create({
+			name: "B",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "b" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		store.logExecution({ rhythmId: r1.id, startedAt: new Date(), status: "success" });
 		store.logExecution({ rhythmId: r2.id, startedAt: new Date(), status: "success" });
 		expect(store.getHistory(undefined, 10).length).toBe(2);
@@ -152,7 +291,16 @@ describe("RhythmStore execution tracking", () => {
 describe("RhythmStore scheduling state", () => {
 	test("markExecuted() updates lastRun, lastResult, nextRun, and increments runCount", () => {
 		const nextRun = new Date("2026-02-25T09:00:00Z");
-		const rhythm = store.create({ name: "A", description: "", cron: "0 9 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date("2026-02-24T09:00:00Z"), clearance: [] });
+		const rhythm = store.create({
+			name: "A",
+			description: "",
+			cron: "0 9 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date("2026-02-24T09:00:00Z"),
+			clearance: [],
+		});
 		store.markExecuted(rhythm.id, "success", nextRun);
 		const updated = store.get(rhythm.id)!;
 		expect(updated.lastResult).toBe("success");
@@ -163,7 +311,16 @@ describe("RhythmStore scheduling state", () => {
 	});
 
 	test("markExecuted() with failure increments consecutiveFailures", () => {
-		const rhythm = store.create({ name: "A", description: "", cron: "0 9 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
+		const rhythm = store.create({
+			name: "A",
+			description: "",
+			cron: "0 9 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		store.markExecuted(rhythm.id, "failure", new Date());
 		store.markExecuted(rhythm.id, "failure", new Date());
 		const updated = store.get(rhythm.id)!;
@@ -171,7 +328,16 @@ describe("RhythmStore scheduling state", () => {
 	});
 
 	test("markExecuted() with success resets consecutiveFailures", () => {
-		const rhythm = store.create({ name: "A", description: "", cron: "0 9 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
+		const rhythm = store.create({
+			name: "A",
+			description: "",
+			cron: "0 9 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		store.markExecuted(rhythm.id, "failure", new Date());
 		store.markExecuted(rhythm.id, "failure", new Date());
 		store.markExecuted(rhythm.id, "success", new Date());
@@ -181,9 +347,36 @@ describe("RhythmStore scheduling state", () => {
 	test("getDueRhythms() returns enabled rhythms past nextRun", () => {
 		const past = new Date("2026-02-23T00:00:00Z");
 		const future = new Date("2026-02-26T00:00:00Z");
-		store.create({ name: "Due", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: past, clearance: [] });
-		store.create({ name: "NotDue", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "b" }, nextRun: future, clearance: [] });
-		store.create({ name: "Disabled", description: "", cron: "0 0 * * *", enabled: false, origin: "user", action: { type: "prompt", prompt: "c" }, nextRun: past, clearance: [] });
+		store.create({
+			name: "Due",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: past,
+			clearance: [],
+		});
+		store.create({
+			name: "NotDue",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "b" },
+			nextRun: future,
+			clearance: [],
+		});
+		store.create({
+			name: "Disabled",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: false,
+			origin: "user",
+			action: { type: "prompt", prompt: "c" },
+			nextRun: past,
+			clearance: [],
+		});
 		const now = new Date("2026-02-24T12:00:00Z");
 		const due = store.getDueRhythms(now);
 		expect(due.length).toBe(1);
@@ -191,7 +384,16 @@ describe("RhythmStore scheduling state", () => {
 	});
 
 	test("completeExecution() prunes history beyond 100 entries per rhythm", () => {
-		const rhythm = store.create({ name: "Prunable", description: "", cron: "* * * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
+		const rhythm = store.create({
+			name: "Prunable",
+			description: "",
+			cron: "* * * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		// Create 105 executions
 		const execIds: string[] = [];
 		for (let i = 0; i < 105; i++) {
@@ -210,7 +412,16 @@ describe("RhythmStore scheduling state", () => {
 	});
 
 	test("remove() cascades to rhythm_executions", () => {
-		const rhythm = store.create({ name: "A", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
+		const rhythm = store.create({
+			name: "A",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		store.logExecution({ rhythmId: rhythm.id, startedAt: new Date(), status: "success" });
 		store.remove(rhythm.id);
 		expect(store.getHistory(rhythm.id).length).toBe(0);

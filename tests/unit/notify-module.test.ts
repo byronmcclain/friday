@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { AuditLogger } from "../../src/audit/logger.ts";
+import { type FridayNotification, NotificationManager } from "../../src/core/notifications.ts";
 import notifyModule from "../../src/modules/notify/index.ts";
 import { notifySend } from "../../src/modules/notify/send.ts";
 import type { ToolContext } from "../../src/modules/types.ts";
-import { NotificationManager, type FridayNotification } from "../../src/core/notifications.ts";
 
 let mockWebhookServer: ReturnType<typeof Bun.serve>;
 let mockWebhookUrl: string;
@@ -39,7 +39,9 @@ function ctxWithNotifications() {
 	const notifications = new NotificationManager();
 	notifications.addChannel({
 		name: "test",
-		async send(n: FridayNotification) { sent.push(n); },
+		async send(n: FridayNotification) {
+			sent.push(n);
+		},
 	});
 	return {
 		ctx: { ...ctx, notifications } satisfies ToolContext,
@@ -89,10 +91,7 @@ describe("notify.send", () => {
 	});
 
 	test("rejects unsupported channel", async () => {
-		const result = await notifySend.execute(
-			{ title: "test", body: "test", channel: "sms" },
-			ctx,
-		);
+		const result = await notifySend.execute({ title: "test", body: "test", channel: "sms" }, ctx);
 		expect(result.success).toBe(false);
 		expect(result.output).toContain("Unsupported channel");
 	});
@@ -107,19 +106,13 @@ describe("notify.send", () => {
 	});
 
 	test("fails for slack without URL when no local channels", async () => {
-		const result = await notifySend.execute(
-			{ title: "test", body: "test", channel: "slack" },
-			ctx,
-		);
+		const result = await notifySend.execute({ title: "test", body: "test", channel: "slack" }, ctx);
 		expect(result.success).toBe(false);
 		expect(result.output).toContain("No Slack webhook URL");
 	});
 
 	test("fails for email without URL when no local channels", async () => {
-		const result = await notifySend.execute(
-			{ title: "test", body: "test", channel: "email" },
-			ctx,
-		);
+		const result = await notifySend.execute({ title: "test", body: "test", channel: "email" }, ctx);
 		expect(result.success).toBe(false);
 		expect(result.output).toContain("No email webhook URL");
 	});
@@ -148,10 +141,17 @@ describe("notify.send", () => {
 
 	test("sends webhook notification successfully", async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = Object.assign(async () => new Response("ok", { status: 200 }), { preconnect: globalThis.fetch.preconnect }) as typeof fetch;
+		globalThis.fetch = Object.assign(async () => new Response("ok", { status: 200 }), {
+			preconnect: globalThis.fetch.preconnect,
+		}) as typeof fetch;
 		try {
 			const result = await notifySend.execute(
-				{ title: "Test Alert", body: "Something happened", channel: "webhook", url: "https://hooks.example.com/webhook" },
+				{
+					title: "Test Alert",
+					body: "Something happened",
+					channel: "webhook",
+					url: "https://hooks.example.com/webhook",
+				},
 				ctx,
 			);
 			expect(result.success).toBe(true);
@@ -165,10 +165,17 @@ describe("notify.send", () => {
 
 	test("sends slack notification successfully", async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = Object.assign(async () => new Response("ok", { status: 200 }), { preconnect: globalThis.fetch.preconnect }) as typeof fetch;
+		globalThis.fetch = Object.assign(async () => new Response("ok", { status: 200 }), {
+			preconnect: globalThis.fetch.preconnect,
+		}) as typeof fetch;
 		try {
 			const result = await notifySend.execute(
-				{ title: "Slack Test", body: "Hello Slack", channel: "slack", url: "https://hooks.slack.com/test" },
+				{
+					title: "Slack Test",
+					body: "Hello Slack",
+					channel: "slack",
+					url: "https://hooks.slack.com/test",
+				},
 				ctx,
 			);
 			expect(result.success).toBe(true);
@@ -197,11 +204,18 @@ describe("notify.send", () => {
 
 	test("fires local notification even when external channel also dispatches", async () => {
 		const originalFetch = globalThis.fetch;
-		globalThis.fetch = Object.assign(async () => new Response("ok", { status: 200 }), { preconnect: globalThis.fetch.preconnect }) as typeof fetch;
+		globalThis.fetch = Object.assign(async () => new Response("ok", { status: 200 }), {
+			preconnect: globalThis.fetch.preconnect,
+		}) as typeof fetch;
 		try {
 			const { ctx: localCtx, sent } = ctxWithNotifications();
 			const result = await notifySend.execute(
-				{ title: "Dual", body: "Both paths", channel: "webhook", url: "https://hooks.example.com/webhook" },
+				{
+					title: "Dual",
+					body: "Both paths",
+					channel: "webhook",
+					url: "https://hooks.example.com/webhook",
+				},
 				localCtx,
 			);
 			expect(result.success).toBe(true);
@@ -228,10 +242,7 @@ describe("notify.send", () => {
 
 	test("default level is info for local notifications", async () => {
 		const { ctx: localCtx, sent } = ctxWithNotifications();
-		await notifySend.execute(
-			{ title: "Default Level", body: "Should be info" },
-			localCtx,
-		);
+		await notifySend.execute({ title: "Default Level", body: "Should be info" }, localCtx);
 		expect(sent).toHaveLength(1);
 		expect(sent[0]!.level).toBe("info");
 	});

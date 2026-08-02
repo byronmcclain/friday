@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
-import { PALETTE, FRIDAY_SYNTAX_STYLE, BOLD, DIM } from "../theme.ts";
+import { useEffect, useRef, useState } from "react";
 import type { Message as MessageType } from "../state.ts";
+import { BOLD, DIM, FRIDAY_SYNTAX_STYLE, PALETTE } from "../theme.ts";
 
 const STREAM_THROTTLE_MS = 150;
 
@@ -32,9 +32,12 @@ function useThrottled(value: string, ms: number, active: boolean): string {
 		}
 	}, [value, ms, active]);
 
-	useEffect(() => () => {
-		if (timerRef.current) clearTimeout(timerRef.current);
-	}, []);
+	useEffect(
+		() => () => {
+			if (timerRef.current) clearTimeout(timerRef.current);
+		},
+		[],
+	);
 
 	return display;
 }
@@ -56,10 +59,7 @@ export function _normalizeContent(text: string): string {
 
 	// 2. Insert blank line before pipe tables not already preceded by a blank line.
 	//    Matches: non-blank line, then a table header row, then a delimiter row.
-	result = result.replace(
-		/([^\n])\n(\|.+\|)\n(\|[\s:]*-[-\s:|]*\|)/g,
-		"$1\n\n$2\n$3",
-	);
+	result = result.replace(/([^\n])\n(\|.+\|)\n(\|[\s:]*-[-\s:|]*\|)/g, "$1\n\n$2\n$3");
 
 	// 3. Insert blank line before opening fenced code blocks not already preceded by a blank line.
 	//    Only matches opening fences (```<lang>) — closing fences (bare ```) are left alone.
@@ -104,8 +104,7 @@ export function Message({ message, streaming }: MessageProps) {
 
 	if (role === "system") {
 		const isError =
-			content.toLowerCase().startsWith("error") ||
-			content.toLowerCase().startsWith("boot failed");
+			content.toLowerCase().startsWith("error") || content.toLowerCase().startsWith("boot failed");
 		return (
 			<box paddingLeft={1}>
 				<text

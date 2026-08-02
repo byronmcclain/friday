@@ -1,5 +1,5 @@
-import { describe, test, expect } from "bun:test";
-import { PALETTE, FRIDAY_SYNTAX_STYLE } from "../../src/cli/tui/theme.ts";
+import { describe, expect, test } from "bun:test";
+import { FRIDAY_SYNTAX_STYLE, PALETTE } from "../../src/cli/tui/theme.ts";
 
 describe("TUI theme", () => {
 	test("PALETTE contains all required color roles", () => {
@@ -18,9 +18,7 @@ describe("TUI theme", () => {
 		];
 		for (const role of required) {
 			expect(PALETTE).toHaveProperty(role);
-			expect((PALETTE as Record<string, string>)[role]).toMatch(
-				/^#[0-9A-Fa-f]{6}$/,
-			);
+			expect((PALETTE as Record<string, string>)[role]).toMatch(/^#[0-9A-Fa-f]{6}$/);
 		}
 	});
 

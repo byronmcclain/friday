@@ -1,8 +1,8 @@
-import type { SmartsStore } from "./store.ts";
-import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { LanguageModelV4 } from "@ai-sdk/provider";
 import { generateText } from "ai";
 import { type ConversationMessage, getTextContent } from "../core/types.ts";
 import { withTimeout } from "../utils/timeout.ts";
+import type { SmartsStore } from "./store.ts";
 
 const MIN_MESSAGES_FOR_EXTRACTION = 4;
 
@@ -101,7 +101,6 @@ Existing knowledge entries (do NOT create duplicates — use "action": "update" 
 ${existingNames.map((n) => `- ${n}`).join("\n")}`;
 }
 
-
 interface ExtractedSmart {
 	action?: "create" | "update";
 	name: string;
@@ -114,7 +113,7 @@ interface ExtractedSmart {
 export class SmartsCurator {
 	constructor(
 		private store: SmartsStore,
-		private languageModel: LanguageModelV3,
+		private languageModel: LanguageModelV4,
 	) {}
 
 	async extractFromConversation(messages: ConversationMessage[]): Promise<void> {
@@ -149,9 +148,9 @@ export class SmartsCurator {
 					const existing = await this.store.getByName(smart.name);
 					if (existing) {
 						await this.store.update(smart.name, smart.content, {
-						tags: smart.tags,
-						confidence: cappedConfidence,
-					});
+							tags: smart.tags,
+							confidence: cappedConfidence,
+						});
 						continue;
 					}
 					// Entry not found — fall through to create

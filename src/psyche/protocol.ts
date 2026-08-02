@@ -1,9 +1,5 @@
 // src/psyche/protocol.ts
-import type {
-	FridayProtocol,
-	ProtocolResult,
-	ProtocolContext,
-} from "../modules/types.ts";
+import type { FridayProtocol, ProtocolContext, ProtocolResult } from "../modules/types.ts";
 import type { PsycheStore } from "./store.ts";
 import { getDimensionLabel } from "./types.ts";
 
@@ -48,18 +44,14 @@ function handleStatus(store: PsycheStore): ProtocolResult {
 	if (dims.length === 0) {
 		return {
 			success: true,
-			summary:
-				"No emotional state initialized yet. Psyche will activate after the first session.",
+			summary: "No emotional state initialized yet. Psyche will activate after the first session.",
 		};
 	}
 
 	const lines: string[] = ["**Relational Dimensions:**"];
 	for (const d of dims) {
 		const label = getDimensionLabel(d.name);
-		const desc =
-			d.description.length > 80
-				? `${d.description.slice(0, 80)}...`
-				: d.description;
+		const desc = d.description.length > 80 ? `${d.description.slice(0, 80)}...` : d.description;
 		lines.push(`- **${label}:** ${desc}`);
 	}
 
@@ -98,9 +90,7 @@ function handleMilestones(store: PsycheStore): ProtocolResult {
 	const lines = milestones.map((m) => {
 		const date = m.occurredAt.slice(0, 10);
 		const decay =
-			m.relevanceDecay < 1.0
-				? ` (relevance: ${(m.relevanceDecay * 100).toFixed(0)}%)`
-				: "";
+			m.relevanceDecay < 1.0 ? ` (relevance: ${(m.relevanceDecay * 100).toFixed(0)}%)` : "";
 		return `- **[${date}]** ${m.summary} *(${m.emotionalType})*${decay}`;
 	});
 	return { success: true, summary: lines.join("\n") };

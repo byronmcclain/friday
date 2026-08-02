@@ -8,10 +8,7 @@ export interface ColorSpan {
 
 export type ParsedLine = ColorSpan[];
 
-function parseSgrParams(
-	params: number[],
-	state: { fg?: string; bg?: string },
-): void {
+function parseSgrParams(params: number[], state: { fg?: string; bg?: string }): void {
 	let i = 0;
 	while (i < params.length) {
 		const p = params[i]!;
@@ -21,11 +18,7 @@ function parseSgrParams(
 			i++;
 		} else if (p === 38) {
 			if (params[i + 1] === 2) {
-				state.fg = rgbToHex(
-					params[i + 2] ?? 0,
-					params[i + 3] ?? 0,
-					params[i + 4] ?? 0,
-				);
+				state.fg = rgbToHex(params[i + 2] ?? 0, params[i + 3] ?? 0, params[i + 4] ?? 0);
 				i += 5;
 			} else if (params[i + 1] === 5) {
 				state.fg = ansi256ToHex(params[i + 2] ?? 0);
@@ -35,11 +28,7 @@ function parseSgrParams(
 			}
 		} else if (p === 48) {
 			if (params[i + 1] === 2) {
-				state.bg = rgbToHex(
-					params[i + 2] ?? 0,
-					params[i + 3] ?? 0,
-					params[i + 4] ?? 0,
-				);
+				state.bg = rgbToHex(params[i + 2] ?? 0, params[i + 3] ?? 0, params[i + 4] ?? 0);
 				i += 5;
 			} else if (params[i + 1] === 5) {
 				state.bg = ansi256ToHex(params[i + 2] ?? 0);
@@ -95,20 +84,16 @@ export function parseAnsiLine(line: string): ParsedLine {
 
 	// biome-ignore lint/suspicious/noControlCharactersInRegex: parsing ANSI escape codes
 	const regex = /\x1b\[([0-9;]*)m|\x1b\[\??[0-9;]*[A-Za-z]|([^\x1b]+)/g;
-	let match: RegExpExecArray | null;
+	let match = regex.exec(line);
 
-	while ((match = regex.exec(line)) !== null) {
+	while (match !== null) {
 		if (match[1] !== undefined) {
 			const params = match[1].split(";").map(Number);
 			parseSgrParams(params, state);
 		} else if (match[2]) {
 			const text = match[2];
 			const lastSpan = spans[spans.length - 1];
-			if (
-				lastSpan &&
-				lastSpan.fg === state.fg &&
-				lastSpan.bg === state.bg
-			) {
+			if (lastSpan && lastSpan.fg === state.fg && lastSpan.bg === state.bg) {
 				lastSpan.text += text;
 			} else {
 				const span: ColorSpan = { text };
@@ -117,6 +102,7 @@ export function parseAnsiLine(line: string): ParsedLine {
 				spans.push(span);
 			}
 		}
+		match = regex.exec(line);
 	}
 
 	if (spans.length === 0 && line.length > 0) {

@@ -1,16 +1,14 @@
 import type { ReactNode } from "react";
+import type { Message as MessageType, ToolInfo, WelcomeInfo } from "../state.ts";
 import { PALETTE } from "../theme.ts";
 import { Message } from "./message.tsx";
 import { ThinkingIndicator } from "./thinking.tsx";
 import { Welcome } from "./welcome.tsx";
-import type { Message as MessageType, WelcomeInfo, ToolInfo } from "../state.ts";
 
 function TurnSeparator() {
 	return (
 		<box paddingLeft={1} paddingRight={1}>
-			<text fg={PALETTE.borderDim}>
-				{"─".repeat(60)}
-			</text>
+			<text fg={PALETTE.borderDim}>{"─".repeat(60)}</text>
 		</box>
 	);
 }
@@ -23,7 +21,13 @@ interface ChatAreaProps {
 	currentTool?: ToolInfo | null;
 }
 
-export function ChatArea({ messages, isThinking, isStreaming, welcomeInfo, currentTool }: ChatAreaProps) {
+export function ChatArea({
+	messages,
+	isThinking,
+	isStreaming,
+	welcomeInfo,
+	currentTool,
+}: ChatAreaProps) {
 	const hasUserMessage = messages.some((m) => m.role === "user");
 
 	// Build elements with turn separators between conversation turns
@@ -70,9 +74,7 @@ export function ChatArea({ messages, isThinking, isStreaming, welcomeInfo, curre
 				},
 			}}
 		>
-			{!hasUserMessage && welcomeInfo && (
-				<Welcome model={welcomeInfo.model} />
-			)}
+			{!hasUserMessage && welcomeInfo && <Welcome model={welcomeInfo.model} />}
 			{elements}
 			{isThinking && <ThinkingIndicator currentTool={currentTool} />}
 		</scrollbox>

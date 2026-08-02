@@ -96,6 +96,5 @@ export const NEUTRAL_SEED_DIMENSIONS: Record<DimensionName, string> = {
 	emotional_openness:
 		"Baseline. No emotional patterns observed yet. Pay attention to communication style.",
 	shared_history: "None yet. Everything from here is first.",
-	current_energy:
-		"Fresh start. Open, attentive, ready to learn who this person is.",
+	current_energy: "Fresh start. Open, attentive, ready to learn who this person is.",
 };

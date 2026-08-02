@@ -1,8 +1,5 @@
-import { describe, test, expect } from "bun:test";
-import {
-	processLogo,
-	checkChafa,
-} from "../../src/cli/tui/lib/logo-processor.ts";
+import { describe, expect, test } from "bun:test";
+import { checkChafa, processLogo } from "../../src/cli/tui/lib/logo-processor.ts";
 
 describe("checkChafa", () => {
 	test("returns true when chafa binary exists", () => {
@@ -15,8 +12,7 @@ describe("checkChafa", () => {
 describe("processLogo", () => {
 	test("returns LogoData with parsedLines and dimensions", async () => {
 		// Uses actual chafa with the project logo
-		const logoPath = new URL("../../friday-logo.jpeg", import.meta.url)
-			.pathname;
+		const logoPath = new URL("../../friday-logo.jpeg", import.meta.url).pathname;
 		const data = await processLogo(logoPath, 20, 10);
 
 		expect(data).not.toBeNull();

@@ -1,9 +1,5 @@
-import type {
-	ForgeManifest,
-	ForgeModuleEntry,
-	ForgeHistoryEntry,
-} from "./types.ts";
 import { resolve } from "node:path";
+import type { ForgeHistoryEntry, ForgeManifest, ForgeModuleEntry } from "./types.ts";
 
 export class ForgeManifestManager {
 	private manifestPath: string;
@@ -104,10 +100,7 @@ export class ForgeManifestManager {
 		});
 	}
 
-	async setStatus(
-		name: string,
-		status: ForgeModuleEntry["status"],
-	): Promise<void> {
+	async setStatus(name: string, status: ForgeModuleEntry["status"]): Promise<void> {
 		return this.withLock(async () => {
 			const manifest = await this._load();
 			const entry = manifest.modules[name];

@@ -1,12 +1,12 @@
 // tests/unit/arc-rhythm-executor.test.ts
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { RhythmExecutor } from "../../src/arc-rhythm/executor.ts";
+import type { Rhythm } from "../../src/arc-rhythm/types.ts";
+import { AuditLogger } from "../../src/audit/logger.ts";
+import { ClearanceManager } from "../../src/core/clearance.ts";
 import { Cortex } from "../../src/core/cortex.ts";
 import { ProtocolRegistry } from "../../src/protocols/registry.ts";
-import { ClearanceManager } from "../../src/core/clearance.ts";
-import { AuditLogger } from "../../src/audit/logger.ts";
 import { createMockModel } from "../helpers/stubs.ts";
-import type { Rhythm } from "../../src/arc-rhythm/types.ts";
 
 let executor: RhythmExecutor;
 let cortex: Cortex;
@@ -87,7 +87,10 @@ describe("RhythmExecutor", () => {
 	test("returns failure when clearance is denied", async () => {
 		const restrictedClearance = new ClearanceManager([]);
 		const restrictedExecutor = new RhythmExecutor({
-			cortex, protocols, clearance: restrictedClearance, audit,
+			cortex,
+			protocols,
+			clearance: restrictedClearance,
+			audit,
 		});
 		const rhythm = makeRhythm({ clearance: ["system"] });
 		const result = await restrictedExecutor.execute(rhythm);
@@ -99,7 +102,10 @@ describe("RhythmExecutor", () => {
 		const restrictedClearance = new ClearanceManager([]);
 		const restrictedAudit = new AuditLogger();
 		const restrictedExecutor = new RhythmExecutor({
-			cortex, protocols, clearance: restrictedClearance, audit: restrictedAudit,
+			cortex,
+			protocols,
+			clearance: restrictedClearance,
+			audit: restrictedAudit,
 		});
 		const rhythm = makeRhythm({ name: "Blocked Beat", clearance: ["system"] });
 		await restrictedExecutor.execute(rhythm);
@@ -134,7 +140,9 @@ describe("RhythmExecutor", () => {
 			description: "test",
 			parameters: [],
 			clearance: [],
-			execute: async () => { throw new Error("boom"); },
+			execute: async () => {
+				throw new Error("boom");
+			},
 		});
 		const rhythm = makeRhythm({
 			action: { type: "tool", tool: "failing_tool" },

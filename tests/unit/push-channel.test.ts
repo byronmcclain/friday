@@ -1,6 +1,6 @@
-import { describe, test, expect } from "bun:test";
-import { PushNotificationChannel } from "../../src/server/push-channel.ts";
+import { describe, expect, test } from "bun:test";
 import type { FridayNotification } from "../../src/core/notifications.ts";
+import { PushNotificationChannel } from "../../src/server/push-channel.ts";
 
 describe("PushNotificationChannel", () => {
 	test("sends notification to registered callback", async () => {

@@ -1,12 +1,12 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { useKeyboard, useTerminalDimensions } from "@opentui/react";
-import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core";
-import { PALETTE, BOLD, DIM } from "../theme.ts";
-import { filterCommands, type TypeaheadEntry } from "../filter-commands.ts";
-import { usePulse } from "../lib/use-pulse.ts";
-import { lerpColor } from "../lib/color-utils.ts";
-import { consumePendingEditorResult } from "../app.tsx";
 import { platform } from "node:os";
+import type { ScrollBoxRenderable, TextareaRenderable } from "@opentui/core";
+import { useKeyboard, useTerminalDimensions } from "@opentui/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { consumePendingEditorResult } from "../app.tsx";
+import { filterCommands, type TypeaheadEntry } from "../filter-commands.ts";
+import { lerpColor } from "../lib/color-utils.ts";
+import { usePulse } from "../lib/use-pulse.ts";
+import { BOLD, DIM, PALETTE } from "../theme.ts";
 
 const MAX_SUGGESTIONS = 25;
 const VISIBLE_ROWS = 10;
@@ -128,10 +128,7 @@ export function CommandTypeahead({
 	);
 	const suggestions =
 		!suggestionsBlocked && shadow.startsWith("/") && !shadow.includes(" ")
-			? filterCommands(sortedCommands, shadow.slice(1)).slice(
-					0,
-					MAX_SUGGESTIONS,
-				)
+			? filterCommands(sortedCommands, shadow.slice(1)).slice(0, MAX_SUGGESTIONS)
 			: [];
 	const hasSuggestions = suggestions.length > 0;
 
@@ -231,8 +228,7 @@ export function CommandTypeahead({
 				// Push to history (skip consecutive duplicates)
 				if (historyRef.current[0] !== trimmed) {
 					historyRef.current.unshift(trimmed);
-					if (historyRef.current.length > MAX_HISTORY)
-						historyRef.current.pop();
+					if (historyRef.current.length > MAX_HISTORY) historyRef.current.pop();
 				}
 				historyIndexRef.current = -1;
 				onSubmit(trimmed);
@@ -246,14 +242,15 @@ export function CommandTypeahead({
 		if (key.name === "up") {
 			if (hasSuggestions) {
 				key.preventDefault();
-				setSelectedIndex((i) =>
-					i <= 0 ? suggestions.length - 1 : i - 1,
-				);
+				setSelectedIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
 				return;
 			}
 			// Read cursor position directly from textarea ref — state may be stale
 			const currentLine = textareaRef.current?.logicalCursor.row ?? 0;
-			const currentLineCount = computeInputHeight(textareaRef.current?.plainText ?? "", textareaWidthRef.current);
+			const currentLineCount = computeInputHeight(
+				textareaRef.current?.plainText ?? "",
+				textareaWidthRef.current,
+			);
 			// Multi-line: let textarea handle cursor movement unless on first line
 			if (currentLineCount > 1 && currentLine > 0) {
 				return; // don't preventDefault — textarea moves cursor up
@@ -263,13 +260,9 @@ export function CommandTypeahead({
 				if (historyIndexRef.current === -1) {
 					savedCurrentRef.current = shadowRef.current;
 				}
-				if (
-					historyIndexRef.current <
-					historyRef.current.length - 1
-				) {
+				if (historyIndexRef.current < historyRef.current.length - 1) {
 					historyIndexRef.current++;
-					const entry =
-						historyRef.current[historyIndexRef.current];
+					const entry = historyRef.current[historyIndexRef.current];
 					if (entry !== undefined) replaceInput(entry);
 				}
 			}
@@ -280,14 +273,15 @@ export function CommandTypeahead({
 		if (key.name === "down") {
 			if (hasSuggestions) {
 				key.preventDefault();
-				setSelectedIndex((i) =>
-					i >= suggestions.length - 1 ? 0 : i + 1,
-				);
+				setSelectedIndex((i) => (i >= suggestions.length - 1 ? 0 : i + 1));
 				return;
 			}
 			// Read cursor position directly from textarea ref — state may be stale
 			const currentLineDown = textareaRef.current?.logicalCursor.row ?? 0;
-			const currentLineCountDown = computeInputHeight(textareaRef.current?.plainText ?? "", textareaWidthRef.current);
+			const currentLineCountDown = computeInputHeight(
+				textareaRef.current?.plainText ?? "",
+				textareaWidthRef.current,
+			);
 			// Multi-line: let textarea handle cursor movement unless on last line
 			if (currentLineCountDown > 1 && currentLineDown < currentLineCountDown - 1) {
 				return; // don't preventDefault — textarea moves cursor down
@@ -296,8 +290,7 @@ export function CommandTypeahead({
 			if (historyIndexRef.current >= 0) {
 				if (historyIndexRef.current > 0) {
 					historyIndexRef.current--;
-					const entry =
-						historyRef.current[historyIndexRef.current];
+					const entry = historyRef.current[historyIndexRef.current];
 					if (entry !== undefined) replaceInput(entry);
 				} else {
 					historyIndexRef.current = -1;
@@ -375,30 +368,14 @@ export function CommandTypeahead({
 									key={entry.name}
 									flexDirection="row"
 									width="100%"
-									backgroundColor={
-										selected
-											? PALETTE.surfaceLight
-											: undefined
-									}
+									backgroundColor={selected ? PALETTE.surfaceLight : undefined}
 									paddingLeft={1}
 									paddingRight={1}
 								>
-									<text
-										fg={
-											selected
-												? PALETTE.amberGlow
-												: PALETTE.amberPrimary
-										}
-									>
+									<text fg={selected ? PALETTE.amberGlow : PALETTE.amberPrimary}>
 										{selected ? `❯ /${entry.name}` : `  /${entry.name}`}
 									</text>
-									<text
-										fg={
-											selected
-												? PALETTE.textPrimary
-												: PALETTE.textMuted
-										}
-									>
+									<text fg={selected ? PALETTE.textPrimary : PALETTE.textMuted}>
 										{`  ${entry.description}`}
 									</text>
 								</box>
@@ -410,11 +387,7 @@ export function CommandTypeahead({
 
 			{/* Input row: glyph + input field + character count */}
 			<box flexDirection="row" gap={1} width="100%">
-				<PromptGlyph
-					isThinking={isThinking}
-					isStreaming={isStreaming}
-					disabled={disabled}
-				/>
+				<PromptGlyph isThinking={isThinking} isStreaming={isStreaming} disabled={disabled} />
 				<textarea
 					ref={textareaRef}
 					key={inputKey}

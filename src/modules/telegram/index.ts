@@ -1,20 +1,19 @@
 import type { FridayModule, ModuleContext } from "../types.ts";
+import { TelegramChannel } from "./channel.ts";
 import { TelegramClient } from "./client.ts";
 import { TelegramListener } from "./listener.ts";
-import { TelegramChannel } from "./channel.ts";
-import { telegramSend } from "./tools/send.ts";
 import { telegramProtocol } from "./protocol.ts";
 import {
-	setTelegramClient,
-	setTelegramListener,
 	getTelegramClient,
 	getTelegramListener,
+	setTelegramClient,
+	setTelegramListener,
 } from "./state.ts";
+import { telegramSend } from "./tools/send.ts";
 
 const telegramModule = {
 	name: "telegram",
-	description:
-		"Telegram bot — chat with Friday from your phone, receive notifications and alerts.",
+	description: "Telegram bot — chat with Friday from your phone, receive notifications and alerts.",
 	version: "1.0.0",
 	tools: [telegramSend],
 	protocols: [telegramProtocol],
@@ -25,9 +24,7 @@ const telegramModule = {
 	async onLoad(context: ModuleContext) {
 		const token = process.env.TELEGRAM_BOT_TOKEN;
 		if (!token) {
-			console.warn(
-				"[Telegram] TELEGRAM_BOT_TOKEN not set — Telegram module inactive.",
-			);
+			console.warn("[Telegram] TELEGRAM_BOT_TOKEN not set — Telegram module inactive.");
 			return;
 		}
 
@@ -63,10 +60,12 @@ const telegramModule = {
 		// Send session separator to owner on Telegram so they know context is fresh
 		const chatId = client.getOwnerChatId();
 		if (chatId) {
-			client.sendMessage(
-				chatId,
-				"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔄 *Friday restarted — new session*\n_My active context is fresh, but I can recall past conversations via memory._\n━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-			).catch(() => {}); // Fire-and-forget — don't block boot if Telegram is unreachable
+			client
+				.sendMessage(
+					chatId,
+					"━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔄 *Friday restarted — new session*\n_My active context is fresh, but I can recall past conversations via memory._\n━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+				)
+				.catch(() => {}); // Fire-and-forget — don't block boot if Telegram is unreachable
 		}
 	},
 

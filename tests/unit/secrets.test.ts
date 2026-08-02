@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { SecretStore } from "../../src/core/secrets.ts";
 import type { ScopedMemory } from "../../src/core/memory.ts";
+import { SecretStore } from "../../src/core/secrets.ts";
 
 function createMemoryStub(): ScopedMemory {
 	const store = new Map<string, unknown>();
@@ -62,7 +62,6 @@ describe("SecretStore.decodeEnvKey", () => {
 		expect(decoded).toEqual(expected);
 	});
 });
-
 
 describe("SecretStore", () => {
 	test("encrypt then decrypt returns original value", async () => {

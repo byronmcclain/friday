@@ -3,8 +3,7 @@ import { assertSafeArg } from "../validation.ts";
 
 export const dockerStop: FridayTool = {
 	name: "docker.stop",
-	description:
-		"Stop a running Docker container. Optionally remove it after stopping.",
+	description: "Stop a running Docker container. Optionally remove it after stopping.",
 	parameters: [
 		{
 			name: "container",
@@ -22,18 +21,14 @@ export const dockerStop: FridayTool = {
 		{
 			name: "timeout",
 			type: "number",
-			description:
-				"Seconds to wait before force-killing (default: 10)",
+			description: "Seconds to wait before force-killing (default: 10)",
 			required: false,
 			default: 10,
 		},
 	],
 	clearance: ["exec-shell"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const container = args.container as string;
 		if (!container) {
 			return {
@@ -49,25 +44,19 @@ export const dockerStop: FridayTool = {
 			const remove = (args.remove as boolean) ?? false;
 			const timeout = Math.max(1, (args.timeout as number) ?? 10);
 
-			const stopResult =
-				await Bun.$`docker stop -t ${timeout} ${container}`
-					.quiet()
-					.nothrow();
+			const stopResult = await Bun.$`docker stop -t ${timeout} ${container}`.quiet().nothrow();
 
 			if (stopResult.exitCode !== 0) {
 				return {
 					success: false,
-					output:
-						stopResult.stderr.toString().trim() ||
-						`Failed to stop ${container}`,
+					output: stopResult.stderr.toString().trim() || `Failed to stop ${container}`,
 				};
 			}
 
 			let output = `Stopped container ${container}`;
 
 			if (remove) {
-				const rmResult =
-					await Bun.$`docker rm ${container}`.quiet().nothrow();
+				const rmResult = await Bun.$`docker rm ${container}`.quiet().nothrow();
 				if (rmResult.exitCode !== 0) {
 					return {
 						success: false,

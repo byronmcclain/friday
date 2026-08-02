@@ -1,10 +1,10 @@
-import { describe, test, expect, mock } from "bun:test";
-import { Cortex } from "../../src/core/cortex.ts";
-import { createMockModel, buildUsage } from "../helpers/stubs.ts";
-import { AuditLogger } from "../../src/audit/logger.ts";
-import { MockLanguageModelV3 } from "ai/test";
+import { describe, expect, mock, test } from "bun:test";
+import type { LanguageModelV4StreamPart } from "@ai-sdk/provider";
 import { simulateReadableStream } from "ai";
-import type { LanguageModelV3StreamPart } from "@ai-sdk/provider";
+import { MockLanguageModelV4 } from "ai/test";
+import { AuditLogger } from "../../src/audit/logger.ts";
+import { Cortex } from "../../src/core/cortex.ts";
+import { buildUsage, createMockModel } from "../helpers/stubs.ts";
 
 describe("Cortex (AI SDK)", () => {
 	test("chat returns text response", async () => {
@@ -93,9 +93,7 @@ describe("Cortex (AI SDK)", () => {
 		});
 		await cortex.chat("test");
 
-		const debugEntry = entries.find(
-			(e) => e.action === "debug:system-prompt",
-		);
+		const debugEntry = entries.find((e) => e.action === "debug:system-prompt");
 		expect(debugEntry).toBeDefined();
 	});
 
@@ -109,20 +107,18 @@ describe("Cortex (AI SDK)", () => {
 });
 
 // Helper: creates a mock model that returns different text per call
-function createSequencingModel(responses: string[]): MockLanguageModelV3 {
+function createSequencingModel(responses: string[]): MockLanguageModelV4 {
 	let callCount = 0;
-	return new MockLanguageModelV3({
+	return new MockLanguageModelV4({
 		doStream: async () => {
 			const text = responses[callCount] ?? "";
 			callCount++;
 			const usage = buildUsage();
 			return {
-				stream: simulateReadableStream<LanguageModelV3StreamPart>({
+				stream: simulateReadableStream<LanguageModelV4StreamPart>({
 					chunks: [
 						{ type: "text-start" as const, id: "text-0" },
-						...(text
-							? [{ type: "text-delta" as const, id: "text-0", delta: text }]
-							: []),
+						...(text ? [{ type: "text-delta" as const, id: "text-0", delta: text }] : []),
 						{ type: "text-end" as const, id: "text-0" },
 						{
 							type: "finish" as const,
@@ -168,37 +164,43 @@ describe("Cortex — empty response guard", () => {
 	test("audit logs inference:empty on empty response", async () => {
 		const audit = new AuditLogger();
 		const entries: Array<{ action: string; detail: string }> = [];
-		audit.log = (entry: any) => { entries.push(entry); };
+		audit.log = (entry: any) => {
+			entries.push(entry);
+		};
 
 		const model = createSequencingModel(["", "ok"]);
 		const cortex = new Cortex({ injectedModel: model, audit });
 		await cortex.chat("test");
 
-		expect(entries.some(e => e.action === "inference:empty")).toBe(true);
+		expect(entries.some((e) => e.action === "inference:empty")).toBe(true);
 	});
 
 	test("audit logs retry-success when retry recovers", async () => {
 		const audit = new AuditLogger();
 		const entries: Array<{ action: string; detail: string }> = [];
-		audit.log = (entry: any) => { entries.push(entry); };
+		audit.log = (entry: any) => {
+			entries.push(entry);
+		};
 
 		const model = createSequencingModel(["", "recovered"]);
 		const cortex = new Cortex({ injectedModel: model, audit });
 		await cortex.chat("test");
 
-		expect(entries.some(e => e.action === "inference:retry-success")).toBe(true);
+		expect(entries.some((e) => e.action === "inference:retry-success")).toBe(true);
 	});
 
 	test("audit logs empty-fallback when all retries fail", async () => {
 		const audit = new AuditLogger();
 		const entries: Array<{ action: string; detail: string }> = [];
-		audit.log = (entry: any) => { entries.push(entry); };
+		audit.log = (entry: any) => {
+			entries.push(entry);
+		};
 
 		const model = createSequencingModel(["", "", ""]);
 		const cortex = new Cortex({ injectedModel: model, audit });
 		await cortex.chat("test");
 
-		expect(entries.some(e => e.action === "inference:empty-fallback")).toBe(true);
+		expect(entries.some((e) => e.action === "inference:empty-fallback")).toBe(true);
 	});
 
 	test("normal non-empty response is unaffected", async () => {

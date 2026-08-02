@@ -1,16 +1,16 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { AuditLogger } from "../../src/audit/logger.ts";
-import { Vox } from "../../src/core/voice/vox.ts";
-import { SignalBus } from "../../src/core/events.ts";
-import { NotificationManager } from "../../src/core/notifications.ts";
-import { ClearanceManager } from "../../src/core/clearance.ts";
-import { VOX_DEFAULTS } from "../../src/core/voice/types.ts";
-import { FridayRuntime } from "../../src/core/runtime.ts";
-import { createMockModel } from "../helpers/stubs.ts";
-import { createRecallTool } from "../../src/core/recall-tool.ts";
-import { SQLiteMemory } from "../../src/core/memory.ts";
-import type { ToolContext } from "../../src/modules/types.ts";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { unlink } from "node:fs/promises";
+import { AuditLogger } from "../../src/audit/logger.ts";
+import { ClearanceManager } from "../../src/core/clearance.ts";
+import { SignalBus } from "../../src/core/events.ts";
+import { SQLiteMemory } from "../../src/core/memory.ts";
+import { NotificationManager } from "../../src/core/notifications.ts";
+import { createRecallTool } from "../../src/core/recall-tool.ts";
+import { FridayRuntime } from "../../src/core/runtime.ts";
+import { VOX_DEFAULTS } from "../../src/core/voice/types.ts";
+import { Vox } from "../../src/core/voice/vox.ts";
+import type { ToolContext } from "../../src/modules/types.ts";
+import { createMockModel } from "../helpers/stubs.ts";
 
 // ---------------------------------------------------------------------------
 // Vox lifecycle audit logging
@@ -22,10 +22,23 @@ const TEST_VOX_CONFIG = { ...VOX_DEFAULTS, timeoutMs: 100 };
 describe("Vox lifecycle audit logging", () => {
 	let signals: SignalBus;
 	let audit: AuditLogger;
+	let prevApiKey: string | undefined;
 
 	beforeEach(() => {
 		signals = new SignalBus();
 		audit = new AuditLogger();
+		// speak() returns early without an API key (before vox:speak audit).
+		// Provide a dummy key so clearance + audit run; TTS fetch then fails fast.
+		prevApiKey = process.env.XAI_API_KEY;
+		process.env.XAI_API_KEY = "test-key-for-audit";
+	});
+
+	afterEach(() => {
+		if (prevApiKey === undefined) {
+			delete process.env.XAI_API_KEY;
+		} else {
+			process.env.XAI_API_KEY = prevApiKey;
+		}
 	});
 
 	test("logs vox:speak when speak() is called in on mode", async () => {
@@ -212,11 +225,7 @@ describe("Recall tool audit logging", () => {
 
 	afterEach(async () => {
 		memory.close();
-		await Promise.allSettled([
-			unlink(TEST_DB),
-			unlink(`${TEST_DB}-wal`),
-			unlink(`${TEST_DB}-shm`),
-		]);
+		await Promise.allSettled([unlink(TEST_DB), unlink(`${TEST_DB}-wal`), unlink(`${TEST_DB}-shm`)]);
 	});
 
 	function makeContext(): { context: ToolContext; audit: AuditLogger } {
@@ -227,7 +236,12 @@ describe("Recall tool audit logging", () => {
 				workingDirectory: "/tmp",
 				audit,
 				signal: { emit: async () => {} } as unknown as ToolContext["signal"],
-				memory: { get: async () => undefined, set: async () => {}, delete: async () => {}, list: async () => [] },
+				memory: {
+					get: async () => undefined,
+					set: async () => {},
+					delete: async () => {},
+					list: async () => [],
+				},
 			},
 		};
 	}
@@ -306,7 +320,7 @@ describe("Recall tool audit logging", () => {
 // Framework-level tool audit logging (Cortex)
 // ---------------------------------------------------------------------------
 
-// Note: MockLanguageModelV3's streamText does not invoke tool execute callbacks,
+// Note: MockLanguageModelV4's streamText does not invoke tool execute callbacks,
 // so framework-level tool:called / tool:error entries cannot be exercised in
 // unit tests. These are verified by integration testing. The test below verifies
 // that the audit logger is wired into Cortex correctly (i.e., the instance

@@ -1,10 +1,11 @@
 // tests/unit/psyche-protocol.test.ts
-import { describe, test, expect, beforeEach } from "bun:test";
+
 import { Database } from "bun:sqlite";
+import { beforeEach, describe, expect, test } from "bun:test";
+import type { ProtocolContext } from "../../src/modules/types.ts";
 import { createPsycheProtocol } from "../../src/psyche/protocol.ts";
 import { PsycheStore } from "../../src/psyche/store.ts";
 import { PSYCHE_DEFAULTS } from "../../src/psyche/types.ts";
-import type { ProtocolContext } from "../../src/modules/types.ts";
 
 function makeContext(): ProtocolContext {
 	return {
@@ -39,10 +40,7 @@ describe("/psyche protocol", () => {
 
 	test("status shows empty state on fresh database", async () => {
 		const proto = createPsycheProtocol(store);
-		const result = await proto.execute(
-			{ rawArgs: "status" },
-			makeContext(),
-		);
+		const result = await proto.execute({ rawArgs: "status" }, makeContext());
 		expect(result.success).toBe(true);
 		expect(result.summary).toContain("No emotional state");
 	});
@@ -56,10 +54,7 @@ describe("/psyche protocol", () => {
 			arcSummary: "A warm session.",
 		});
 		const proto = createPsycheProtocol(store);
-		const result = await proto.execute(
-			{ rawArgs: "status" },
-			makeContext(),
-		);
+		const result = await proto.execute({ rawArgs: "status" }, makeContext());
 		expect(result.success).toBe(true);
 		expect(result.summary).toContain("Trust:");
 		expect(result.summary).toContain("Last session:");
@@ -68,10 +63,7 @@ describe("/psyche protocol", () => {
 	test("dimensions shows full dimension descriptions", async () => {
 		store.seedNeutralDefaults();
 		const proto = createPsycheProtocol(store);
-		const result = await proto.execute(
-			{ rawArgs: "dimensions" },
-			makeContext(),
-		);
+		const result = await proto.execute({ rawArgs: "dimensions" }, makeContext());
 		expect(result.success).toBe(true);
 		expect(result.summary).toContain("Trust:");
 		expect(result.summary).toContain("Banter:");
@@ -79,10 +71,7 @@ describe("/psyche protocol", () => {
 
 	test("milestones shows empty message when none exist", async () => {
 		const proto = createPsycheProtocol(store);
-		const result = await proto.execute(
-			{ rawArgs: "milestones" },
-			makeContext(),
-		);
+		const result = await proto.execute({ rawArgs: "milestones" }, makeContext());
 		expect(result.success).toBe(true);
 		expect(result.summary).toContain("No milestones");
 	});
@@ -93,10 +82,7 @@ describe("/psyche protocol", () => {
 			emotionalType: "triumph",
 		});
 		const proto = createPsycheProtocol(store);
-		const result = await proto.execute(
-			{ rawArgs: "milestones" },
-			makeContext(),
-		);
+		const result = await proto.execute({ rawArgs: "milestones" }, makeContext());
 		expect(result.success).toBe(true);
 		expect(result.summary).toContain("Shipped the Forge");
 		expect(result.summary).toContain("triumph");
@@ -109,10 +95,7 @@ describe("/psyche protocol", () => {
 			emotionalType: "warmth",
 		});
 		const proto = createPsycheProtocol(store);
-		const result = await proto.execute(
-			{ rawArgs: "reset" },
-			makeContext(),
-		);
+		const result = await proto.execute({ rawArgs: "reset" }, makeContext());
 		expect(result.success).toBe(true);
 		expect(result.summary).toContain("reset");
 		expect(store.getDimensions()).toEqual([]);
@@ -121,10 +104,7 @@ describe("/psyche protocol", () => {
 
 	test("unknown subcommand returns helpful error", async () => {
 		const proto = createPsycheProtocol(store);
-		const result = await proto.execute(
-			{ rawArgs: "nonexistent" },
-			makeContext(),
-		);
+		const result = await proto.execute({ rawArgs: "nonexistent" }, makeContext());
 		expect(result.success).toBe(false);
 		expect(result.summary).toContain("Unknown");
 	});

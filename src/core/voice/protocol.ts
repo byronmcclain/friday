@@ -1,6 +1,6 @@
-import type { FridayProtocol, ProtocolResult, ProtocolContext } from "../../modules/types.ts";
-import type { Vox } from "./vox.ts";
+import type { FridayProtocol, ProtocolContext, ProtocolResult } from "../../modules/types.ts";
 import type { VoiceMode } from "./types.ts";
+import type { Vox } from "./vox.ts";
 
 export function createVoiceProtocol(vox: Vox): FridayProtocol {
 	return {

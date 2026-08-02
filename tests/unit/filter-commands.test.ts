@@ -1,8 +1,5 @@
-import { describe, test, expect } from "bun:test";
-import {
-	filterCommands,
-	type TypeaheadEntry,
-} from "../../src/cli/tui/filter-commands.ts";
+import { describe, expect, test } from "bun:test";
+import { filterCommands, type TypeaheadEntry } from "../../src/cli/tui/filter-commands.ts";
 
 const testCommands: TypeaheadEntry[] = [
 	{

@@ -1,9 +1,8 @@
-import { useState, useEffect } from "react";
-import { PALETTE, BOLD, DIM } from "../theme.ts";
+import { useEffect, useState } from "react";
 import { lerpColor } from "../lib/color-utils.ts";
+import { BOLD, DIM, PALETTE } from "../theme.ts";
 
-const TITLE_TEXT =
-	process.env.FRIDAY_CONTEXT === "browser" ? "F.R.I.D.A.Y." : "◆ F.R.I.D.A.Y.";
+const TITLE_TEXT = process.env.FRIDAY_CONTEXT === "browser" ? "F.R.I.D.A.Y." : "◆ F.R.I.D.A.Y.";
 const SHIMMER_TICK_MS = 60;
 const SHIMMER_RADIUS = 3;
 const PAUSE_MS = 4000;
@@ -60,9 +59,7 @@ export function Header({ model }: HeaderProps) {
 		>
 			<box flexDirection="row" justifyContent="space-between" width="100%">
 				<ShimmerTitle />
-				<text fg={PALETTE.amberDim}>
-					{`Grok: ${model}`}
-				</text>
+				<text fg={PALETTE.amberDim}>{`Grok: ${model}`}</text>
 			</box>
 			<text fg={PALETTE.textMuted} attributes={DIM}>
 				{"Female Replacement Intelligent Digital Assistant Youth"}

@@ -49,8 +49,7 @@ export const dockerRun: FridayTool = {
 		{
 			name: "rm",
 			type: "boolean",
-			description:
-				"Automatically remove container when it exits (default: false)",
+			description: "Automatically remove container when it exits (default: false)",
 			required: false,
 			default: false,
 		},
@@ -63,10 +62,7 @@ export const dockerRun: FridayTool = {
 	],
 	clearance: ["exec-shell", "network"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const image = args.image as string;
 		if (!image) {
 			return {
@@ -105,7 +101,10 @@ export const dockerRun: FridayTool = {
 						return { success: false, output: `Invalid env var key "${key}": must not contain "="` };
 					}
 					if (key.startsWith("-")) {
-						return { success: false, output: `Invalid env var key "${key}": must not start with "-"` };
+						return {
+							success: false,
+							output: `Invalid env var key "${key}": must not start with "-"`,
+						};
 					}
 					cmdParts.push("-e", `${key}=${value}`);
 				}
@@ -153,8 +152,7 @@ export const dockerRun: FridayTool = {
 			if (exitCode !== 0) {
 				return {
 					success: false,
-					output:
-						parts.join("\n") || "docker run failed",
+					output: parts.join("\n") || "docker run failed",
 				};
 			}
 
@@ -167,8 +165,7 @@ export const dockerRun: FridayTool = {
 
 			return {
 				success: true,
-				output:
-					parts.join("\n") || `Container started from ${image}`,
+				output: parts.join("\n") || `Container started from ${image}`,
 				artifacts: {
 					image,
 					name: name ?? null,

@@ -1,7 +1,4 @@
-import type {
-	NotificationChannel,
-	FridayNotification,
-} from "../core/notifications.ts";
+import type { FridayNotification, NotificationChannel } from "../core/notifications.ts";
 import type { SendFn } from "./client-registry.ts";
 
 export class PushNotificationChannel implements NotificationChannel {

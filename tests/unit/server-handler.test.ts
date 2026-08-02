@@ -1,9 +1,9 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { WebSocketHandler } from "../../src/server/handler.ts";
-import { SessionHub } from "../../src/server/session-hub.ts";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { FridayRuntime } from "../../src/core/runtime.ts";
-import { createMockModel } from "../helpers/stubs.ts";
+import { WebSocketHandler } from "../../src/server/handler.ts";
 import type { ServerMessage } from "../../src/server/protocol.ts";
+import { SessionHub } from "../../src/server/session-hub.ts";
+import { createMockModel } from "../helpers/stubs.ts";
 
 describe("WebSocketHandler", () => {
 	let runtime: FridayRuntime;
@@ -37,10 +37,7 @@ describe("WebSocketHandler", () => {
 	});
 
 	test("handles legacy session:boot by responding with session:booted", async () => {
-		await handler.handle(
-			'{"type":"session:boot","id":"1"}',
-			mockSend,
-		);
+		await handler.handle('{"type":"session:boot","id":"1"}', mockSend);
 		expect(sent).toHaveLength(1);
 		expect(sent[0]!.type).toBe("session:booted");
 		// Runtime was already booted — it stays booted
@@ -48,10 +45,7 @@ describe("WebSocketHandler", () => {
 	});
 
 	test("handles session:identify and responds with session:ready", async () => {
-		await handler.handle(
-			'{"type":"session:identify","id":"1","clientType":"voice"}',
-			mockSend,
-		);
+		await handler.handle('{"type":"session:identify","id":"1","clientType":"voice"}', mockSend);
 		expect(sent).toHaveLength(1);
 		expect(sent[0]!.type).toBe("session:ready");
 		const ready = sent[0] as any;
@@ -62,15 +56,9 @@ describe("WebSocketHandler", () => {
 	});
 
 	test("handles chat after identify — streams chunks then final response", async () => {
-		await handler.handle(
-			'{"type":"session:identify","id":"0","clientType":"chat"}',
-			mockSend,
-		);
+		await handler.handle('{"type":"session:identify","id":"0","clientType":"chat"}', mockSend);
 		sent = [];
-		await handler.handle(
-			'{"type":"chat","id":"2","content":"hello"}',
-			mockSend,
-		);
+		await handler.handle('{"type":"chat","id":"2","content":"hello"}', mockSend);
 		// Streaming: at least 1 chat:chunk + 1 final chat:response
 		expect(sent.length).toBeGreaterThanOrEqual(2);
 
@@ -97,10 +85,7 @@ describe("WebSocketHandler", () => {
 			clearance: [],
 			execute: async () => ({ success: true, summary: "Test OK" }),
 		});
-		await handler.handle(
-			'{"type":"protocol","id":"3","command":"/test"}',
-			mockSend,
-		);
+		await handler.handle('{"type":"protocol","id":"3","command":"/test"}', mockSend);
 		expect(sent).toHaveLength(1);
 		expect(sent[0]!.type).toBe("protocol:response");
 		expect((sent[0] as any).content).toContain("Test OK");
@@ -127,5 +112,67 @@ describe("WebSocketHandler", () => {
 		expect(sent).toHaveLength(1);
 		expect(sent[0]!.type).toBe("error");
 		expect((sent[0] as any).code).toBe("INVALID_MESSAGE");
+	});
+
+	test("START_FAILED nulls voiceSession so retry is not SESSION_IN_USE", async () => {
+		const prev = process.env.XAI_API_KEY;
+		delete process.env.XAI_API_KEY;
+		try {
+			await handler.handle('{"type":"voice:start","id":"v1"}', mockSend);
+			const first = sent.find((m) => m.type === "voice:error") as
+				| { type: string; code?: string }
+				| undefined;
+			expect(first?.code).toBe("START_FAILED");
+			expect((handler as any).voiceSession).toBeNull();
+
+			sent = [];
+			await handler.handle('{"type":"voice:start","id":"v2"}', mockSend);
+			const codes = sent
+				.filter((m) => m.type === "voice:error")
+				.map((m) => (m as { code?: string }).code);
+			expect(codes).not.toContain("SESSION_IN_USE");
+			expect(codes).toContain("START_FAILED");
+		} finally {
+			if (prev === undefined) delete process.env.XAI_API_KEY;
+			else process.env.XAI_API_KEY = prev;
+		}
+	});
+
+	test("onSessionError wiring emits voice:error and clears voiceSession", async () => {
+		const { VoiceSessionManager } = await import("../../src/core/voice/session-manager.ts");
+		const manager = new VoiceSessionManager(
+			runtime.cortex,
+			{
+				voice: "Eve",
+				sampleRate: 48000,
+				instructions: "Test",
+				silenceDurationMs: 800,
+			},
+			{
+				onAudioDelta: () => {},
+				onTranscriptDelta: () => {},
+				onStateChange: () => {},
+				onUserTranscript: () => {},
+				onSessionError: (code, message) => {
+					mockSend({ type: "voice:error", code, message } as ServerMessage);
+					(handler as any).voiceSession = null;
+				},
+			},
+		);
+		(handler as any).voiceSession = manager;
+		(manager as any).active = true;
+		(manager as any)._generation = 1;
+		(manager as any)._openSocket = async () => {
+			throw new Error("connection refused");
+		};
+		(manager as any)._reconnectDelaysMs = [0];
+
+		await (manager as any).handleSocketClose(1);
+
+		expect((handler as any).voiceSession).toBeNull();
+		const err = sent.find((m) => m.type === "voice:error") as
+			| { code?: string }
+			| undefined;
+		expect(err?.code).toBe("RECONNECT_FAILED");
 	});
 });

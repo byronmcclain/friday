@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync, realpathSync } from "node:fs";
+import { mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { AuditLogger } from "../../src/audit/logger.ts";
-import gitModule from "../../src/modules/git/index.ts";
-import { gitStatus } from "../../src/modules/git/status.ts";
-import { gitDiff } from "../../src/modules/git/diff.ts";
-import { gitLog } from "../../src/modules/git/log.ts";
-import { gitCommit } from "../../src/modules/git/commit.ts";
 import { gitBranch } from "../../src/modules/git/branch.ts";
-import { gitStash } from "../../src/modules/git/stash.ts";
-import { gitPush } from "../../src/modules/git/push.ts";
+import { gitCommit } from "../../src/modules/git/commit.ts";
+import { gitDiff } from "../../src/modules/git/diff.ts";
+import gitModule from "../../src/modules/git/index.ts";
+import { gitLog } from "../../src/modules/git/log.ts";
 import { gitPull } from "../../src/modules/git/pull.ts";
+import { gitPush } from "../../src/modules/git/push.ts";
+import { gitStash } from "../../src/modules/git/stash.ts";
+import { gitStatus } from "../../src/modules/git/status.ts";
 import type { ToolContext } from "../../src/modules/types.ts";
 
 let testDir: string;
@@ -185,10 +185,7 @@ describe("git.log", () => {
 describe("git.commit", () => {
 	test("commits staged files", async () => {
 		writeFileSync(resolve(testDir, "new.txt"), "content\n");
-		const result = await gitCommit.execute(
-			{ message: "add new file", files: ["."] },
-			ctx,
-		);
+		const result = await gitCommit.execute({ message: "add new file", files: ["."] }, ctx);
 		expect(result.success).toBe(true);
 		expect(result.output).toContain("add new file");
 	});
@@ -200,18 +197,12 @@ describe("git.commit", () => {
 	});
 
 	test("fails when nothing to commit", async () => {
-		const result = await gitCommit.execute(
-			{ message: "empty" },
-			ctx,
-		);
+		const result = await gitCommit.execute({ message: "empty" }, ctx);
 		expect(result.success).toBe(false);
 	});
 
 	test("rejects files outside working directory", async () => {
-		const result = await gitCommit.execute(
-			{ message: "test", files: ["../../etc/passwd"] },
-			ctx,
-		);
+		const result = await gitCommit.execute({ message: "test", files: ["../../etc/passwd"] }, ctx);
 		expect(result.success).toBe(false);
 		expect(result.output).toContain("outside working directory");
 	});
@@ -227,22 +218,18 @@ describe("git.branch", () => {
 		const result = await gitBranch.execute({ action: "list" }, ctx);
 		expect(result.success).toBe(true);
 		// Branch name depends on git config — could be "main" or "master"
-		expect(
-			result.output.includes("main") || result.output.includes("master"),
-		).toBe(true);
+		expect(result.output.includes("main") || result.output.includes("master")).toBe(true);
 	});
 
 	test("creates and switches to new branch", async () => {
-		const result = await gitBranch.execute(
-			{ action: "create", name: "feature-test" },
-			ctx,
-		);
+		const result = await gitBranch.execute({ action: "create", name: "feature-test" }, ctx);
 		expect(result.success).toBe(true);
 		expect(result.output).toContain("feature-test");
 
 		// Verify we're on the new branch
-		const statusResult =
-			await Bun.$`git -C ${testDir} rev-parse --abbrev-ref HEAD`.quiet().nothrow();
+		const statusResult = await Bun.$`git -C ${testDir} rev-parse --abbrev-ref HEAD`
+			.quiet()
+			.nothrow();
 		expect(statusResult.stdout.toString().trim()).toBe("feature-test");
 	});
 
@@ -250,10 +237,7 @@ describe("git.branch", () => {
 		// Create a temp branch and switch back to original
 		await Bun.$`git -C ${testDir} branch temp-branch`.quiet().nothrow();
 
-		const result = await gitBranch.execute(
-			{ action: "switch", name: "temp-branch" },
-			ctx,
-		);
+		const result = await gitBranch.execute({ action: "switch", name: "temp-branch" }, ctx);
 		expect(result.success).toBe(true);
 		expect(result.output).toContain("temp-branch");
 	});
@@ -265,10 +249,7 @@ describe("git.branch", () => {
 	});
 
 	test("rejects branch name starting with dash (flag injection)", async () => {
-		const result = await gitBranch.execute(
-			{ action: "create", name: "--option=evil" },
-			ctx,
-		);
+		const result = await gitBranch.execute({ action: "create", name: "--option=evil" }, ctx);
 		expect(result.success).toBe(false);
 		expect(result.output).toContain("Invalid");
 	});
@@ -293,10 +274,7 @@ describe("git.stash", () => {
 	});
 
 	test("rejects non-numeric stash index", async () => {
-		const result = await gitStash.execute(
-			{ action: "pop", index: "not-a-number" },
-			ctx,
-		);
+		const result = await gitStash.execute({ action: "pop", index: "not-a-number" }, ctx);
 		expect(result.success).toBe(false);
 		expect(result.output).toContain("Invalid");
 	});

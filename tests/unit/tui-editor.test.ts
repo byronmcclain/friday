@@ -1,6 +1,6 @@
-import { describe, test, expect } from "bun:test";
-import { openExternalEditor } from "../../src/cli/tui/lib/external-editor.ts";
+import { describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
+import { openExternalEditor } from "../../src/cli/tui/lib/external-editor.ts";
 
 describe("openExternalEditor", () => {
 	test("writes initial content to temp file and reads it back", async () => {
@@ -44,7 +44,9 @@ describe("openExternalEditor", () => {
 		let capturedPath = "";
 		const result = await openExternalEditor("test", {
 			editorCommand: "true",
-			onTempPath: (p) => { capturedPath = p; },
+			onTempPath: (p) => {
+				capturedPath = p;
+			},
 		});
 		expect(capturedPath).toMatch(/friday-editor-/);
 		expect(existsSync(capturedPath)).toBe(false);
@@ -54,7 +56,9 @@ describe("openExternalEditor", () => {
 		let capturedPath = "";
 		await openExternalEditor("test", {
 			editorCommand: "false",
-			onTempPath: (p) => { capturedPath = p; },
+			onTempPath: (p) => {
+				capturedPath = p;
+			},
 		});
 		expect(capturedPath.length).toBeGreaterThan(0);
 		expect(existsSync(capturedPath)).toBe(false);

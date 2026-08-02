@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { lerpColor, parseHex } from "../../src/cli/tui/lib/color-utils.ts";
 
 describe("parseHex", () => {

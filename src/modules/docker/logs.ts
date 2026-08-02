@@ -6,8 +6,7 @@ const LOGS_TIMEOUT_MS = 30_000;
 
 export const dockerLogs: FridayTool = {
 	name: "docker.logs",
-	description:
-		"Fetch logs from a Docker container. Supports tail count and timestamp display.",
+	description: "Fetch logs from a Docker container. Supports tail count and timestamp display.",
 	parameters: [
 		{
 			name: "container",
@@ -39,10 +38,7 @@ export const dockerLogs: FridayTool = {
 	],
 	clearance: ["exec-shell"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const container = args.container as string;
 		if (!container) {
 			return {
@@ -59,12 +55,7 @@ export const dockerLogs: FridayTool = {
 			const timestamps = (args.timestamps as boolean) ?? false;
 			const since = args.since as string | undefined;
 
-			const cmdParts = [
-				"docker",
-				"logs",
-				"--tail",
-				String(tail),
-			];
+			const cmdParts = ["docker", "logs", "--tail", String(tail)];
 			if (timestamps) cmdParts.push("--timestamps");
 			if (since) {
 				const sinceCheck = assertSafeArg(since, "since");

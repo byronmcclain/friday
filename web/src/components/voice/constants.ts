@@ -5,6 +5,7 @@ export const VOICE_STATES: Record<string, VoiceState> = {
   LISTENING: "listening",
   THINKING: "thinking",
   SPEAKING: "speaking",
+  RECONNECTING: "reconnecting",
   ERROR: "error",
 } as const;
 
@@ -31,6 +32,7 @@ export const STATE_COLORS: Record<VoiceState, StateColor> = {
   listening: { r: 232, g: 148, b: 58 },
   thinking: { r: 196, g: 122, b: 58 },
   speaking: { r: 255, g: 208, b: 144 },
+  reconnecting: { r: 196, g: 160, b: 80 },
   error: { r: 248, g: 113, b: 113 },
 };
 

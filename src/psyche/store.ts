@@ -1,17 +1,17 @@
 import type { Database } from "bun:sqlite";
 import type {
-	RelationalDimension,
 	EmotionalMilestone,
-	SessionMood,
+	EmotionalType,
 	PsycheState,
 	PsycheStoreConfig,
-	EmotionalType,
+	RelationalDimension,
+	SessionMood,
 } from "./types.ts";
 import {
-	PSYCHE_DEFAULTS,
 	DIMENSION_NAMES,
-	NEUTRAL_SEED_DIMENSIONS,
 	getDimensionLabel,
+	NEUTRAL_SEED_DIMENSIONS,
+	PSYCHE_DEFAULTS,
 } from "./types.ts";
 
 type DimensionRow = {
@@ -46,9 +46,9 @@ export class PsycheStore {
 		this.db = db;
 		this.config = config;
 		this.migrate();
-		this._hasDimensions = (this.db
-			.query<{ cnt: number }, []>("SELECT COUNT(*) as cnt FROM psyche_dimensions")
-			.get()?.cnt ?? 0) > 0;
+		this._hasDimensions =
+			(this.db.query<{ cnt: number }, []>("SELECT COUNT(*) as cnt FROM psyche_dimensions").get()
+				?.cnt ?? 0) > 0;
 	}
 
 	private migrate(): void {
@@ -137,9 +137,7 @@ export class PsycheStore {
 
 	getDimensionSummary(): string {
 		const dims = this.getDimensions();
-		return dims
-			.map((d) => `${getDimensionLabel(d.name)}: ${d.description}`)
-			.join("\n");
+		return dims.map((d) => `${getDimensionLabel(d.name)}: ${d.description}`).join("\n");
 	}
 
 	// ── Milestones ─────────────────────────────────────────────
@@ -158,15 +156,11 @@ export class PsycheStore {
 				)
 				.run(id, now, input.summary, input.emotionalType, input.sessionId ?? null);
 			const row = this.db
-				.query<{ rowid: number }, [string]>(
-					"SELECT rowid FROM psyche_milestones WHERE id = ?",
-				)
+				.query<{ rowid: number }, [string]>("SELECT rowid FROM psyche_milestones WHERE id = ?")
 				.get(id);
 			if (row) {
 				this.db
-					.query(
-						"INSERT INTO psyche_milestones_fts(rowid, summary) VALUES (?, ?)",
-					)
+					.query("INSERT INTO psyche_milestones_fts(rowid, summary) VALUES (?, ?)")
 					.run(row.rowid, input.summary);
 			}
 		})();
@@ -222,11 +216,8 @@ export class PsycheStore {
 
 	pruneMilestones(): void {
 		const count =
-			this.db
-				.query<{ cnt: number }, []>(
-					"SELECT COUNT(*) as cnt FROM psyche_milestones",
-				)
-				.get()?.cnt ?? 0;
+			this.db.query<{ cnt: number }, []>("SELECT COUNT(*) as cnt FROM psyche_milestones").get()
+				?.cnt ?? 0;
 		if (count <= this.config.maxMilestones) return;
 
 		const excess = count - this.config.maxMilestones;
@@ -238,12 +229,8 @@ export class PsycheStore {
 
 		this.db.transaction(() => {
 			for (const row of toDelete) {
-				this.db
-					.query("DELETE FROM psyche_milestones_fts WHERE rowid = ?")
-					.run(row.rowid);
-				this.db
-					.query("DELETE FROM psyche_milestones WHERE id = ?")
-					.run(row.id);
+				this.db.query("DELETE FROM psyche_milestones_fts WHERE rowid = ?").run(row.rowid);
+				this.db.query("DELETE FROM psyche_milestones WHERE id = ?").run(row.id);
 			}
 		})();
 	}
@@ -260,12 +247,7 @@ export class PsycheStore {
 			.query(
 				"INSERT OR REPLACE INTO psyche_session_moods (session_id, started_mood, ended_mood, arc_summary, analyzed_at) VALUES (?, ?, ?, ?, datetime('now'))",
 			)
-			.run(
-				input.sessionId,
-				input.startedMood,
-				input.endedMood,
-				input.arcSummary,
-			);
+			.run(input.sessionId, input.startedMood, input.endedMood, input.arcSummary);
 	}
 
 	getLastSessionMood(): SessionMood | undefined {
@@ -288,10 +270,7 @@ export class PsycheStore {
 
 	decayMilestones(): void {
 		const rows = this.db
-			.query<
-				{ id: string; occurred_at: string; relevance_decay: number },
-				[number]
-			>(
+			.query<{ id: string; occurred_at: string; relevance_decay: number }, [number]>(
 				"SELECT id, occurred_at, relevance_decay FROM psyche_milestones WHERE relevance_decay > ?",
 			)
 			.all(this.config.decayFloor);
@@ -304,19 +283,14 @@ export class PsycheStore {
 			if (ageDays <= this.config.decayGraceDays) continue;
 			const daysOverGrace = ageDays - this.config.decayGraceDays;
 			const decayRate = Math.LN2 / this.config.decayHalfLifeDays;
-			const newDecay = Math.max(
-				this.config.decayFloor,
-				Math.exp(-decayRate * daysOverGrace),
-			);
+			const newDecay = Math.max(this.config.decayFloor, Math.exp(-decayRate * daysOverGrace));
 			updates.push({ id: row.id, decay: newDecay });
 		}
 		if (updates.length > 0) {
 			this.db.transaction(() => {
 				for (const u of updates) {
 					this.db
-						.query(
-							"UPDATE psyche_milestones SET relevance_decay = ? WHERE id = ?",
-						)
+						.query("UPDATE psyche_milestones SET relevance_decay = ? WHERE id = ?")
 						.run(u.decay, u.id);
 				}
 			})();

@@ -6,9 +6,7 @@ export interface PushIterable<T> {
 	fullValue: Promise<string>;
 }
 
-export function createPushIterable<T>(options?: {
-	collect?: boolean;
-}): PushIterable<T> {
+export function createPushIterable<T>(options?: { collect?: boolean }): PushIterable<T> {
 	const queue: T[] = [];
 	let resolve: ((result: IteratorResult<T>) => void) | null = null;
 	let reject: ((err: Error) => void) | null = null;

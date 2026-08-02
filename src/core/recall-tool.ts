@@ -21,7 +21,8 @@ export function createRecallTool(memory: SQLiteMemory): FridayTool {
 			{
 				name: "mode",
 				type: "string",
-				description: "'search' to find conversations by keyword, 'recall' to retrieve full messages by session ID. Defaults to 'search'.",
+				description:
+					"'search' to find conversations by keyword, 'recall' to retrieve full messages by session ID. Defaults to 'search'.",
 				required: false,
 				default: "search",
 			},
@@ -41,10 +42,7 @@ export function createRecallTool(memory: SQLiteMemory): FridayTool {
 		],
 		clearance: [],
 
-		async execute(
-			args: Record<string, unknown>,
-			context: ToolContext,
-		): Promise<ToolResult> {
+		async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 			const mode = (args.mode as string) ?? "search";
 
 			if (mode === "recall") {
@@ -140,7 +138,10 @@ async function handleRecall(
 		}
 		const line = `${msg.role}: ${text}\n`;
 		if (totalLength + line.length > MAX_OUTPUT_LENGTH) {
-			const remaining = Math.min(session.messages.length - messages.indexOf(msg) - 1, MAX_RECALL_MESSAGES);
+			const remaining = Math.min(
+				session.messages.length - messages.indexOf(msg) - 1,
+				MAX_RECALL_MESSAGES,
+			);
 			output += `\n... (${remaining} more messages truncated)`;
 			break;
 		}

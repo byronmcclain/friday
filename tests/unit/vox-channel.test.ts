@@ -1,9 +1,9 @@
-import { describe, test, expect, beforeEach } from "bun:test";
-import { VoiceChannel } from "../../src/core/voice/channel.ts";
-import { Vox } from "../../src/core/voice/vox.ts";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { SignalBus } from "../../src/core/events.ts";
-import { NotificationManager, type FridayNotification } from "../../src/core/notifications.ts";
+import { type FridayNotification, NotificationManager } from "../../src/core/notifications.ts";
+import { VoiceChannel } from "../../src/core/voice/channel.ts";
 import { VOX_DEFAULTS } from "../../src/core/voice/types.ts";
+import { Vox } from "../../src/core/voice/vox.ts";
 
 describe("VoiceChannel", () => {
 	let vox: Vox;

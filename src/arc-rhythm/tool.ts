@@ -1,7 +1,7 @@
 import type { FridayTool, ToolContext, ToolResult } from "../modules/types.ts";
+import { describe as describeCron, nextOccurrence, validate } from "./cron.ts";
 import type { RhythmStore } from "./store.ts";
 import type { RhythmAction } from "./types.ts";
-import { validate, nextOccurrence, describe as describeCron } from "./cron.ts";
 
 export function createManageRhythmTool(store: RhythmStore): FridayTool {
 	return {
@@ -53,10 +53,7 @@ export function createManageRhythmTool(store: RhythmStore): FridayTool {
 			},
 		],
 		clearance: ["system"],
-		execute: async (
-			args: Record<string, unknown>,
-			_context: ToolContext,
-		): Promise<ToolResult> => {
+		execute: async (args: Record<string, unknown>, _context: ToolContext): Promise<ToolResult> => {
 			const operation = args.operation as string;
 
 			switch (operation) {
@@ -78,10 +75,7 @@ export function createManageRhythmTool(store: RhythmStore): FridayTool {
 	};
 }
 
-function handleCreate(
-	store: RhythmStore,
-	args: Record<string, unknown>,
-): ToolResult {
+function handleCreate(store: RhythmStore, args: Record<string, unknown>): ToolResult {
 	const name = args.name as string | undefined;
 	const cron = args.cron as string | undefined;
 	const actionType = args.action_type as string | undefined;
@@ -161,10 +155,7 @@ function handleList(store: RhythmStore): ToolResult {
 	return { success: true, output: lines.join("\n") };
 }
 
-function handleUpdate(
-	store: RhythmStore,
-	args: Record<string, unknown>,
-): ToolResult {
+function handleUpdate(store: RhythmStore, args: Record<string, unknown>): ToolResult {
 	const rhythmId = args.rhythm_id as string | undefined;
 	if (!rhythmId) {
 		return { success: false, output: "Missing required field: rhythm_id" };
@@ -230,10 +221,7 @@ function handleUpdate(
 	};
 }
 
-function handleDelete(
-	store: RhythmStore,
-	args: Record<string, unknown>,
-): ToolResult {
+function handleDelete(store: RhythmStore, args: Record<string, unknown>): ToolResult {
 	const rhythmId = args.rhythm_id as string | undefined;
 	if (!rhythmId) {
 		return { success: false, output: "Missing required field: rhythm_id" };

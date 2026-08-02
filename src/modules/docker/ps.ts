@@ -16,17 +16,13 @@ export const dockerPs: FridayTool = {
 		{
 			name: "filter",
 			type: "string",
-			description:
-				'Filter containers (e.g., "name=myapp", "status=exited")',
+			description: 'Filter containers (e.g., "name=myapp", "status=exited")',
 			required: false,
 		},
 	],
 	clearance: ["exec-shell"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		try {
 			const all = (args.all as boolean) ?? false;
 			const filter = args.filter as string | undefined;

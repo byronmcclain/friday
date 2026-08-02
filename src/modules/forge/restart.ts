@@ -8,8 +8,7 @@ export const forgeRestart: FridayTool = {
 		{
 			name: "reason",
 			type: "string",
-			description:
-				"Why the restart is needed (e.g., 'Load new weather module')",
+			description: "Why the restart is needed (e.g., 'Load new weather module')",
 			required: true,
 		},
 		{
@@ -21,10 +20,7 @@ export const forgeRestart: FridayTool = {
 	],
 	clearance: ["system", "forge-modify"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const reason = args.reason as string;
 		const moduleName = args.moduleName as string;
 

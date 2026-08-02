@@ -1,4 +1,4 @@
-import { PALETTE, BOLD, DIM } from "../theme.ts";
+import { BOLD, DIM, PALETTE } from "../theme.ts";
 
 interface WelcomeProps {
 	model: string;
@@ -20,9 +20,7 @@ export function Welcome({ model }: WelcomeProps) {
 			<text fg={PALETTE.amberGlow} attributes={BOLD}>
 				{"Welcome back, boss."}
 			</text>
-			<text fg={PALETTE.textMuted}>
-				{`Model: ${model}`}
-			</text>
+			<text fg={PALETTE.textMuted}>{`Model: ${model}`}</text>
 			<text fg={PALETTE.textMuted} attributes={DIM}>
 				{"Type a message or /command to get started."}
 			</text>

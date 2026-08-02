@@ -1,10 +1,10 @@
 import { resolve } from "node:path";
-import { FridayRuntime, type RuntimeConfig, type BootStep } from "../core/runtime.ts";
-import { WebSocketHandler, type SendFn } from "./handler.ts";
-import { SessionHub } from "./session-hub.ts";
-import type { ServerMessage } from "./protocol.ts";
 import type { ServerWebSocket } from "bun";
+import { type BootStep, FridayRuntime, type RuntimeConfig } from "../core/runtime.ts";
 import { getTelegramListener } from "../modules/telegram/state.ts";
+import { type SendFn, WebSocketHandler } from "./handler.ts";
+import type { ServerMessage } from "./protocol.ts";
+import { SessionHub } from "./session-hub.ts";
 
 export interface FridayServerConfig {
 	port: number;
@@ -33,10 +33,7 @@ export async function createFridayServer(config: FridayServerConfig) {
 	// Always boot fresh — SessionHub owns session lifecycle (start/save/clear),
 	// so loading previous history at boot would leak stale conversations to clients.
 	const runtime = new FridayRuntime();
-	await runtime.boot(
-		{ ...config.runtimeConfig, fresh: true },
-		config.onBootProgress,
-	);
+	await runtime.boot({ ...config.runtimeConfig, fresh: true }, config.onBootProgress);
 
 	const hub = new SessionHub({
 		runtime,
@@ -130,7 +127,9 @@ export async function createFridayServer(config: FridayServerConfig) {
 						if (ws.readyState === 1) {
 							ws.send(JSON.stringify(msg));
 						}
-					} catch { /* connection may have closed */ }
+					} catch {
+						/* connection may have closed */
+					}
 				};
 				await ws.data.handler.handle(raw, send);
 
@@ -144,11 +143,9 @@ export async function createFridayServer(config: FridayServerConfig) {
 					const interval = setInterval(() => {
 						try {
 							if (ws.readyState === 1) {
-								ws.data.handler.pushSensoriumUpdate(
-									(msg: ServerMessage) => {
-										ws.send(JSON.stringify(msg));
-									},
-								);
+								ws.data.handler.pushSensoriumUpdate((msg: ServerMessage) => {
+									ws.send(JSON.stringify(msg));
+								});
 							}
 						} catch {
 							// Connection may have closed

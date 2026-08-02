@@ -1,7 +1,7 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
+import type { FridayRuntime } from "../../src/core/runtime.ts";
 import { createFridayServer } from "../../src/server/index.ts";
 import { createMockModel } from "../helpers/stubs.ts";
-import type { FridayRuntime } from "../../src/core/runtime.ts";
 
 describe("createFridayServer", () => {
 	let server: ReturnType<typeof Bun.serve> | undefined;

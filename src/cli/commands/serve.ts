@@ -1,10 +1,10 @@
-import type { Command } from "commander";
-import chalk from "chalk";
-import boxen from "boxen";
-import { resolve, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
 import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import boxen from "boxen";
+import chalk from "chalk";
+import type { Command } from "commander";
 import { createFridayServer } from "../../server/index.ts";
 import { FridaySocketServer } from "../../server/socket.ts";
 import { spawnTtyd } from "../../server/ttyd.ts";
@@ -86,8 +86,8 @@ export function serveCommand(program: Command): void {
 
 				try {
 					// Hide ^C echo: clear current line, then print on a fresh line
-				process.stdout.write("\r\x1b[2K");
-				console.log(chalk.hex("#F0A030").bold("\nShutting down..."));
+					process.stdout.write("\r\x1b[2K");
+					console.log(chalk.hex("#F0A030").bold("\nShutting down..."));
 					if (ttydProc) {
 						step("Stopping terminal server");
 						ttydProc.kill();

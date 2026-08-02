@@ -1,7 +1,7 @@
 import { webhookCallback } from "grammy";
-import type { TelegramClient } from "./client.ts";
-import type { ScopedMemory } from "../../core/memory.ts";
 import type { AuditLogger } from "../../audit/logger.ts";
+import type { ScopedMemory } from "../../core/memory.ts";
+import type { TelegramClient } from "./client.ts";
 
 export interface ListenerConfig {
 	ownerId?: number;
@@ -14,9 +14,7 @@ export type BroadcastFn = (role: "user" | "assistant", content: string, source: 
 
 export class TelegramListener {
 	private mode: "webhook" | "polling" | "stopped" = "stopped";
-	private webhookHandler:
-		| ((req: Request) => Response | Promise<Response>)
-		| null = null;
+	private webhookHandler: ((req: Request) => Response | Promise<Response>) | null = null;
 	private pollingDone: Promise<void> | null = null;
 	private broadcast: BroadcastFn | null = null;
 
@@ -150,9 +148,7 @@ export class TelegramListener {
 		return this.mode;
 	}
 
-	getWebhookHandler():
-		| ((req: Request) => Response | Promise<Response>)
-		| null {
+	getWebhookHandler(): ((req: Request) => Response | Promise<Response>) | null {
 		return this.webhookHandler;
 	}
 }

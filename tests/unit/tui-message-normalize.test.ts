@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { _normalizeContent } from "../../src/cli/tui/components/message.tsx";
 
 describe("normalizeContent", () => {
@@ -80,8 +80,7 @@ describe("normalizeContent", () => {
 
 	test("handles table with colon-aligned delimiter", () => {
 		const input = "text\n| Left | Center | Right |\n| :--- | :---: | ---: |\n| a | b | c |";
-		const expected =
-			"text\n\n| Left | Center | Right |\n| :--- | :---: | ---: |\n| a | b | c |";
+		const expected = "text\n\n| Left | Center | Right |\n| :--- | :---: | ---: |\n| a | b | c |";
 		expect(_normalizeContent(input)).toBe(expected);
 	});
 });

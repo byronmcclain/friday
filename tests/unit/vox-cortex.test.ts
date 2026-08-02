@@ -1,9 +1,9 @@
-import { describe, test, expect, beforeEach } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { Cortex } from "../../src/core/cortex.ts";
-import { Vox } from "../../src/core/voice/vox.ts";
 import { SignalBus } from "../../src/core/events.ts";
 import { NotificationManager } from "../../src/core/notifications.ts";
 import { VOX_DEFAULTS } from "../../src/core/voice/types.ts";
+import { Vox } from "../../src/core/voice/vox.ts";
 import { createMockModel } from "../helpers/stubs.ts";
 
 describe("Cortex + Vox integration", () => {

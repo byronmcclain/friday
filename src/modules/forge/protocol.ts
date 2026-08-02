@@ -1,8 +1,4 @@
-import type {
-	FridayProtocol,
-	ProtocolResult,
-	ProtocolContext,
-} from "../types.ts";
+import type { FridayProtocol, ProtocolContext, ProtocolResult } from "../types.ts";
 import { ForgeManifestManager } from "./manifest.ts";
 
 export function createForgeProtocol(forgeDir: string): FridayProtocol {
@@ -66,9 +62,7 @@ export function createForgeProtocol(forgeDir: string): FridayProtocol {
 	};
 }
 
-async function handleList(
-	manifest: ForgeManifestManager,
-): Promise<ProtocolResult> {
+async function handleList(manifest: ForgeManifestManager): Promise<ProtocolResult> {
 	const names = await manifest.listModules();
 	if (names.length === 0) {
 		return { success: true, summary: "No forge modules found." };
@@ -78,9 +72,7 @@ async function handleList(
 		const entry = await manifest.getEntry(name);
 		if (entry) {
 			const prot = entry.protected ? " [protected]" : "";
-			lines.push(
-				`  ${name} v${entry.version} (${entry.status})${prot}`,
-			);
+			lines.push(`  ${name} v${entry.version} (${entry.status})${prot}`);
 		}
 	}
 	return {
@@ -89,10 +81,7 @@ async function handleList(
 	};
 }
 
-async function handleStatus(
-	manifest: ForgeManifestManager,
-	name: string,
-): Promise<ProtocolResult> {
+async function handleStatus(manifest: ForgeManifestManager, name: string): Promise<ProtocolResult> {
 	if (!name) return { success: false, summary: "Usage: /forge status <name>" };
 	const entry = await manifest.getEntry(name);
 	if (!entry) return { success: false, summary: `Module "${name}" not found.` };
@@ -112,13 +101,10 @@ async function handleHistory(
 	manifest: ForgeManifestManager,
 	name: string,
 ): Promise<ProtocolResult> {
-	if (!name)
-		return { success: false, summary: "Usage: /forge history <name>" };
+	if (!name) return { success: false, summary: "Usage: /forge history <name>" };
 	const entry = await manifest.getEntry(name);
 	if (!entry) return { success: false, summary: `Module "${name}" not found.` };
-	const lines = entry.history.map(
-		(h) => `  v${h.version} [${h.action}] ${h.date} — ${h.reason}`,
-	);
+	const lines = entry.history.map((h) => `  v${h.version} [${h.action}] ${h.date} — ${h.reason}`);
 	return {
 		success: true,
 		summary: `History for ${name}:\n${lines.join("\n")}`,
@@ -147,19 +133,15 @@ async function handleProtect(
 	}
 }
 
-async function handleManifestDump(
-	manifest: ForgeManifestManager,
-): Promise<ProtocolResult> {
+async function handleManifestDump(manifest: ForgeManifestManager): Promise<ProtocolResult> {
 	const data = await manifest.load();
 	return { success: true, summary: JSON.stringify(data, null, 2) };
 }
 
 async function handleRollback(_name: string): Promise<ProtocolResult> {
-	if (!_name)
-		return { success: false, summary: "Usage: /forge rollback <name>" };
+	if (!_name) return { success: false, summary: "Usage: /forge rollback <name>" };
 	return {
 		success: false,
-		summary:
-			"Rollback is not yet implemented. Manually restore from forge/.backups/ for now.",
+		summary: "Rollback is not yet implemented. Manually restore from forge/.backups/ for now.",
 	};
 }

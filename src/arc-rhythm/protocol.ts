@@ -1,15 +1,13 @@
 import type { FridayProtocol, ProtocolContext, ProtocolResult } from "../modules/types.ts";
-import type { RhythmStore } from "./store.ts";
+import { describe as describeCron, nextOccurrence, validate } from "./cron.ts";
 import type { RhythmScheduler } from "./scheduler.ts";
-import { validate, describe as describeCron, nextOccurrence } from "./cron.ts";
+import type { RhythmStore } from "./store.ts";
 
-export function createArcProtocol(
-	store: RhythmStore,
-	scheduler: RhythmScheduler,
-): FridayProtocol {
+export function createArcProtocol(store: RhythmStore, scheduler: RhythmScheduler): FridayProtocol {
 	return {
 		name: "arc",
-		description: "Manage Arc Rhythm scheduled tasks: list, show, create, pause, resume, delete, history, run",
+		description:
+			"Manage Arc Rhythm scheduled tasks: list, show, create, pause, resume, delete, history, run",
 		aliases: ["rhythm"],
 		parameters: [],
 		clearance: [],
@@ -40,7 +38,10 @@ export function createArcProtocol(
 				case "run":
 					return handleRun(store, scheduler, rest);
 				default:
-					return { success: false, summary: `Unknown subcommand: ${subcommand}. Use: list, show, create, pause, resume, delete, history, run` };
+					return {
+						success: false,
+						summary: `Unknown subcommand: ${subcommand}. Use: list, show, create, pause, resume, delete, history, run`,
+					};
 			}
 		},
 	};
@@ -130,7 +131,10 @@ function handleResume(store: RhythmStore, id: string): ProtocolResult {
 
 	const next = nextOccurrence(rhythm.cron);
 	store.update(rhythm.id, { enabled: true, nextRun: next });
-	return { success: true, summary: `Resumed rhythm "${rhythm.name}" — next run: ${next.toISOString()}` };
+	return {
+		success: true,
+		summary: `Resumed rhythm "${rhythm.name}" — next run: ${next.toISOString()}`,
+	};
 }
 
 function handleDelete(store: RhythmStore, id: string): ProtocolResult {

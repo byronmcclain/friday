@@ -1,9 +1,9 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { createRecallTool } from "../../src/core/recall-tool.ts";
-import { SQLiteMemory } from "../../src/core/memory.ts";
-import type { ConversationSession } from "../../src/core/memory.ts";
-import type { ToolContext } from "../../src/modules/types.ts";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { unlink } from "node:fs/promises";
+import type { ConversationSession } from "../../src/core/memory.ts";
+import { SQLiteMemory } from "../../src/core/memory.ts";
+import { createRecallTool } from "../../src/core/recall-tool.ts";
+import type { ToolContext } from "../../src/modules/types.ts";
 
 const TEST_DB = "/tmp/friday-test-recall-tool.db";
 
@@ -11,10 +11,20 @@ const stubContext: ToolContext = {
 	workingDirectory: "/tmp",
 	audit: { log: () => {} } as unknown as ToolContext["audit"],
 	signal: { emit: async () => {} } as unknown as ToolContext["signal"],
-	memory: { get: async () => undefined, set: async () => {}, delete: async () => {}, list: async () => [] },
+	memory: {
+		get: async () => undefined,
+		set: async () => {},
+		delete: async () => {},
+		list: async () => [],
+	},
 };
 
-function makeSession(id: string, summary: string, date?: Date, messageCount = 4): ConversationSession {
+function makeSession(
+	id: string,
+	summary: string,
+	date?: Date,
+	messageCount = 4,
+): ConversationSession {
 	const messages = Array.from({ length: messageCount }, (_, i) => ({
 		role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
 		content: `Message ${i} about the topic discussed in ${id}`,
@@ -39,11 +49,7 @@ describe("recall_memory tool", () => {
 
 	afterEach(async () => {
 		memory.close();
-		await Promise.allSettled([
-			unlink(TEST_DB),
-			unlink(`${TEST_DB}-wal`),
-			unlink(`${TEST_DB}-shm`),
-		]);
+		await Promise.allSettled([unlink(TEST_DB), unlink(`${TEST_DB}-wal`), unlink(`${TEST_DB}-shm`)]);
 	});
 
 	test("tool has correct name and parameters", () => {
@@ -58,7 +64,9 @@ describe("recall_memory tool", () => {
 
 	describe("search mode", () => {
 		test("returns matching conversations", async () => {
-			await memory.saveConversation(makeSession("s1", "Discussed Docker networking and bridge config."));
+			await memory.saveConversation(
+				makeSession("s1", "Discussed Docker networking and bridge config."),
+			);
 			await memory.saveConversation(makeSession("s2", "Implemented SMARTS knowledge extraction."));
 
 			const tool = createRecallTool(memory);
@@ -99,9 +107,15 @@ describe("recall_memory tool", () => {
 		});
 
 		test("respects limit parameter", async () => {
-			await memory.saveConversation(makeSession("s1", "Docker topic one.", new Date("2026-02-20T10:00:00Z")));
-			await memory.saveConversation(makeSession("s2", "Docker topic two.", new Date("2026-02-21T10:00:00Z")));
-			await memory.saveConversation(makeSession("s3", "Docker topic three.", new Date("2026-02-22T10:00:00Z")));
+			await memory.saveConversation(
+				makeSession("s1", "Docker topic one.", new Date("2026-02-20T10:00:00Z")),
+			);
+			await memory.saveConversation(
+				makeSession("s2", "Docker topic two.", new Date("2026-02-21T10:00:00Z")),
+			);
+			await memory.saveConversation(
+				makeSession("s3", "Docker topic three.", new Date("2026-02-22T10:00:00Z")),
+			);
 
 			const tool = createRecallTool(memory);
 			const result = await tool.execute({ query: "Docker", limit: 2 }, stubContext);
@@ -115,7 +129,9 @@ describe("recall_memory tool", () => {
 
 	describe("recall mode", () => {
 		test("returns full messages for a session", async () => {
-			await memory.saveConversation(makeSession("s-recall", "Docker networking recap.", undefined, 6));
+			await memory.saveConversation(
+				makeSession("s-recall", "Docker networking recap.", undefined, 6),
+			);
 
 			const tool = createRecallTool(memory);
 			const result = await tool.execute({ mode: "recall", sessionId: "s-recall" }, stubContext);

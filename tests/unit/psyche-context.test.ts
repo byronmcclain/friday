@@ -1,15 +1,12 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { buildEmotionalContext } from "../../src/psyche/context.ts";
 import type {
+	EmotionalMilestone,
 	RelationalDimension,
 	SessionMood,
-	EmotionalMilestone,
 } from "../../src/psyche/types.ts";
 
-const makeDimension = (
-	name: string,
-	desc: string,
-): RelationalDimension => ({
+const makeDimension = (name: string, desc: string): RelationalDimension => ({
 	name,
 	description: desc,
 	updatedAt: new Date().toISOString(),
@@ -30,8 +27,7 @@ const makeMood = (): SessionMood => ({
 	sessionId: "s-1",
 	startedMood: "Focused and technical",
 	endedMood: "Celebratory after deploy",
-	arcSummary:
-		"Started focused, shifted to celebratory after deploy succeeded.",
+	arcSummary: "Started focused, shifted to celebratory after deploy succeeded.",
 	analyzedAt: new Date().toISOString(),
 });
 
@@ -42,10 +38,7 @@ describe("buildEmotionalContext", () => {
 	});
 
 	test("includes How We Are section with dimensions", () => {
-		const dims = [
-			makeDimension("trust", "Deep trust."),
-			makeDimension("banter", "High comfort."),
-		];
+		const dims = [makeDimension("trust", "Deep trust."), makeDimension("banter", "High comfort.")];
 		const result = buildEmotionalContext(dims, undefined, []);
 		expect(result).toBeDefined();
 		expect(result).toContain("## Emotional Context");

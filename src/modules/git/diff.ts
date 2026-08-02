@@ -24,8 +24,7 @@ export const gitDiff: FridayTool = {
 		{
 			name: "ref",
 			type: "string",
-			description:
-				"Diff against a specific ref (branch, tag, commit). E.g., 'HEAD~3', 'main'",
+			description: "Diff against a specific ref (branch, tag, commit). E.g., 'HEAD~3', 'main'",
 			required: false,
 		},
 		{
@@ -38,10 +37,7 @@ export const gitDiff: FridayTool = {
 	],
 	clearance: ["git-read"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		try {
 			const staged = (args.staged as boolean) ?? false;
 			const path = args.path as string | undefined;

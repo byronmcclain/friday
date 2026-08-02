@@ -8,11 +8,7 @@ export class TimeoutError extends Error {
 /**
  * Race a promise against a timeout. Rejects with TimeoutError on expiration.
  */
-export function withTimeout<T>(
-	promise: Promise<T>,
-	ms: number,
-	label?: string,
-): Promise<T> {
+export function withTimeout<T>(promise: Promise<T>, ms: number, label?: string): Promise<T> {
 	return new Promise<T>((res, rej) => {
 		const timer = setTimeout(() => rej(new TimeoutError(label)), ms);
 		promise.then(

@@ -1,4 +1,4 @@
-import { parseAnsiOutput, type ParsedLine } from "./ansi-parser.ts";
+import { type ParsedLine, parseAnsiOutput } from "./ansi-parser.ts";
 
 export interface LogoData {
 	parsedLines: ParsedLine[];
@@ -72,10 +72,7 @@ export async function processLogo(
 		if (lines.length === 0) return null;
 
 		const parsedLines = parseAnsiOutput(lines);
-		const maxWidth = lines.reduce(
-			(max, line) => Math.max(max, stripAnsi(line).length),
-			0,
-		);
+		const maxWidth = lines.reduce((max, line) => Math.max(max, stripAnsi(line).length), 0);
 
 		return { parsedLines, width: maxWidth, height: lines.length };
 	} catch {

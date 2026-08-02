@@ -1,4 +1,4 @@
-import type { NotificationChannel, FridayNotification } from "../notifications.ts";
+import type { FridayNotification, NotificationChannel } from "../notifications.ts";
 import type { Vox } from "./vox.ts";
 
 export class VoiceChannel implements NotificationChannel {

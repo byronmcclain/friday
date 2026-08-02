@@ -1,11 +1,12 @@
 // tests/unit/psyche-curator.test.ts
-import { describe, test, expect, beforeEach } from "bun:test";
+
 import { Database } from "bun:sqlite";
+import { beforeEach, describe, expect, test } from "bun:test";
+import type { ConversationMessage } from "../../src/core/types.ts";
 import { PsycheCurator } from "../../src/psyche/curator.ts";
 import { PsycheStore } from "../../src/psyche/store.ts";
 import { PSYCHE_DEFAULTS } from "../../src/psyche/types.ts";
-import { createMockModel, createErrorModel } from "../helpers/stubs.ts";
-import type { ConversationMessage } from "../../src/core/types.ts";
+import { createErrorModel, createMockModel } from "../helpers/stubs.ts";
 
 function makeMessages(count: number): ConversationMessage[] {
 	const msgs: ConversationMessage[] = [];
@@ -50,9 +51,7 @@ describe("PsycheCurator", () => {
 		await curator.analyzeSession("session-1", makeMessages(6));
 
 		const trust = store.getDimension("trust");
-		expect(trust!.description).toBe(
-			"Growing trust after a successful collaborative debug.",
-		);
+		expect(trust!.description).toBe("Growing trust after a successful collaborative debug.");
 		const mood = store.getLastSessionMood();
 		expect(mood!.startedMood).toBe("Focused");
 		expect(mood!.endedMood).toBe("Satisfied");
@@ -80,9 +79,7 @@ describe("PsycheCurator", () => {
 
 		const milestones = store.getMilestones();
 		expect(milestones).toHaveLength(1);
-		expect(milestones[0]!.summary).toBe(
-			"Saved a production deploy with a last-minute fix.",
-		);
+		expect(milestones[0]!.summary).toBe("Saved a production deploy with a last-minute fix.");
 		expect(milestones[0]!.sessionId).toBe("session-2");
 	});
 

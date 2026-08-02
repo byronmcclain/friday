@@ -1,11 +1,11 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { mkdir, rm, chmod, stat } from "node:fs/promises";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { chmod, mkdir, rm, stat } from "node:fs/promises";
 import {
-	GENESIS_DEFAULT_DIR,
-	resolveGenesisPath,
-	loadGenesis,
-	seedGenesis,
 	checkGenesis,
+	GENESIS_DEFAULT_DIR,
+	loadGenesis,
+	resolveGenesisPath,
+	seedGenesis,
 } from "../../src/core/genesis.ts";
 import { GENESIS_TEMPLATE } from "../../src/core/prompts.ts";
 
@@ -22,8 +22,7 @@ describe("genesis", () => {
 	});
 
 	test("GENESIS_DEFAULT_DIR points to ~/.friday", () => {
-		const home =
-			process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
+		const home = process.env.HOME ?? process.env.USERPROFILE ?? "/tmp";
 		expect(GENESIS_DEFAULT_DIR).toBe(`${home}/.friday`);
 	});
 
@@ -42,12 +41,9 @@ describe("genesis", () => {
 		const original = process.env.FRIDAY_GENESIS_PATH;
 		try {
 			delete process.env.FRIDAY_GENESIS_PATH;
-			expect(resolveGenesisPath()).toBe(
-				`${GENESIS_DEFAULT_DIR}/GENESIS.md`,
-			);
+			expect(resolveGenesisPath()).toBe(`${GENESIS_DEFAULT_DIR}/GENESIS.md`);
 		} finally {
-			if (original !== undefined)
-				process.env.FRIDAY_GENESIS_PATH = original;
+			if (original !== undefined) process.env.FRIDAY_GENESIS_PATH = original;
 		}
 	});
 
@@ -58,16 +54,14 @@ describe("genesis", () => {
 	});
 
 	test("loadGenesis throws on missing file", async () => {
-		await expect(
-			loadGenesis(`${TEST_GENESIS_DIR}/nonexistent.md`),
-		).rejects.toThrow("GENESIS.md not found");
+		await expect(loadGenesis(`${TEST_GENESIS_DIR}/nonexistent.md`)).rejects.toThrow(
+			"GENESIS.md not found",
+		);
 	});
 
 	test("loadGenesis throws on empty file", async () => {
 		await Bun.write(TEST_GENESIS_PATH, "");
-		await expect(loadGenesis(TEST_GENESIS_PATH)).rejects.toThrow(
-			"GENESIS.md is empty",
-		);
+		await expect(loadGenesis(TEST_GENESIS_PATH)).rejects.toThrow("GENESIS.md is empty");
 	});
 
 	test("seedGenesis creates file with template content", async () => {
@@ -104,9 +98,7 @@ describe("genesis", () => {
 	});
 
 	test("checkGenesis reports missing file", async () => {
-		const result = await checkGenesis(
-			`${TEST_GENESIS_DIR}/nope.md`,
-		);
+		const result = await checkGenesis(`${TEST_GENESIS_DIR}/nope.md`);
 		expect(result.ok).toBe(false);
 		expect(result.issues).toContain("File not found");
 	});

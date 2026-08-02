@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
-import type { Rhythm, RhythmAction, RhythmExecution } from "./types.ts";
 import type { ClearanceName } from "../core/clearance.ts";
+import type { Rhythm, RhythmAction, RhythmExecution } from "./types.ts";
 
 type RhythmRow = {
 	id: string;
@@ -105,9 +105,15 @@ export class RhythmStore {
 				error TEXT
 			)
 		`);
-		this.db.run("CREATE INDEX IF NOT EXISTS idx_rhythm_executions_rhythm_id ON rhythm_executions(rhythm_id)");
-		this.db.run("CREATE INDEX IF NOT EXISTS idx_rhythm_executions_started_at ON rhythm_executions(started_at)");
-		this.db.run("CREATE INDEX IF NOT EXISTS idx_rhythm_executions_rhythm_started ON rhythm_executions(rhythm_id, started_at DESC)");
+		this.db.run(
+			"CREATE INDEX IF NOT EXISTS idx_rhythm_executions_rhythm_id ON rhythm_executions(rhythm_id)",
+		);
+		this.db.run(
+			"CREATE INDEX IF NOT EXISTS idx_rhythm_executions_started_at ON rhythm_executions(started_at)",
+		);
+		this.db.run(
+			"CREATE INDEX IF NOT EXISTS idx_rhythm_executions_rhythm_started ON rhythm_executions(rhythm_id, started_at DESC)",
+		);
 		this.db.run("CREATE INDEX IF NOT EXISTS idx_rhythms_next_run ON rhythms(next_run)");
 		this.db.run("CREATE INDEX IF NOT EXISTS idx_rhythms_enabled ON rhythms(enabled)");
 	}
@@ -118,7 +124,25 @@ export class RhythmStore {
 		const actionData = this.serializeActionData(input.action);
 
 		this.db
-			.query<void, [string, string, string, string, number, string, string, string, string, number, number, string, string, string]>(
+			.query<
+				void,
+				[
+					string,
+					string,
+					string,
+					string,
+					number,
+					string,
+					string,
+					string,
+					string,
+					number,
+					number,
+					string,
+					string,
+					string,
+				]
+			>(
 				`INSERT INTO rhythms (id, name, description, cron, enabled, origin, action_type, action_data, next_run, run_count, consecutive_failures, clearance, created_at, updated_at)
 				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			)
@@ -143,9 +167,7 @@ export class RhythmStore {
 	}
 
 	get(id: string): Rhythm | undefined {
-		const row = this.db
-			.query<RhythmRow, [string]>("SELECT * FROM rhythms WHERE id = ?")
-			.get(id);
+		const row = this.db.query<RhythmRow, [string]>("SELECT * FROM rhythms WHERE id = ?").get(id);
 		return row ? this.hydrate(row) : undefined;
 	}
 
@@ -213,9 +235,7 @@ export class RhythmStore {
 		params.push(id);
 
 		this.db
-			.query<void, (string | number)[]>(
-				`UPDATE rhythms SET ${sets.join(", ")} WHERE id = ?`,
-			)
+			.query<void, (string | number)[]>(`UPDATE rhythms SET ${sets.join(", ")} WHERE id = ?`)
 			.run(...params);
 
 		return this.get(id)!;
@@ -288,11 +308,7 @@ export class RhythmStore {
 		return rows.map((row) => this.hydrateExecution(row));
 	}
 
-	markExecuted(
-		id: string,
-		result: "success" | "failure",
-		nextRun: Date,
-	): void {
+	markExecuted(id: string, result: "success" | "failure", nextRun: Date): void {
 		const failureExpr =
 			result === "success"
 				? "consecutive_failures = 0"
@@ -309,13 +325,7 @@ export class RhythmStore {
 					updated_at = ?
 				WHERE id = ?`,
 			)
-			.run(
-				new Date().toISOString(),
-				result,
-				nextRun.toISOString(),
-				new Date().toISOString(),
-				id,
-			);
+			.run(new Date().toISOString(), result, nextRun.toISOString(), new Date().toISOString(), id);
 	}
 
 	getDueRhythms(now: Date): Rhythm[] {

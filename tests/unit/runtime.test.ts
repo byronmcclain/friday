@@ -1,10 +1,10 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { FridayRuntime, type ShutdownStep } from "../../src/core/runtime.ts";
-import { mkdir, writeFile, rm, unlink } from "node:fs/promises";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync } from "node:fs";
+import { mkdir, rm, unlink, writeFile } from "node:fs/promises";
+import { SQLiteMemory } from "../../src/core/memory.ts";
+import { FridayRuntime, type ShutdownStep } from "../../src/core/runtime.ts";
 import { GROK_DEFAULTS } from "../../src/providers/index.ts";
 import { createMockModel } from "../helpers/stubs.ts";
-import { SQLiteMemory } from "../../src/core/memory.ts";
 
 describe("FridayRuntime", () => {
 	let runtime: FridayRuntime;
@@ -74,7 +74,15 @@ describe("FridayRuntime", () => {
 	test("shutdown calls onProgress callback for each step", async () => {
 		runtime = new FridayRuntime();
 		await runtime.boot({ injectedModel: createMockModel() });
-		const validSteps: ShutdownStep[] = ["arc-rhythm", "vox", "sensorium", "conversation", "knowledge", "modules", "cleanup"];
+		const validSteps: ShutdownStep[] = [
+			"arc-rhythm",
+			"vox",
+			"sensorium",
+			"conversation",
+			"knowledge",
+			"modules",
+			"cleanup",
+		];
 		const captured: Array<{ step: ShutdownStep; label: string }> = [];
 		await runtime.shutdown((step, label) => {
 			captured.push({ step, label });
@@ -591,9 +599,7 @@ describe("FridayRuntime — Genesis", () => {
 	});
 
 	test("sets protected paths when genesisPath is provided", async () => {
-		const { isProtectedPath } = await import(
-			"../../src/modules/filesystem/containment.ts"
-		);
+		const { isProtectedPath } = await import("../../src/modules/filesystem/containment.ts");
 		await writeFile(TEST_GENESIS_PATH, "Custom identity");
 		runtime = new FridayRuntime();
 		await runtime.boot({

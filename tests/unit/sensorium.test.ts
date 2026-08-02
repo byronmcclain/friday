@@ -1,7 +1,7 @@
-import { describe, test, expect, beforeEach } from "bun:test";
-import { Sensorium } from "../../src/sensorium/sensorium.ts";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { SignalBus } from "../../src/core/events.ts";
 import { NotificationManager } from "../../src/core/notifications.ts";
+import { Sensorium } from "../../src/sensorium/sensorium.ts";
 import { SENSORIUM_DEFAULTS } from "../../src/sensorium/types.ts";
 
 describe("Sensorium", () => {

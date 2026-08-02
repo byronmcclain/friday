@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
-import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
 import { assertContained } from "../filesystem/containment.ts";
+import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_TIMEOUT_MS = 120_000;
@@ -45,10 +45,7 @@ export const codeRunFile: FridayTool = {
 	],
 	clearance: ["exec-shell", "read-fs"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const filePath = args.path as string;
 		if (!filePath) {
 			return { success: false, output: "Missing required parameter: path" };

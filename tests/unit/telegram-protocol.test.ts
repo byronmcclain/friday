@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { telegramProtocol } from "../../src/modules/telegram/protocol.ts";
 import { setTelegramClient, setTelegramListener } from "../../src/modules/telegram/state.ts";
 import type { ProtocolContext } from "../../src/modules/types.ts";
@@ -7,7 +7,12 @@ const stubContext: ProtocolContext = {
 	workingDirectory: "/tmp",
 	audit: { log: () => {} } as any,
 	signal: { emit: async () => {} } as any,
-	memory: { get: async () => undefined, set: async () => {}, delete: async () => {}, list: async () => [] },
+	memory: {
+		get: async () => undefined,
+		set: async () => {},
+		delete: async () => {},
+		list: async () => [],
+	},
 	tools: new Map(),
 };
 
@@ -26,7 +31,10 @@ describe("/telegram protocol", () => {
 	});
 
 	test("status shows mode and connection info", async () => {
-		const mockClient = { getOwnerChatId: () => 12345, getMe: async () => ({ id: 1, username: "friday_bot" }) } as any;
+		const mockClient = {
+			getOwnerChatId: () => 12345,
+			getMe: async () => ({ id: 1, username: "friday_bot" }),
+		} as any;
 		const mockListener = { getMode: () => "polling" as const } as any;
 		setTelegramClient(mockClient);
 		setTelegramListener(mockListener);

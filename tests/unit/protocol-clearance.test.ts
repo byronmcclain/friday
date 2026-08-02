@@ -1,8 +1,8 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { FridayRuntime } from "../../src/core/runtime.ts";
-import { createMockModel } from "../helpers/stubs.ts";
-import type { FridayProtocol } from "../../src/modules/types.ts";
 import type { FridayDirective } from "../../src/directives/types.ts";
+import type { FridayProtocol } from "../../src/modules/types.ts";
+import { createMockModel } from "../helpers/stubs.ts";
 
 describe("Protocol clearance enforcement", () => {
 	let runtime: FridayRuntime;

@@ -1,10 +1,10 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import {
-	SENSORIUM_DEFAULTS,
-	type SystemSnapshot,
-	type SensorConfig,
-	type AlertThresholds,
 	AlertState,
+	type AlertThresholds,
+	SENSORIUM_DEFAULTS,
+	type SensorConfig,
+	type SystemSnapshot,
 } from "../../src/sensorium/types.ts";
 
 describe("Sensorium types", () => {

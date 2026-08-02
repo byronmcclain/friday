@@ -1,10 +1,16 @@
-import type { SignalBus } from "../events.ts";
-import type { ClearanceManager } from "../clearance.ts";
+import type { LanguageModelV4 } from "@ai-sdk/provider";
 import type { AuditLogger } from "../../audit/logger.ts";
-import { type VoiceMode, type GrokVoice, type VoxConfig, type VoxOptions, VOX_TTS_URL } from "./types.ts";
-import { playAudio, cleanupTempFile, detectPlayer } from "./audio.ts";
-import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { ClearanceManager } from "../clearance.ts";
+import type { SignalBus } from "../events.ts";
+import { cleanupTempFile, detectPlayer, playAudio } from "./audio.ts";
 import { emotionalRewrite } from "./emotion.ts";
+import {
+	type GrokVoice,
+	VOX_TTS_URL,
+	type VoiceMode,
+	type VoxConfig,
+	type VoxOptions,
+} from "./types.ts";
 
 interface VoxStatus {
 	mode: VoiceMode;
@@ -24,7 +30,7 @@ export class Vox {
 	private _activeController: AbortController | null = null;
 	private _speaking = false;
 	private _playerAvailable: boolean | null = null;
-	private _fastModel?: LanguageModelV3;
+	private _fastModel?: LanguageModelV4;
 	private _getRecentHistory?: () => string[];
 	private _psycheDimensionSummary?: () => string | undefined;
 
@@ -48,7 +54,7 @@ export class Vox {
 	}
 
 	setEmotionEngine(
-		fastModel: LanguageModelV3,
+		fastModel: LanguageModelV4,
 		getRecentHistory: () => string[],
 		getPsycheDimensions?: () => string | undefined,
 	): void {
@@ -132,7 +138,11 @@ export class Vox {
 					psycheCtx,
 				);
 				spokenText = result.text;
-				this.logAudit("vox:rewrite", `Emotional rewrite applied (mood: ${result.emotion?.mood ?? "neutral"})`, true);
+				this.logAudit(
+					"vox:rewrite",
+					`Emotional rewrite applied (mood: ${result.emotion?.mood ?? "neutral"})`,
+					true,
+				);
 			} catch {
 				// Fallback: use original text
 			}

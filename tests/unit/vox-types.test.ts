@@ -1,14 +1,14 @@
-import { describe, test, expect } from "bun:test";
-import { VOX_DEFAULTS, VOX_TTS_URL, GROK_REALTIME_URL } from "../../src/core/voice/types.ts";
+import { describe, expect, test } from "bun:test";
 import type {
-	VoiceMode,
-	GrokVoice,
-	VoxConfig,
-	EmotionMood,
-	EmotionIntensity,
-	EmotionProfile,
 	EmotionalRewriteResult,
+	EmotionIntensity,
+	EmotionMood,
+	EmotionProfile,
+	GrokVoice,
+	VoiceMode,
+	VoxConfig,
 } from "../../src/core/voice/types.ts";
+import { GROK_REALTIME_URL, VOX_DEFAULTS, VOX_TTS_URL } from "../../src/core/voice/types.ts";
 
 describe("Vox types", () => {
 	test("VOX_DEFAULTS has correct shape", () => {

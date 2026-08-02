@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { computeInputHeight } from "../../src/cli/tui/components/command-typeahead.tsx";
 
 describe("computeInputHeight", () => {

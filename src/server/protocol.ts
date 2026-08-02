@@ -59,15 +59,34 @@ export type ServerMessage =
 	  }
 	| { type: "error"; requestId?: string; code: string; message: string }
 	| { type: "session:ready"; requestId: string; model: string; capabilities: string[] }
-	| { type: "session:protocols"; requestId: string; protocols: { name: string; description: string; aliases?: string[] }[] }
-	| { type: "voice:state"; state: "idle" | "listening" | "thinking" | "speaking" | "error" }
+	| {
+			type: "session:protocols";
+			requestId: string;
+			protocols: { name: string; description: string; aliases?: string[] }[];
+	  }
+	| {
+			type: "voice:state";
+			state: "idle" | "listening" | "thinking" | "speaking" | "reconnecting" | "error";
+	  }
 	| { type: "voice:transcript"; role: "user" | "assistant"; delta: string; done: boolean }
 	| { type: "voice:audio"; delta: string }
 	| { type: "voice:started"; requestId: string }
 	| { type: "voice:stopped"; requestId: string }
 	| { type: "voice:error"; code: string; message: string }
-	| { type: "conversation:message"; role: "user" | "assistant"; content: string; source: "voice" | "chat" | "tui" | "replay" | "telegram" }
-	| { type: "audit:entry"; action: string; source: string; detail: string; success: boolean; timestamp: string };
+	| {
+			type: "conversation:message";
+			role: "user" | "assistant";
+			content: string;
+			source: "voice" | "chat" | "tui" | "replay" | "telegram";
+	  }
+	| {
+			type: "audit:entry";
+			action: string;
+			source: string;
+			detail: string;
+			success: boolean;
+			timestamp: string;
+	  };
 
 // ─── Validators ─────────────────────────────────────────────────
 
@@ -130,8 +149,8 @@ export function parseClientMessage(raw: string): ClientMessage | null {
 	if ("sessionId" in parsed && typeof parsed.sessionId !== "string") return null;
 	if ("clientType" in parsed && typeof parsed.clientType !== "string") return null;
 	if ("mode" in parsed && typeof parsed.mode !== "string") return null;
-	if ("voice" in parsed && parsed.voice !== undefined && typeof parsed.voice !== "string") return null;
+	if ("voice" in parsed && parsed.voice !== undefined && typeof parsed.voice !== "string")
+		return null;
 
 	return parsed as ClientMessage;
 }
-

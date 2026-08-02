@@ -1,12 +1,8 @@
-import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { LanguageModelV4 } from "@ai-sdk/provider";
 import { generateText } from "ai";
-import type {
-	EmotionMood,
-	EmotionIntensity,
-	EmotionalRewriteResult,
-} from "./types.ts";
-import { FRIDAY_VOICE_IDENTITY } from "./prompt.ts";
 import { withTimeout } from "../../utils/timeout.ts";
+import { FRIDAY_VOICE_IDENTITY } from "./prompt.ts";
+import type { EmotionalRewriteResult, EmotionIntensity, EmotionMood } from "./types.ts";
 
 const VALID_MOODS: ReadonlySet<string> = new Set<EmotionMood>([
 	"neutral",
@@ -119,7 +115,7 @@ export async function emotionalRewrite(
 	text: string,
 	recentMessages: string[],
 	mode: "on" | "whisper",
-	fastModel: LanguageModelV3,
+	fastModel: LanguageModelV4,
 	psycheContext?: string,
 ): Promise<EmotionalRewriteResult> {
 	try {
@@ -128,9 +124,7 @@ export async function emotionalRewrite(
 				? `RECENT CONVERSATION:\n${recentMessages.join("\n")}\n`
 				: "RECENT CONVERSATION:\n(no prior messages)\n";
 
-		const psycheBlock = psycheContext
-			? `\nRELATIONAL CONTEXT:\n${psycheContext}\n`
-			: "";
+		const psycheBlock = psycheContext ? `\nRELATIONAL CONTEXT:\n${psycheContext}\n` : "";
 		const prompt = `${EMOTION_REWRITE_PROMPT}\n\n${MODE_GUIDANCE[mode]}\n${psycheBlock}\n${historyBlock}\nTEXT TO REWRITE:\n${text}`;
 
 		const result = await withTimeout(

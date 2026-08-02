@@ -56,10 +56,7 @@ function replaceNames(token: string, names: Record<string, number>): string {
 	return result;
 }
 
-function parseField(
-	token: string,
-	spec: FieldSpec,
-): { values: Set<number> } | { error: string } {
+function parseField(token: string, spec: FieldSpec): { values: Set<number> } | { error: string } {
 	const resolved = spec.names ? replaceNames(token, spec.names) : token;
 	const values = new Set<number>();
 
@@ -115,7 +112,9 @@ export function validate(expr: string): { valid: boolean; error?: string } {
 	return { valid: true };
 }
 
-function parsedFields(expr: string): [Set<number>, Set<number>, Set<number>, Set<number>, Set<number>] {
+function parsedFields(
+	expr: string,
+): [Set<number>, Set<number>, Set<number>, Set<number>, Set<number>] {
 	const expanded = expandShorthand(expr);
 	const parts = expanded.split(/\s+/);
 	const result: Set<number>[] = [];
@@ -135,8 +134,7 @@ function parsedFields(expr: string): [Set<number>, Set<number>, Set<number>, Set
 }
 
 export function nextOccurrence(expr: string, after?: Date): Date {
-	const [minutes, hours, daysOfMonth, months, daysOfWeek] =
-		parsedFields(expr);
+	const [minutes, hours, daysOfMonth, months, daysOfWeek] = parsedFields(expr);
 	const expanded = expandShorthand(expr).split(/\s+/);
 	const dowWildcard = expanded[4] === "*";
 	const domWildcard = expanded[2] === "*";

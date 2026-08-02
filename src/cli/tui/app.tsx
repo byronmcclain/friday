@@ -1,31 +1,26 @@
-import { useReducer, useEffect, useState, useCallback, useRef } from "react";
+import { writeSync } from "node:fs";
+import { resolve } from "node:path";
 import { createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
-import { toast, ToasterRenderable } from "@opentui-ui/toast";
-import { resolve } from "node:path";
-import { writeSync } from "node:fs";
-import type { RuntimeBridge } from "../../core/bridges/types.ts";
+import { ToasterRenderable, toast } from "@opentui-ui/toast";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { SocketBridge } from "../../core/bridges/socket.ts";
-import { appReducer, initialState, isExitWord, createMessage } from "./state.ts";
-import { PALETTE } from "./theme.ts";
-import { Header } from "./components/header.tsx";
+import type { RuntimeBridge } from "../../core/bridges/types.ts";
 import { ChatArea } from "./components/chat-area.tsx";
+import { Header } from "./components/header.tsx";
 import { InputBar } from "./components/input-bar.tsx";
-import { SplashScreen } from "./components/splash.tsx";
-import {
-	processLogo,
-	checkChafa,
-	type LogoData,
-} from "./lib/logo-processor.ts";
-import type { TypeaheadEntry } from "./filter-commands.ts";
-import { LogStore } from "./log-store.ts";
 import { LogPanel } from "./components/log-panel.tsx";
-import { LOG_ICONS, type LogEntry } from "./log-types.ts";
+import { SplashScreen } from "./components/splash.tsx";
+import type { TypeaheadEntry } from "./filter-commands.ts";
 import { openExternalEditor } from "./lib/external-editor.ts";
+import { checkChafa, type LogoData, processLogo } from "./lib/logo-processor.ts";
+import { LogStore } from "./log-store.ts";
+import { LOG_ICONS, type LogEntry } from "./log-types.ts";
+import { appReducer, createMessage, initialState, isExitWord } from "./state.ts";
+import { PALETTE } from "./theme.ts";
 
 // Module-level renderer reference so shutdown can call destroy()
-let activeRenderer: Awaited<ReturnType<typeof createCliRenderer>> | null =
-	null;
+let activeRenderer: Awaited<ReturnType<typeof createCliRenderer>> | null = null;
 
 // Explicit terminal restoration — safety net after renderer.destroy().
 // Uses writeSync to fd 1 (stdout) to bypass OpenTUI's stdout interception
@@ -37,8 +32,8 @@ function restoreTerminal(): void {
 	writeSync(
 		1,
 		"\x1b[?1049l" + // Switch back to main screen (no-op if already there)
-			"\x1b[0m" +     // Reset all SGR attributes
-			"\x1b[?25h",    // Show cursor
+			"\x1b[0m" + // Reset all SGR attributes
+			"\x1b[?25h", // Show cursor
 	);
 }
 
@@ -104,22 +99,25 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 		});
 		renderer.root.add(toaster);
 		return () => {
-			renderer.root.remove(toaster.id);
+			renderer.root.remove(toaster);
 			toaster.destroy();
 		};
 	}, [renderer]);
 
-	const pushLog = useCallback((level: LogEntry["level"], source: string, message: string, detail?: string) => {
-		const entry: LogEntry = {
-			id: crypto.randomUUID(),
-			timestamp: new Date(),
-			level,
-			source,
-			message,
-			detail,
-		};
-		logStoreRef.current.push(entry);
-	}, []);
+	const pushLog = useCallback(
+		(level: LogEntry["level"], source: string, message: string, detail?: string) => {
+			const entry: LogEntry = {
+				id: crypto.randomUUID(),
+				timestamp: new Date(),
+				level,
+				source,
+				message,
+				detail,
+			};
+			logStoreRef.current.push(entry);
+		},
+		[],
+	);
 
 	// Subscribe to LogStore changes to update React state
 	useEffect(() => {
@@ -192,11 +190,10 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 				// Wire notification push from the server into TUI toast + log panel
 				socketBridge.onNotification = (msg) => {
 					if (cancelled) return;
-					const logLevel: LogEntry["level"] = msg.level === "alert" ? "error" : msg.level === "warning" ? "warning" : "info";
+					const logLevel: LogEntry["level"] =
+						msg.level === "alert" ? "error" : msg.level === "warning" ? "warning" : "info";
 					// Toast shows title + truncated body preview; full content lives in the log panel
-					const preview = msg.body.length > 160
-						? msg.body.slice(0, 160).trimEnd() + "…"
-						: msg.body;
+					const preview = msg.body.length > 160 ? msg.body.slice(0, 160).trimEnd() + "…" : msg.body;
 					toast(`${LOG_ICONS[logLevel]} ${msg.title}`, { description: preview });
 					pushLog(logLevel, msg.source, msg.title, msg.body);
 				};
@@ -230,17 +227,17 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 				});
 				dispatch({
 					type: "add-message",
-					message: createMessage("system", `Connected to singleton runtime. (Grok: ${runtimeModel})`),
+					message: createMessage(
+						"system",
+						`Connected to singleton runtime. (Grok: ${runtimeModel})`,
+					),
 				});
 				if (cancelled) return;
 				setBootComplete(true);
 				pushLog("success", "runtime", `Connected to singleton runtime. (Grok: ${runtimeModel})`);
 			} catch (error) {
 				if (cancelled) return;
-				const msg =
-					error instanceof Error
-						? error.message
-						: "Unknown connection error";
+				const msg = error instanceof Error ? error.message : "Unknown connection error";
 				dispatch({
 					type: "add-message",
 					message: createMessage("system", `Connection failed: ${msg}`),
@@ -249,7 +246,9 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			}
 		})();
 
-		return () => { cancelled = true; };
+		return () => {
+			cancelled = true;
+		};
 	}, [options.socketPath]);
 
 	// Activate when both splash is done and boot is complete
@@ -267,7 +266,9 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			}
 		};
 		renderer.keyInput.on("keypress", handler);
-		return () => { renderer.keyInput.off("keypress", handler); };
+		return () => {
+			renderer.keyInput.off("keypress", handler);
+		};
 	}, [renderer]);
 
 	// Shutdown handler
@@ -286,8 +287,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			});
 			pushLog("success", "runtime", "Disconnected.");
 		} catch (error) {
-			const msg =
-				error instanceof Error ? error.message : "Unknown error";
+			const msg = error instanceof Error ? error.message : "Unknown error";
 			dispatch({
 				type: "add-message",
 				message: createMessage("system", `Shutdown failed: ${msg}`),
@@ -343,7 +343,11 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 			skipSplashOnResume = true;
 
 			// Resume TUI — re-create renderer
-			const newRenderer = await createCliRenderer({ exitOnCtrlC: false, useMouse: true, useKittyKeyboard: { disambiguate: true } });
+			const newRenderer = await createCliRenderer({
+				exitOnCtrlC: false,
+				useMouse: true,
+				useKittyKeyboard: { disambiguate: true },
+			});
 			activeRenderer = newRenderer;
 
 			// Re-wire emergency cleanup signals
@@ -370,8 +374,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 	const handleSubmit = useCallback(
 		async (input: string) => {
 			const bridge = bridgeRef.current;
-			if (!bridge || phaseRef.current !== "active" || processingRef.current)
-				return;
+			if (!bridge || phaseRef.current !== "active" || processingRef.current) return;
 
 			// Exit words trigger shutdown
 			if (isExitWord(input)) {
@@ -408,8 +411,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 				}
 			} catch (error) {
 				dispatch({ type: "set-thinking", value: false });
-				const msg =
-					error instanceof Error ? error.message : "Unknown error";
+				const msg = error instanceof Error ? error.message : "Unknown error";
 				dispatch({
 					type: "add-message",
 					message: createMessage("system", `Error: ${msg}`),
@@ -434,9 +436,7 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 				>
 					<SplashScreen
 						logoData={logoDataRef.current}
-						onComplete={() =>
-							dispatch({ type: "set-phase", phase: "booting" })
-						}
+						onComplete={() => dispatch({ type: "set-phase", phase: "booting" })}
 					/>
 				</box>
 			);
@@ -496,27 +496,25 @@ function FridayApp({ options, renderer }: FridayAppProps) {
 						isStreaming={state.isStreaming}
 					/>
 				</box>
-				{state.logPanelVisible && (
-					<LogPanel entries={logEntries} width={panelWidth} />
-				)}
+				{state.logPanelVisible && <LogPanel entries={logEntries} width={panelWidth} />}
 			</box>
 		</box>
 	);
 }
 
 // Entry point — called from chat.ts
-export async function launchTui(options: {
-	socketPath: string;
-}): Promise<void> {
+export async function launchTui(options: { socketPath: string }): Promise<void> {
 	if (!process.stdin.isTTY) {
-		console.error(
-			"Interactive chat requires a TTY. Use 'friday serve' for the web UI.",
-		);
+		console.error("Interactive chat requires a TTY. Use 'friday serve' for the web UI.");
 		process.exit(1);
 	}
 
 	try {
-		const renderer = await createCliRenderer({ exitOnCtrlC: false, useMouse: true, useKittyKeyboard: { disambiguate: true } });
+		const renderer = await createCliRenderer({
+			exitOnCtrlC: false,
+			useMouse: true,
+			useKittyKeyboard: { disambiguate: true },
+		});
 		activeRenderer = renderer;
 
 		// Ensure terminal state is restored on unexpected signals

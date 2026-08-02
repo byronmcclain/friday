@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from "react";
 import { useKeyboard } from "@opentui/react";
-import { PALETTE } from "../theme.ts";
+import { useEffect, useRef, useState } from "react";
+import { version } from "../../../../package.json";
+import type { ParsedLine } from "../lib/ansi-parser.ts";
 import { lerpColor } from "../lib/color-utils.ts";
 import type { LogoData } from "../lib/logo-processor.ts";
-import type { ParsedLine } from "../lib/ansi-parser.ts";
-import { version } from "../../../../package.json";
+import { PALETTE } from "../theme.ts";
 
 const HOLD_MS = 2000;
 const FADE_MS = 1500;
@@ -98,12 +98,7 @@ export function SplashScreen({ logoData, onComplete }: SplashScreenProps) {
 			{/* Logo */}
 			<box style={{ flexDirection: "column", alignItems: "center" }}>
 				{logoData.parsedLines.map((spans, i) => (
-					<FadedLine
-						key={`l-${i}`}
-						spans={spans}
-						fadeProgress={fadeProgress}
-						bg={bg}
-					/>
+					<FadedLine key={`l-${i}`} spans={spans} fadeProgress={fadeProgress} bg={bg} />
 				))}
 			</box>
 

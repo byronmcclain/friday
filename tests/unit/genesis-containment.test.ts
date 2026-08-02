@@ -1,8 +1,5 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import {
-	isProtectedPath,
-	setProtectedPaths,
-} from "../../src/modules/filesystem/containment.ts";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { isProtectedPath, setProtectedPaths } from "../../src/modules/filesystem/containment.ts";
 
 const TEST_GENESIS_DIR = "/tmp/friday-test-containment-genesis";
 const TEST_GENESIS_PATH = `${TEST_GENESIS_DIR}/GENESIS.md`;

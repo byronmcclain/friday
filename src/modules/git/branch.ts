@@ -3,38 +3,31 @@ import { assertSafeArg } from "../validation.ts";
 
 export const gitBranch: FridayTool = {
 	name: "git.branch",
-	description:
-		"List, create, delete, or switch branches. Multipurpose branch management tool.",
+	description: "List, create, delete, or switch branches. Multipurpose branch management tool.",
 	parameters: [
 		{
 			name: "action",
 			type: "string",
-			description:
-				'Action to perform: "list", "create", "delete", "switch" (default: "list")',
+			description: 'Action to perform: "list", "create", "delete", "switch" (default: "list")',
 			required: false,
 			default: "list",
 		},
 		{
 			name: "name",
 			type: "string",
-			description:
-				'Branch name (required for create, delete, switch)',
+			description: "Branch name (required for create, delete, switch)",
 			required: false,
 		},
 		{
 			name: "from",
 			type: "string",
-			description:
-				"Base ref to create branch from (only for create action)",
+			description: "Base ref to create branch from (only for create action)",
 			required: false,
 		},
 	],
 	clearance: ["git-read", "git-write"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const action = (args.action as string) ?? "list";
 		const name = args.name as string | undefined;
 		const from = args.from as string | undefined;
@@ -51,17 +44,14 @@ export const gitBranch: FridayTool = {
 		try {
 			switch (action) {
 				case "list": {
-					const result =
-						await Bun.$`git -C ${context.workingDirectory} branch -vv`
-							.quiet()
-							.nothrow();
+					const result = await Bun.$`git -C ${context.workingDirectory} branch -vv`
+						.quiet()
+						.nothrow();
 
 					if (result.exitCode !== 0) {
 						return {
 							success: false,
-							output:
-								result.stderr.toString().trim() ||
-								"git branch list failed",
+							output: result.stderr.toString().trim() || "git branch list failed",
 						};
 					}
 
@@ -80,14 +70,7 @@ export const gitBranch: FridayTool = {
 						};
 					}
 
-					const cmdParts = [
-						"git",
-						"-C",
-						context.workingDirectory,
-						"switch",
-						"-c",
-						name,
-					];
+					const cmdParts = ["git", "-C", context.workingDirectory, "switch", "-c", name];
 					if (from) cmdParts.push(from);
 
 					const result = await Bun.$`${cmdParts}`.quiet().nothrow();
@@ -95,9 +78,7 @@ export const gitBranch: FridayTool = {
 					if (result.exitCode !== 0) {
 						return {
 							success: false,
-							output:
-								result.stderr.toString().trim() ||
-								"branch creation failed",
+							output: result.stderr.toString().trim() || "branch creation failed",
 						};
 					}
 
@@ -123,17 +104,14 @@ export const gitBranch: FridayTool = {
 						};
 					}
 
-					const result =
-						await Bun.$`git -C ${context.workingDirectory} branch -d ${name}`
-							.quiet()
-							.nothrow();
+					const result = await Bun.$`git -C ${context.workingDirectory} branch -d ${name}`
+						.quiet()
+						.nothrow();
 
 					if (result.exitCode !== 0) {
 						return {
 							success: false,
-							output:
-								result.stderr.toString().trim() ||
-								"branch deletion failed",
+							output: result.stderr.toString().trim() || "branch deletion failed",
 						};
 					}
 
@@ -159,17 +137,14 @@ export const gitBranch: FridayTool = {
 						};
 					}
 
-					const result =
-						await Bun.$`git -C ${context.workingDirectory} switch ${name}`
-							.quiet()
-							.nothrow();
+					const result = await Bun.$`git -C ${context.workingDirectory} switch ${name}`
+						.quiet()
+						.nothrow();
 
 					if (result.exitCode !== 0) {
 						return {
 							success: false,
-							output:
-								result.stderr.toString().trim() ||
-								"branch switch failed",
+							output: result.stderr.toString().trim() || "branch switch failed",
 						};
 					}
 

@@ -1,15 +1,11 @@
-import { useState, useEffect } from "react";
-import { PALETTE, DIM } from "../theme.ts";
-import { CommandTypeahead } from "./command-typeahead.tsx";
+import { freemem, platform, totalmem } from "node:os";
+import { useEffect, useState } from "react";
+import { type CpuTimes, getCpuTimes, parseVmStatMemory } from "../../../sensorium/sensors.ts";
 import type { TypeaheadEntry } from "../filter-commands.ts";
-import { usePulse } from "../lib/use-pulse.ts";
 import { lerpColor } from "../lib/color-utils.ts";
-import { freemem, totalmem, platform } from "node:os";
-import {
-	parseVmStatMemory,
-	getCpuTimes,
-	type CpuTimes,
-} from "../../../sensorium/sensors.ts";
+import { usePulse } from "../lib/use-pulse.ts";
+import { DIM, PALETTE } from "../theme.ts";
+import { CommandTypeahead } from "./command-typeahead.tsx";
 
 interface InputBarProps {
 	commands: TypeaheadEntry[];
@@ -90,10 +86,7 @@ function StatusRow() {
 		const clock = setInterval(() => setNow(new Date()), 1000);
 		// Immediately replace naive initial stats with accurate values
 		void readStatsAsync().then(setStats);
-		const sysStats = setInterval(
-			() => void readStatsAsync().then(setStats),
-			STATS_INTERVAL_MS,
-		);
+		const sysStats = setInterval(() => void readStatsAsync().then(setStats), STATS_INTERVAL_MS);
 		return () => {
 			clearInterval(clock);
 			clearInterval(sysStats);
@@ -112,11 +105,7 @@ function StatusRow() {
 				? PALETTE.warning
 				: PALETTE.textMuted;
 	const memColor =
-		memPercent > 85
-			? PALETTE.error
-			: memPercent > 70
-				? PALETTE.warning
-				: PALETTE.textMuted;
+		memPercent > 85 ? PALETTE.error : memPercent > 70 ? PALETTE.warning : PALETTE.textMuted;
 
 	return (
 		<box
