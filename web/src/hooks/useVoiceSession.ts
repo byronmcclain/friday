@@ -90,6 +90,10 @@ export function useVoiceSession({ wsUrl }: UseVoiceSessionOptions): UseVoiceSess
         } else if (msg.state === "reconnecting") {
           setStatusText("Reconnecting\u2026");
           setIsTyping(false);
+        } else if (msg.state === "error") {
+          setStatusText("Session lost. Please restart voice.");
+          setIsTyping(false);
+          setSessionActive(false);
         }
         break;
 
@@ -126,6 +130,10 @@ export function useVoiceSession({ wsUrl }: UseVoiceSessionOptions): UseVoiceSess
       case "voice:error":
         setState("error");
         setStatusText(msg.message ?? "Error.");
+        // SESSION_IN_USE means an existing session is still fine — don't tear it down.
+        if (msg.code !== "SESSION_IN_USE") {
+          setSessionActive(false);
+        }
         break;
     }
   }, []);

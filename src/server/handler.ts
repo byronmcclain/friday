@@ -352,6 +352,10 @@ export class WebSocketHandler {
 							this.clientId,
 						);
 					},
+					onSessionError: (code, message) => {
+						send({ type: "voice:error", code, message });
+						this.voiceSession = null;
+					},
 				});
 
 				try {

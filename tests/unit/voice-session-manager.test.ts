@@ -193,6 +193,81 @@ describe("VoiceSessionManager", () => {
 		expect(responseCreateAfterGreeting).toBe(-1);
 	});
 
+	test("does not cancel the force_message greeting response", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			makeMockCallbacks(),
+		);
+		const sent = attachMockWs(manager);
+
+		await (manager as any).handleGrokMessage(JSON.stringify({ type: "session.updated" }));
+		await (manager as any).handleGrokMessage(
+			JSON.stringify({ type: "response.created", response: { id: "greet-1" } }),
+		);
+
+		const cancel = sent.map((s) => JSON.parse(s)).find((m) => m.type === "response.cancel");
+		expect(cancel).toBeUndefined();
+		expect((manager as any)._pendingGreetingResponseId).toBe("greet-1");
+	});
+
+	test("response.done for the greeting clears the pending greeting id", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			makeMockCallbacks(),
+		);
+		attachMockWs(manager);
+
+		await (manager as any).handleGrokMessage(JSON.stringify({ type: "session.updated" }));
+		await (manager as any).handleGrokMessage(
+			JSON.stringify({ type: "response.created", response: { id: "greet-1" } }),
+		);
+		await (manager as any).handleGrokMessage(
+			JSON.stringify({
+				type: "response.done",
+				response: { id: "greet-1", status: "completed" },
+			}),
+		);
+
+		expect((manager as any)._pendingGreetingResponseId).toBeNull();
+	});
+
+	test("a genuine unexpected auto-response is still cancelled after the greeting settles", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			makeMockCallbacks(),
+		);
+		const sent = attachMockWs(manager);
+
+		await (manager as any).handleGrokMessage(JSON.stringify({ type: "session.updated" }));
+		await (manager as any).handleGrokMessage(
+			JSON.stringify({ type: "response.created", response: { id: "greet-1" } }),
+		);
+		await (manager as any).handleGrokMessage(
+			JSON.stringify({
+				type: "response.done",
+				response: { id: "greet-1", status: "completed" },
+			}),
+		);
+
+		// A second, unrelated response.created after the greeting has settled
+		// should be treated as an unexpected auto-response and cancelled.
+		await (manager as any).handleGrokMessage(
+			JSON.stringify({ type: "response.created", response: { id: "auto-2" } }),
+		);
+
+		const cancel = sent.map((s) => JSON.parse(s)).find((m) => m.type === "response.cancel");
+		expect(cancel).toBeDefined();
+	});
+
 	test("does not re-greet on mid-session reconnect", async () => {
 		const model = createMockModel({ text: "unused" });
 		const cortex = new Cortex({ injectedModel: model });
@@ -426,6 +501,86 @@ describe("VoiceSessionManager reconnect", () => {
 		expect(states).toContain("reconnecting");
 		expect(states[states.length - 1]).toBe("error");
 		expect((manager as any).active).toBe(false);
+	});
+
+	test("exhausted reconnect attempts notify onSessionError", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const onSessionError = mock((_code: string, _message: string) => {});
+		const callbacks: VoiceSessionCallbacks = { ...makeMockCallbacks(), onSessionError };
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			callbacks,
+		);
+		(manager as any).active = true;
+		(manager as any)._generation = 1;
+
+		(manager as any)._openSocket = async () => {
+			throw new Error("connection refused");
+		};
+		(manager as any)._reconnectDelaysMs = [0, 0];
+
+		await (manager as any).handleSocketClose(1);
+
+		expect(onSessionError).toHaveBeenCalledTimes(1);
+		expect(onSessionError.mock.calls[0]?.[0]).toBe("RECONNECT_FAILED");
+	});
+
+	test("drops a stale conversation id after a failed reconnect attempt", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const callbacks = makeMockCallbacks();
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			callbacks,
+		);
+		(manager as any).active = true;
+		(manager as any)._generation = 1;
+		(manager as any)._conversationId = "stale-conv";
+
+		const opens: Array<{ conversationId?: string }> = [];
+		let attempt = 0;
+		(manager as any)._openSocket = async (opts: { conversationId?: string }) => {
+			opens.push(opts);
+			attempt++;
+			if (attempt === 1) throw new Error("conversation not found");
+			return {
+				send: mock(() => {}),
+				readyState: 1,
+				close: mock(() => {}),
+				addEventListener: mock(() => {}),
+			};
+		};
+		(manager as any)._reconnectDelaysMs = [0, 0];
+
+		await (manager as any).handleSocketClose(1);
+
+		expect(opens[0]?.conversationId).toBe("stale-conv");
+		expect(opens[1]?.conversationId).toBeUndefined();
+	});
+
+	test("clears assistant transcript buffer on socket close", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const callbacks = makeMockCallbacks();
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			callbacks,
+		);
+		(manager as any).active = true;
+		(manager as any)._generation = 1;
+		(manager as any)._assistantBuffer = "orphaned partial transcript";
+		(manager as any)._openSocket = async () => {
+			throw new Error("connection refused");
+		};
+		(manager as any)._reconnectDelaysMs = [0];
+
+		await (manager as any).handleSocketClose(1);
+
+		expect((manager as any)._assistantBuffer).toBe("");
 	});
 });
 

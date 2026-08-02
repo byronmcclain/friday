@@ -41,6 +41,8 @@ export interface VoiceSessionCallbacks {
 	onStateChange: (state: VoiceState) => void;
 	onUserTranscript: (text: string) => void;
 	onAssistantMessage?: (fullText: string) => void;
+	/** Fired when the session dies permanently (e.g. reconnect attempts exhausted). */
+	onSessionError?: (code: string, message: string) => void;
 }
 
 const CANCEL_RESPONSE_MSG = JSON.stringify({ type: "response.cancel" });
@@ -66,9 +68,14 @@ export class VoiceSessionManager {
 	private debug: boolean;
 	private _conversationId: string | null = null;
 	private _greeted = false;
+	/** True from the moment the greeting force_message is sent until Grok acks it with response.created. */
+	private _pendingGreeting = false;
+	/** Response id of the in-flight greeting turn, so response.done can clear it precisely. */
+	private _pendingGreetingResponseId: string | null = null;
 	private _reconnectDelaysMs = [500, 1000, 2000, 4000, 8000];
+	private _apiKey = "";
 	private _openSocket = (opts?: { conversationId?: string }) =>
-		openGrokWebSocket(process.env.XAI_API_KEY!, 10_000, {
+		openGrokWebSocket(this._apiKey, 10_000, {
 			conversationId: opts?.conversationId,
 		});
 
@@ -106,8 +113,12 @@ export class VoiceSessionManager {
 
 		const apiKey = process.env.XAI_API_KEY;
 		if (!apiKey) throw new Error("XAI_API_KEY not set");
+		this._apiKey = apiKey;
 
 		this._conversationId = null;
+		this._greeted = false;
+		this._pendingGreeting = false;
+		this._pendingGreetingResponseId = null;
 		this.active = true;
 		this._generation++;
 		const gen = this._generation;
@@ -176,12 +187,16 @@ export class VoiceSessionManager {
 			this.voiceWorker = null;
 		}
 		this._activeTurn = null;
+		this._assistantBuffer = "";
 
 		this.emitStateChange("reconnecting");
 		for (const delay of this._reconnectDelaysMs) {
 			if (this._generation !== gen || !this.active) return;
 			if (delay > 0) await Bun.sleep(delay);
 			if (this._generation !== gen || !this.active) return;
+			this.log("RECONNECT", "attempting reconnect", {
+				hasConversationId: this._conversationId != null,
+			});
 			try {
 				const ws = await this._openSocket({
 					conversationId: this._conversationId ?? undefined,
@@ -199,11 +214,18 @@ export class VoiceSessionManager {
 				this.emitStateChange("listening");
 				return;
 			} catch {
-				// try next delay
+				// Drop a potentially stale/rejected conversation id so the next
+				// attempt opens a fresh session instead of retrying with the
+				// same id for every remaining attempt.
+				this._conversationId = null;
 			}
 		}
 		this.active = false;
 		this.emitStateChange("error");
+		this.callbacks.onSessionError?.(
+			"RECONNECT_FAILED",
+			"Unable to reconnect to voice session after multiple attempts",
+		);
 	}
 
 	appendAudio(pcmBase64: string): void {
@@ -216,6 +238,8 @@ export class VoiceSessionManager {
 	async stop(): Promise<void> {
 		this.active = false;
 		this._greeted = false;
+		this._pendingGreeting = false;
+		this._pendingGreetingResponseId = null;
 		if (this.voiceWorker) {
 			this.voiceWorker.abort();
 			this.voiceWorker = null;
@@ -278,6 +302,13 @@ export class VoiceSessionManager {
 
 			// -- Auto-response suppression
 			case "response.created": {
+				if (this._pendingGreeting) {
+					// This is Grok's response to our own force_message greeting, not
+					// an unexpected auto-response -- let it play out uncancelled.
+					this._pendingGreeting = false;
+					this._pendingGreetingResponseId = data.response?.id ?? null;
+					break;
+				}
 				if (!this.voiceWorker?.isProcessing) {
 					this.log("AUTO_RESPONSE", "cancelling unexpected auto-response");
 					this.sendToGrok(CANCEL_RESPONSE_MSG);
@@ -289,6 +320,7 @@ export class VoiceSessionManager {
 			case "session.updated": {
 				if (!this._greeted) {
 					this._greeted = true;
+					this._pendingGreeting = true;
 					this.sendToGrok(
 						JSON.stringify(
 							buildForceMessagePayload(VOICE_SESSION_GREETING, { interruptible: true }),
@@ -345,6 +377,12 @@ export class VoiceSessionManager {
 					await this.voiceWorker.handleGrokEvent(data);
 				}
 				if (data.type === "response.done") {
+					if (
+						this._pendingGreetingResponseId &&
+						data.response?.id === this._pendingGreetingResponseId
+					) {
+						this._pendingGreetingResponseId = null;
+					}
 					const status = data.response?.status ?? "completed";
 					if (status !== "cancelled" && !this.voiceWorker?.isProcessing) {
 						this.emitStateChange("idle");
