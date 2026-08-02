@@ -24,7 +24,9 @@ function makeMockCallbacks(): VoiceSessionCallbacks {
 function attachMockWs(manager: VoiceSessionManager): string[] {
 	const sent: string[] = [];
 	const ws = {
-		send: (d: string) => {
+		send: (d: string | Buffer | Uint8Array) => {
+			// Binary mic frames are not JSON control messages.
+			if (typeof d !== "string") return;
 			sent.push(d);
 			const parsed = JSON.parse(d);
 			if (parsed.type === "session.update") {
@@ -71,7 +73,7 @@ describe("VoiceSessionManager", () => {
 		expect(manager.isActive).toBe(false);
 	});
 
-	test("appendAudio forwards to Grok WebSocket", () => {
+	test("appendAudio forwards raw PCM binary to Grok WebSocket", () => {
 		const model = createMockModel({ text: "unused" });
 		const cortex = new Cortex({ injectedModel: model });
 		const config: VoiceSessionConfig = {
@@ -81,15 +83,69 @@ describe("VoiceSessionManager", () => {
 			silenceDurationMs: 800,
 		};
 		const manager = new VoiceSessionManager(cortex, config, makeMockCallbacks());
-		const sent = attachMockWs(manager);
+		const binarySent: Array<Buffer | Uint8Array> = [];
+		const ws = {
+			send: (d: string | Buffer | Uint8Array) => {
+				if (typeof d !== "string") binarySent.push(d);
+			},
+			readyState: 1,
+			close: () => {},
+		};
+		(manager as any).grokWs = ws;
+		(manager as any).active = true;
 
-		manager.appendAudio("base64pcm");
+		const pcm = Buffer.from([0x01, 0x02, 0x03, 0x04]);
+		manager.appendAudio(pcm);
 
-		const audioMsg = sent
-			.map((s) => JSON.parse(s))
-			.find((m) => m.type === "input_audio_buffer.append");
-		expect(audioMsg).toBeDefined();
-		expect(audioMsg.audio).toBe("base64pcm");
+		expect(binarySent).toHaveLength(1);
+		expect(Buffer.from(binarySent[0]!).equals(pcm)).toBe(true);
+		// Must not send JSON input_audio_buffer.append when transport is binary.
+		expect(binarySent.some((d) => typeof d === "string")).toBe(false);
+	});
+
+	test("binary Grok audio frames forward as base64 onAudioDelta", async () => {
+		const callbacks = makeMockCallbacks();
+		const onAudioDelta = mock((_b64: string) => {});
+		callbacks.onAudioDelta = onAudioDelta;
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			callbacks,
+		);
+		attachMockWs(manager);
+
+		const pcm = Buffer.from([0x10, 0x20, 0x30, 0x40]);
+		await (manager as any).handleGrokBinaryAudio(pcm);
+
+		expect(onAudioDelta).toHaveBeenCalledWith(pcm.toString("base64"));
+		expect(callbacks.onStateChange).toHaveBeenCalledWith("speaking");
+	});
+
+	test("binary Grok audio during a turn reaches VoiceWorker", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			makeMockCallbacks(),
+		);
+		attachMockWs(manager);
+
+		const handleGrokEvent = mock(async (_data: Record<string, unknown>) => {});
+		(manager as any).voiceWorker = {
+			isProcessing: true,
+			handleGrokEvent,
+		};
+
+		const pcm = Buffer.from([0xaa, 0xbb]);
+		await (manager as any).handleGrokBinaryAudio(pcm);
+
+		expect(handleGrokEvent).toHaveBeenCalledWith({
+			type: "response.output_audio.delta",
+			delta: pcm.toString("base64"),
+		});
 	});
 
 	test("speech_started triggers listening state", () => {
@@ -767,4 +823,18 @@ test("initial session.update includes silence_duration_ms and resumption", () =>
 	expect(payload.session.turn_detection.silence_duration_ms).toBe(600);
 	expect(payload.session.resumption).toEqual({ enabled: true });
 	expect(payload.session.turn_detection.create_response).toBe(false);
+});
+
+test("initial session.update opts into binary audio transport", () => {
+	const payload = buildInitialSessionPayload({
+		voice: "Eve",
+		sampleRate: 48000,
+		instructions: "Test",
+		silenceDurationMs: 800,
+	});
+
+	expect(payload.session.audio.input.transport).toBe("binary");
+	expect(payload.session.audio.output.transport).toBe("binary");
+	expect(payload.session.audio.input.format).toEqual({ type: "audio/pcm", rate: 48000 });
+	expect(payload.session.audio.output.format).toEqual({ type: "audio/pcm", rate: 48000 });
 });
