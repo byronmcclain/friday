@@ -275,7 +275,12 @@ export class VoiceSessionManager {
 	 */
 	private async handleGrokBinaryAudio(data: unknown): Promise<void> {
 		const buf = VoiceSessionManager.toPcmBuffer(data);
-		if (!buf || buf.byteLength === 0) return;
+		if (!buf || buf.byteLength === 0) {
+			this.log("BINARY_AUDIO", "dropping unrecognized binary frame", {
+				type: data === null ? "null" : typeof data,
+			});
+			return;
+		}
 		await this.forwardAssistantAudio(buf.toString("base64"));
 	}
 
@@ -397,8 +402,8 @@ export class VoiceSessionManager {
 			}
 
 			// -- Audio + transcript (from Grok agent response)
-			// With transport: "binary", audio arrives as WS binary frames (primary path).
-			// Keep JSON deltas as a safety net if Grok still emits them.
+			// Primary path is WS binary frames. JSON deltas are a defensive leftover —
+			// xAI binary output transport is exclusive, so this should rarely fire.
 			case "response.output_audio.delta": {
 				if (typeof data.delta === "string" && data.delta.length > 0) {
 					await this.forwardAssistantAudio(data.delta);

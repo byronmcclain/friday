@@ -83,10 +83,10 @@ describe("VoiceSessionManager", () => {
 			silenceDurationMs: 800,
 		};
 		const manager = new VoiceSessionManager(cortex, config, makeMockCallbacks());
-		const binarySent: Array<Buffer | Uint8Array> = [];
+		const allSent: Array<string | Buffer | Uint8Array> = [];
 		const ws = {
 			send: (d: string | Buffer | Uint8Array) => {
-				if (typeof d !== "string") binarySent.push(d);
+				allSent.push(d);
 			},
 			readyState: 1,
 			close: () => {},
@@ -97,13 +97,86 @@ describe("VoiceSessionManager", () => {
 		const pcm = Buffer.from([0x01, 0x02, 0x03, 0x04]);
 		manager.appendAudio(pcm);
 
-		expect(binarySent).toHaveLength(1);
-		expect(Buffer.from(binarySent[0]!).equals(pcm)).toBe(true);
-		// Must not send JSON input_audio_buffer.append when transport is binary.
-		expect(binarySent.some((d) => typeof d === "string")).toBe(false);
+		expect(allSent).toHaveLength(1);
+		expect(typeof allSent[0]).not.toBe("string");
+		expect(Buffer.from(allSent[0] as Buffer).equals(pcm)).toBe(true);
+		const jsonAppend = allSent.find(
+			(d) => typeof d === "string" && d.includes("input_audio_buffer.append"),
+		);
+		expect(jsonAppend).toBeUndefined();
 	});
 
-	test("binary Grok audio frames forward as base64 onAudioDelta", async () => {
+	test("bindSocketHandlers routes binary message events to audio path", async () => {
+		const callbacks = makeMockCallbacks();
+		const onAudioDelta = mock((_b64: string) => {});
+		callbacks.onAudioDelta = onAudioDelta;
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			callbacks,
+		);
+
+		const listeners = new Map<string, Array<(event: { data: unknown }) => void>>();
+		const ws = {
+			send: () => {},
+			readyState: 1,
+			close: () => {},
+			addEventListener: (type: string, fn: (event: { data: unknown }) => void) => {
+				const list = listeners.get(type) ?? [];
+				list.push(fn);
+				listeners.set(type, list);
+			},
+		};
+		(manager as any).active = true;
+		(manager as any)._generation = 1;
+		(manager as any).bindSocketHandlers(ws, 1);
+
+		const pcm = Buffer.from([0x10, 0x20, 0x30, 0x40]);
+		for (const fn of listeners.get("message") ?? []) {
+			fn({ data: pcm });
+		}
+		await Bun.sleep(0);
+
+		expect(onAudioDelta).toHaveBeenCalledWith(pcm.toString("base64"));
+		expect(callbacks.onStateChange).toHaveBeenCalledWith("speaking");
+	});
+
+	test("bindSocketHandlers routes string message events to handleGrokMessage", async () => {
+		const callbacks = makeMockCallbacks();
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			callbacks,
+		);
+
+		const listeners = new Map<string, Array<(event: { data: unknown }) => void>>();
+		const ws = {
+			send: () => {},
+			readyState: 1,
+			close: () => {},
+			addEventListener: (type: string, fn: (event: { data: unknown }) => void) => {
+				const list = listeners.get(type) ?? [];
+				list.push(fn);
+				listeners.set(type, list);
+			},
+		};
+		(manager as any).active = true;
+		(manager as any)._generation = 1;
+		(manager as any).bindSocketHandlers(ws, 1);
+
+		for (const fn of listeners.get("message") ?? []) {
+			fn({ data: JSON.stringify({ type: "input_audio_buffer.speech_started" }) });
+		}
+		await Bun.sleep(0);
+
+		expect(callbacks.onStateChange).toHaveBeenCalledWith("listening");
+	});
+
+	test("binary Grok audio accepts ArrayBuffer and Uint8Array frames", async () => {
 		const callbacks = makeMockCallbacks();
 		const onAudioDelta = mock((_b64: string) => {});
 		callbacks.onAudioDelta = onAudioDelta;
@@ -116,10 +189,36 @@ describe("VoiceSessionManager", () => {
 		);
 		attachMockWs(manager);
 
-		const pcm = Buffer.from([0x10, 0x20, 0x30, 0x40]);
-		await (manager as any).handleGrokBinaryAudio(pcm);
+		const bytes = new Uint8Array([0x11, 0x22]);
+		await (manager as any).handleGrokBinaryAudio(bytes.buffer);
+		expect(onAudioDelta).toHaveBeenCalledWith(Buffer.from(bytes).toString("base64"));
 
-		expect(onAudioDelta).toHaveBeenCalledWith(pcm.toString("base64"));
+		onAudioDelta.mockClear();
+		await (manager as any).handleGrokBinaryAudio(bytes);
+		expect(onAudioDelta).toHaveBeenCalledWith(Buffer.from(bytes).toString("base64"));
+	});
+
+	test("JSON response.output_audio.delta still forwards via safety path", async () => {
+		const callbacks = makeMockCallbacks();
+		const onAudioDelta = mock((_b64: string) => {});
+		callbacks.onAudioDelta = onAudioDelta;
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			callbacks,
+		);
+		attachMockWs(manager);
+
+		await (manager as any).handleGrokMessage(
+			JSON.stringify({
+				type: "response.output_audio.delta",
+				delta: "YmluYXJ5",
+			}),
+		);
+
+		expect(onAudioDelta).toHaveBeenCalledWith("YmluYXJ5");
 		expect(callbacks.onStateChange).toHaveBeenCalledWith("speaking");
 	});
 

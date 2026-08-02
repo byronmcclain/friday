@@ -85,7 +85,7 @@ src/
 │       ├── audio.ts        # detectPlayer, playAudio, cleanupTempFile
 │       ├── prompt.ts       # FRIDAY_VOICE_IDENTITY, buildVoiceSystemPrompt, VOICE_DELIVERY_RULES
 │       ├── vox.ts          # Vox class — REST TTS lifecycle, modes, speak/cancel
-│       ├── session-manager.ts # VoiceSessionManager — thin audio I/O + lifecycle (replaces VoiceBridge)
+│       ├── session-manager.ts # VoiceSessionManager — audio I/O + lifecycle; binary PCM to Grok
 │       ├── narration.ts    # NarrationPicker, ACK_PHRASES, TOOL_NARRATIONS — Vox notification TTS phrases
 │       ├── channel.ts      # VoiceChannel — notification bridge (NotificationChannel impl)
 │       ├── emotion.ts      # emotionalRewrite() — conversation-aware emotional TTS rewriting

@@ -87,13 +87,13 @@ Each item: what it is → Friday impact → effort → **seed recommendation** (
 
 **What:** `audio.input/output.transport: "binary"` sends raw PCM/Opus as WS binary frames instead of base64 JSON. Lifecycle events stay JSON.
 
-**Friday impact:** Today every mic/audio frame is base64’d into JSON (~50–100 Hz). Binary would cut CPU/bandwidth between Friday server ↔ Grok. Browser ↔ Friday already uses binary PCM on `/ws`.
+**Friday impact (pre-ship):** Mic/audio frames on Friday↔Grok were base64’d into JSON (~50–100 Hz). Binary cuts CPU/bandwidth on that hop. Browser ↔ Friday already used binary PCM uplink on `/ws`.
 
 **Effort:** Medium (Grok WS binary handling in `session-manager`; keep Friday↔browser protocol as-is or align).
 
 **Seed:** **Later** — clear win, not blocking Think Fast 2.0.
 
-**Decision:** **Fast follow-up** (immediately after first pass, not parked indefinitely).
+**Decision:** **Shipped** — always-on binary PCM Friday↔Grok; browser downlink stays `voice:audio` base64.
 
 ---
 
