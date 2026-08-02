@@ -1,6 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
 import { Cortex } from "../../src/core/cortex.ts";
 import {
+	buildInitialSessionPayload,
 	type VoiceSessionCallbacks,
 	type VoiceSessionConfig,
 	VoiceSessionManager,
@@ -61,6 +62,7 @@ describe("VoiceSessionManager", () => {
 			voice: "Eve",
 			sampleRate: 48000,
 			instructions: "Test",
+			silenceDurationMs: 800,
 		};
 		const manager = new VoiceSessionManager(cortex, config, makeMockCallbacks());
 		expect(manager).toBeDefined();
@@ -74,6 +76,7 @@ describe("VoiceSessionManager", () => {
 			voice: "Eve",
 			sampleRate: 48000,
 			instructions: "Test",
+			silenceDurationMs: 800,
 		};
 		const manager = new VoiceSessionManager(cortex, config, makeMockCallbacks());
 		const sent = attachMockWs(manager);
@@ -93,7 +96,7 @@ describe("VoiceSessionManager", () => {
 		const cortex = new Cortex({ injectedModel: model });
 		const manager = new VoiceSessionManager(
 			cortex,
-			{ voice: "Eve", sampleRate: 48000, instructions: "Test" },
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
 			callbacks,
 		);
 		attachMockWs(manager);
@@ -113,7 +116,7 @@ describe("VoiceSessionManager", () => {
 		const callbacks = makeMockCallbacks();
 		const manager = new VoiceSessionManager(
 			cortex,
-			{ voice: "Eve", sampleRate: 48000, instructions: "Test" },
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
 			callbacks,
 		);
 		const sent = attachMockWs(manager);
@@ -147,7 +150,7 @@ describe("VoiceSessionManager", () => {
 		const cortex = new Cortex({ injectedModel: model });
 		const manager = new VoiceSessionManager(
 			cortex,
-			{ voice: "Eve", sampleRate: 48000, instructions: "Test" },
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
 			makeMockCallbacks(),
 		);
 		const sent = attachMockWs(manager);
@@ -170,7 +173,7 @@ describe("VoiceSessionManager", () => {
 		const callbacks = makeMockCallbacks();
 		const manager = new VoiceSessionManager(
 			cortex,
-			{ voice: "Eve", sampleRate: 48000, instructions: "Test" },
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
 			callbacks,
 		);
 		attachMockWs(manager);
@@ -180,4 +183,17 @@ describe("VoiceSessionManager", () => {
 		expect(manager.isActive).toBe(false);
 		expect(callbacks.onStateChange).toHaveBeenCalledWith("idle");
 	});
+});
+
+test("initial session.update includes silence_duration_ms and resumption", () => {
+	const payload = buildInitialSessionPayload({
+		voice: "Eve",
+		sampleRate: 48000,
+		instructions: "Test",
+		silenceDurationMs: 600,
+	});
+
+	expect(payload.session.turn_detection.silence_duration_ms).toBe(600);
+	expect(payload.session.resumption).toEqual({ enabled: true });
+	expect(payload.session.turn_detection.create_response).toBe(false);
 });

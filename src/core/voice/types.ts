@@ -57,6 +57,16 @@ export function resolveVoiceModel(): string {
 	return fromEnv && fromEnv.length > 0 ? fromEnv : GROK_VOICE_MODEL_DEFAULT;
 }
 
+export const VOICE_SILENCE_MS_DEFAULT = 800;
+
+export function resolveVoiceSilenceMs(): number {
+	const raw = process.env.FRIDAY_VOICE_SILENCE_MS?.trim();
+	if (!raw) return VOICE_SILENCE_MS_DEFAULT;
+	const n = Number.parseInt(raw, 10);
+	if (!Number.isFinite(n) || n < 0) return VOICE_SILENCE_MS_DEFAULT;
+	return Math.min(n, 10_000);
+}
+
 export function buildGrokRealtimeUrl(opts?: {
 	model?: string;
 	conversationId?: string;

@@ -2,7 +2,7 @@ import type { SignalHandler } from "../core/events.ts";
 import type { FridayRuntime } from "../core/runtime.ts";
 import { FRIDAY_VOICE_IDENTITY } from "../core/voice/prompt.ts";
 import { type VoiceSessionConfig, VoiceSessionManager } from "../core/voice/session-manager.ts";
-import { type GrokVoice, isGrokVoice } from "../core/voice/types.ts";
+import { type GrokVoice, isGrokVoice, resolveVoiceSilenceMs } from "../core/voice/types.ts";
 import { type ClientMessage, parseClientMessage, type ServerMessage } from "./protocol.ts";
 import { PushNotificationChannel } from "./push-channel.ts";
 import type { SessionHub } from "./session-hub.ts";
@@ -310,6 +310,7 @@ export class WebSocketHandler {
 					voice,
 					sampleRate: 48000,
 					instructions: FRIDAY_VOICE_IDENTITY,
+					silenceDurationMs: resolveVoiceSilenceMs(),
 				};
 
 				this.voiceSession = new VoiceSessionManager(this.runtime.cortex, sessionConfig, {

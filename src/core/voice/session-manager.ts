@@ -9,7 +9,29 @@ export interface VoiceSessionConfig {
 	voice: GrokVoice;
 	sampleRate: number;
 	instructions: string;
+	silenceDurationMs: number;
 	debug?: boolean;
+}
+
+export function buildInitialSessionPayload(config: VoiceSessionConfig) {
+	return {
+		type: "session.update" as const,
+		session: {
+			voice: config.voice,
+			instructions: config.instructions,
+			resumption: { enabled: true },
+			turn_detection: {
+				type: "server_vad" as const,
+				create_response: false,
+				silence_duration_ms: config.silenceDurationMs,
+			},
+			input_audio_transcription: { model: "whisper-1" },
+			audio: {
+				input: { format: { type: "audio/pcm", rate: config.sampleRate } },
+				output: { format: { type: "audio/pcm", rate: config.sampleRate } },
+			},
+		},
+	};
 }
 
 export interface VoiceSessionCallbacks {
@@ -88,34 +110,7 @@ export class VoiceSessionManager {
 
 		// Initial session config: voice, VAD, audio format
 		// Tools and instructions are sent per-turn by VoiceWorker via session.update
-		ws.send(
-			JSON.stringify({
-				type: "session.update",
-				session: {
-					voice: this.config.voice,
-					instructions: this.config.instructions,
-					turn_detection: {
-						type: "server_vad",
-						create_response: false,
-					},
-					input_audio_transcription: { model: "whisper-1" },
-					audio: {
-						input: {
-							format: {
-								type: "audio/pcm",
-								rate: this.config.sampleRate,
-							},
-						},
-						output: {
-							format: {
-								type: "audio/pcm",
-								rate: this.config.sampleRate,
-							},
-						},
-					},
-				},
-			}),
-		);
+		ws.send(JSON.stringify(buildInitialSessionPayload(this.config)));
 
 		// Create VoiceWorker with send bound to this WebSocket
 		this.voiceWorker = new VoiceWorker({
