@@ -1,10 +1,10 @@
-import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { LanguageModelV4 } from "@ai-sdk/provider";
 import { generateText } from "ai";
 import { type ConversationMessage, getTextContent } from "../core/types.ts";
-import type { PsycheStore } from "./store.ts";
-import type { PsycheCuratorResult, EmotionalType } from "./types.ts";
-import { DIMENSION_NAMES } from "./types.ts";
 import { withTimeout } from "../utils/timeout.ts";
+import type { PsycheStore } from "./store.ts";
+import type { EmotionalType, PsycheCuratorResult } from "./types.ts";
+import { DIMENSION_NAMES } from "./types.ts";
 
 const MIN_MESSAGES_FOR_ANALYSIS = 4;
 const MAX_CONVERSATION_CHARS = 16_000;
@@ -60,13 +60,10 @@ Return ONLY the JSON object. No markdown fences, no explanation.`;
 export class PsycheCurator {
 	constructor(
 		private store: PsycheStore,
-		private model: LanguageModelV3,
+		private model: LanguageModelV4,
 	) {}
 
-	async analyzeSession(
-		sessionId: string,
-		messages: ConversationMessage[],
-	): Promise<void> {
+	async analyzeSession(sessionId: string, messages: ConversationMessage[]): Promise<void> {
 		if (messages.length < MIN_MESSAGES_FOR_ANALYSIS) return;
 
 		try {
@@ -203,10 +200,7 @@ Return ONLY the JSON object.`;
 		}
 
 		for (const milestone of result.milestones) {
-			if (
-				milestone.summary &&
-				VALID_EMOTIONAL_TYPES.has(milestone.emotional_type)
-			) {
+			if (milestone.summary && VALID_EMOTIONAL_TYPES.has(milestone.emotional_type)) {
 				this.store.addMilestone({
 					summary: milestone.summary,
 					emotionalType: milestone.emotional_type as EmotionalType,
@@ -245,9 +239,7 @@ Return ONLY the JSON object.`;
 			return {
 				session_mood: parsed.session_mood,
 				milestones: Array.isArray(parsed.milestones) ? parsed.milestones : [],
-				dimension_updates: Array.isArray(parsed.dimension_updates)
-					? parsed.dimension_updates
-					: [],
+				dimension_updates: Array.isArray(parsed.dimension_updates) ? parsed.dimension_updates : [],
 			};
 		} catch {
 			return undefined;

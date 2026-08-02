@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { AuditLogger } from "../../src/audit/logger.ts";
-import webFetchModule from "../../src/modules/web-fetch/index.ts";
-import { webFetch } from "../../src/modules/web-fetch/fetch.ts";
-import { webSearch } from "../../src/modules/web-fetch/search.ts";
 import type { ToolContext } from "../../src/modules/types.ts";
+import { webFetch } from "../../src/modules/web-fetch/fetch.ts";
+import webFetchModule from "../../src/modules/web-fetch/index.ts";
+import { webSearch } from "../../src/modules/web-fetch/search.ts";
 
 let testServer: ReturnType<typeof Bun.serve>;
 let testServerUrl: string;
@@ -138,10 +138,7 @@ describe("web.search", () => {
 	});
 
 	test("rejects unsupported engine", async () => {
-		const result = await webSearch.execute(
-			{ query: "test", engine: "bing" },
-			ctx,
-		);
+		const result = await webSearch.execute({ query: "test", engine: "bing" }, ctx);
 		expect(result.success).toBe(false);
 		expect(result.output).toContain("Unsupported");
 	});

@@ -1,11 +1,11 @@
-import type { Rhythm } from "./types.ts";
-import type { Cortex } from "../core/cortex.ts";
-import type { ProtocolRegistry } from "../protocols/registry.ts";
-import type { ClearanceManager } from "../core/clearance.ts";
 import type { AuditLogger } from "../audit/logger.ts";
+import type { ClearanceManager } from "../core/clearance.ts";
+import type { Cortex } from "../core/cortex.ts";
 import type { SignalBus } from "../core/events.ts";
 import type { ScopedMemory } from "../core/memory.ts";
-import type { ToolContext, ProtocolContext } from "../modules/types.ts";
+import type { ProtocolContext, ToolContext } from "../modules/types.ts";
+import type { ProtocolRegistry } from "../protocols/registry.ts";
+import type { Rhythm } from "./types.ts";
 
 export interface ExecutorConfig {
 	cortex: Cortex;
@@ -97,10 +97,7 @@ export class RhythmExecutor {
 		}
 
 		const context = this.buildToolContext();
-		const result = await tool.execute(
-			rhythm.action.args ?? {},
-			context,
-		);
+		const result = await tool.execute(rhythm.action.args ?? {}, context);
 
 		this.audit.log({
 			action: "arc-rhythm:tool",
@@ -125,10 +122,7 @@ export class RhythmExecutor {
 		}
 
 		const context = this.buildProtocolContext();
-		const result = await protocol.execute(
-			rhythm.action.args ?? { rawArgs: "" },
-			context,
-		);
+		const result = await protocol.execute(rhythm.action.args ?? { rawArgs: "" }, context);
 
 		this.audit.log({
 			action: "arc-rhythm:protocol",
@@ -157,9 +151,7 @@ export class RhythmExecutor {
 	private buildProtocolContext(): ProtocolContext {
 		return {
 			...this.buildToolContext(),
-			tools: new Map(
-				this.cortex.availableTools.map((t) => [t.name, t]),
-			),
+			tools: new Map(this.cortex.availableTools.map((t) => [t.name, t])),
 		};
 	}
 }

@@ -1,10 +1,10 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import {
-	gatherMachine,
+	type CpuTimes,
 	gatherContainers,
 	gatherDev,
+	gatherMachine,
 	parseVmStatMemory,
-	type CpuTimes,
 } from "../../src/sensorium/sensors.ts";
 
 describe("gatherMachine", () => {

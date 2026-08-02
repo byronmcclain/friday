@@ -1,10 +1,14 @@
-import { describe, test, expect } from "bun:test";
-import { buildToolDefinitions, createToolExecutor, toGrokTools } from "../../src/core/tool-bridge.ts";
-import type { FridayTool } from "../../src/modules/types.ts";
-import type { ScopedMemory } from "../../src/core/memory.ts";
-import { ClearanceManager } from "../../src/core/clearance.ts";
+import { describe, expect, test } from "bun:test";
 import { AuditLogger } from "../../src/audit/logger.ts";
+import { ClearanceManager } from "../../src/core/clearance.ts";
 import { SignalBus } from "../../src/core/events.ts";
+import type { ScopedMemory } from "../../src/core/memory.ts";
+import {
+	buildToolDefinitions,
+	createToolExecutor,
+	toGrokTools,
+} from "../../src/core/tool-bridge.ts";
+import type { FridayTool } from "../../src/modules/types.ts";
 import { mockTool } from "../helpers/stubs.ts";
 
 describe("buildToolDefinitions", () => {
@@ -73,7 +77,9 @@ describe("createToolExecutor", () => {
 
 	test("catches tool exception and returns error string", async () => {
 		const tool = mockTool({
-			execute: async () => { throw new Error("Kaboom!"); },
+			execute: async () => {
+				throw new Error("Kaboom!");
+			},
 		});
 		const tools = new Map([["test-tool", tool]]);
 		const executor = createToolExecutor({ tools });
@@ -142,10 +148,14 @@ describe("createToolExecutor", () => {
 	test("emits tool:completed signal even on tool error", async () => {
 		const signals = new SignalBus();
 		const emitted: string[] = [];
-		signals.on("tool:completed", (signal) => { emitted.push(signal.source); });
+		signals.on("tool:completed", (signal) => {
+			emitted.push(signal.source);
+		});
 
 		const tool = mockTool({
-			execute: async () => { throw new Error("boom"); },
+			execute: async () => {
+				throw new Error("boom");
+			},
 		});
 		const tools = new Map([["fail-tool", tool]]);
 		const executor = createToolExecutor({ tools, signals });
@@ -182,7 +192,9 @@ describe("createToolExecutor", () => {
 		};
 
 		const tool = mockTool({
-			execute: async () => { throw new Error("fail"); },
+			execute: async () => {
+				throw new Error("fail");
+			},
 		});
 		const tools = new Map([["test-tool", tool]]);
 		const executor = createToolExecutor({ tools, audit });
@@ -198,8 +210,12 @@ describe("createToolExecutor — toolMemoryMap", () => {
 		return {
 			store,
 			get: async <T>(key: string) => store.get(key) as T | undefined,
-			set: async <T>(key: string, value: T) => { store.set(key, value); },
-			delete: async (key: string) => { store.delete(key); },
+			set: async <T>(key: string, value: T) => {
+				store.set(key, value);
+			},
+			delete: async (key: string) => {
+				store.delete(key);
+			},
 			list: async () => [...store.keys()],
 		};
 	}
@@ -273,7 +289,10 @@ describe("createToolExecutor — toolMemoryMap", () => {
 		toolMemoryMap.set("tool-a", memA);
 		toolMemoryMap.set("tool-b", memB);
 
-		const tools = new Map<string, FridayTool>([["tool-a", toolA], ["tool-b", toolB]]);
+		const tools = new Map<string, FridayTool>([
+			["tool-a", toolA],
+			["tool-b", toolB],
+		]);
 		const executor = createToolExecutor({ tools, toolMemoryMap });
 
 		expect(await executor("tool-a", {})).toBe("module-a");
@@ -287,13 +306,15 @@ describe("toGrokTools", () => {
 	});
 
 	test("converts single tool to Grok function format", () => {
-		const defs = [{
-			name: "git.status",
-			description: "Get git status",
-			parameters: [
-				{ name: "path", type: "string" as const, description: "repo path", required: true },
-			],
-		}];
+		const defs = [
+			{
+				name: "git.status",
+				description: "Get git status",
+				parameters: [
+					{ name: "path", type: "string" as const, description: "repo path", required: true },
+				],
+			},
+		];
 		const result = toGrokTools(defs);
 		expect(result).toHaveLength(1);
 		expect(result[0]!.type).toBe("function");
@@ -308,14 +329,16 @@ describe("toGrokTools", () => {
 	});
 
 	test("optional parameters are not in required array", () => {
-		const defs = [{
-			name: "test",
-			description: "Test",
-			parameters: [
-				{ name: "a", type: "string" as const, description: "required", required: true },
-				{ name: "b", type: "number" as const, description: "optional", required: false },
-			],
-		}];
+		const defs = [
+			{
+				name: "test",
+				description: "Test",
+				parameters: [
+					{ name: "a", type: "string" as const, description: "required", required: true },
+					{ name: "b", type: "number" as const, description: "optional", required: false },
+				],
+			},
+		];
 		const result = toGrokTools(defs);
 		expect(result[0]!.parameters.required).toEqual(["a"]);
 		expect(result[0]!.parameters.properties.b).toEqual({
@@ -325,17 +348,19 @@ describe("toGrokTools", () => {
 	});
 
 	test("handles all parameter types", () => {
-		const defs = [{
-			name: "multi",
-			description: "Multi-type",
-			parameters: [
-				{ name: "s", type: "string" as const, description: "str", required: true },
-				{ name: "n", type: "number" as const, description: "num", required: true },
-				{ name: "b", type: "boolean" as const, description: "bool", required: true },
-				{ name: "a", type: "array" as const, description: "arr", required: false },
-				{ name: "o", type: "object" as const, description: "obj", required: false },
-			],
-		}];
+		const defs = [
+			{
+				name: "multi",
+				description: "Multi-type",
+				parameters: [
+					{ name: "s", type: "string" as const, description: "str", required: true },
+					{ name: "n", type: "number" as const, description: "num", required: true },
+					{ name: "b", type: "boolean" as const, description: "bool", required: true },
+					{ name: "a", type: "array" as const, description: "arr", required: false },
+					{ name: "o", type: "object" as const, description: "obj", required: false },
+				],
+			},
+		];
 		const result = toGrokTools(defs);
 		const props = result[0]!.parameters.properties;
 		expect(props.s!.type).toBe("string");
@@ -346,11 +371,13 @@ describe("toGrokTools", () => {
 	});
 
 	test("tool with no parameters has empty properties", () => {
-		const defs = [{
-			name: "simple",
-			description: "No params",
-			parameters: [],
-		}];
+		const defs = [
+			{
+				name: "simple",
+				description: "No params",
+				parameters: [],
+			},
+		];
 		const result = toGrokTools(defs);
 		expect(result[0]!.parameters.properties).toEqual({});
 		expect(result[0]!.parameters.required).toEqual([]);

@@ -1,11 +1,6 @@
-import type {
-	WorkerRequest,
-	WorkerResult,
-	ToolEvent,
-	CortexWorker,
-} from "./types.ts";
+import { type GrokToolDefinition, type ToolDefinition, toGrokTools } from "../tool-bridge.ts";
 import { createPushIterable, type PushIterable } from "./push-iterable.ts";
-import { toGrokTools, type ToolDefinition, type GrokToolDefinition } from "../tool-bridge.ts";
+import type { CortexWorker, ToolEvent, WorkerRequest, WorkerResult } from "./types.ts";
 
 export interface VoiceWorkerConfig {
 	send: (data: string) => void;
@@ -113,9 +108,7 @@ export class VoiceWorker implements CortexWorker {
 				const callId = data.call_id as string;
 				let args: Record<string, unknown>;
 				try {
-					args = JSON.parse(
-						(data.arguments as string) ?? "{}",
-					) as Record<string, unknown>;
+					args = JSON.parse((data.arguments as string) ?? "{}") as Record<string, unknown>;
 				} catch {
 					this.toolPush.push({ type: "error", toolName, result: "Malformed tool arguments" });
 					this.closeTurn();
@@ -125,10 +118,7 @@ export class VoiceWorker implements CortexWorker {
 				this.toolPush.push({ type: "start", toolName, args });
 
 				// Execute through the shared tool executor
-				const result = await this.activeRequest!.executeTool(
-					toolName,
-					args,
-				);
+				const result = await this.activeRequest!.executeTool(toolName, args);
 
 				this.toolPush.push({ type: "result", toolName, result });
 				this.toolIterationCount++;
@@ -146,10 +136,7 @@ export class VoiceWorker implements CortexWorker {
 				);
 
 				// Request Grok to continue (with tool result)
-				if (
-					this.toolIterationCount <
-					(this.activeRequest?.maxToolIterations ?? 10)
-				) {
+				if (this.toolIterationCount < (this.activeRequest?.maxToolIterations ?? 10)) {
 					this.send(
 						JSON.stringify({
 							type: "response.create",
@@ -164,9 +151,7 @@ export class VoiceWorker implements CortexWorker {
 			}
 
 			case "response.done": {
-				const response = data.response as
-					| { status?: string }
-					| undefined;
+				const response = data.response as { status?: string } | undefined;
 				const status = response?.status ?? "completed";
 				if (status === "cancelled") break; // ignore cancelled responses
 				// Only close if no pending tool calls

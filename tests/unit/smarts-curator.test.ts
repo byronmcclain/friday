@@ -1,10 +1,10 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { SmartsCurator, buildExtractionPrompt } from "../../src/smarts/curator.ts";
-import { SmartsStore } from "../../src/smarts/store.ts";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdir, rm, unlink } from "node:fs/promises";
 import { SQLiteMemory } from "../../src/core/memory.ts";
 import type { ConversationMessage } from "../../src/core/types.ts";
+import { buildExtractionPrompt, SmartsCurator } from "../../src/smarts/curator.ts";
+import { SmartsStore } from "../../src/smarts/store.ts";
 import { createMockModel } from "../helpers/stubs.ts";
-import { unlink, mkdir, rm } from "node:fs/promises";
 
 const TEST_DB = "/tmp/friday-test-curator.db";
 const TEST_DIR = "/tmp/friday-test-curator-smarts";
@@ -115,7 +115,9 @@ That's what I found.`,
 	test("handles error gracefully", async () => {
 		const model = createMockModel({ text: "ok" });
 		// Override doGenerate to throw
-		(model as any).doGenerate = async () => { throw new Error("API down"); };
+		(model as any).doGenerate = async () => {
+			throw new Error("API down");
+		};
 		const curator = new SmartsCurator(store, model);
 		await curator.extractFromConversation(makeMessages(10, "Go programming"));
 		expect(store.all()).toHaveLength(0);
@@ -266,7 +268,10 @@ That's what I found.`,
 
 		// Check the prompt sent to generateText via doGenerateCalls
 		const call = model.doGenerateCalls[0]!;
-		const prompt = call.prompt as Array<{ role: string; content: Array<{ type: string; text: string }> }>;
+		const prompt = call.prompt as Array<{
+			role: string;
+			content: Array<{ type: string; text: string }>;
+		}>;
 		const userPart = prompt.find((p) => p.role === "user");
 		const userText = userPart?.content.find((c) => c.type === "text")?.text;
 		expect(userText).toContain("- existing-one");

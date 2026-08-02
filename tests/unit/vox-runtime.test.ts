@@ -1,7 +1,7 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdir, unlink } from "node:fs/promises";
 import { FridayRuntime } from "../../src/core/runtime.ts";
 import { createMockModel } from "../helpers/stubs.ts";
-import { mkdir, unlink } from "node:fs/promises";
 
 const TEST_DATA_DIR = "/tmp/friday-vox-runtime-test";
 

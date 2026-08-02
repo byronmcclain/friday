@@ -15,10 +15,7 @@ export const gitStatus: FridayTool = {
 	],
 	clearance: ["git-read"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		try {
 			const short = (args.short as boolean) ?? false;
 			const cmdParts = ["git", "-C", context.workingDirectory, "status"];

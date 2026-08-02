@@ -1,4 +1,4 @@
-import { SyntaxStyle, RGBA, createTextAttributes } from "@opentui/core";
+import { createTextAttributes, RGBA, SyntaxStyle } from "@opentui/core";
 
 export const PALETTE = {
 	background: "#0D1117",

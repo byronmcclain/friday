@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { TelegramClient } from "../../src/modules/telegram/client.ts";
 
 describe("TelegramClient", () => {

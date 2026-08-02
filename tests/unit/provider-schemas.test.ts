@@ -1,6 +1,6 @@
-import { describe, test, expect } from "bun:test";
-import { toZodSchema } from "../../src/providers/schemas.ts";
+import { describe, expect, test } from "bun:test";
 import type { ToolParameter } from "../../src/modules/types.ts";
+import { toZodSchema } from "../../src/providers/schemas.ts";
 
 describe("toZodSchema", () => {
 	test("converts string parameters", () => {

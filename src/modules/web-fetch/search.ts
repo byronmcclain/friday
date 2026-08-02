@@ -17,18 +17,14 @@ export const webSearch: FridayTool = {
 		{
 			name: "engine",
 			type: "string",
-			description:
-				'Search engine to use: "duckduckgo" (default: "duckduckgo")',
+			description: 'Search engine to use: "duckduckgo" (default: "duckduckgo")',
 			required: false,
 			default: "duckduckgo",
 		},
 	],
 	clearance: ["network"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const query = args.query as string;
 		if (!query) {
 			return { success: false, output: "Missing required parameter: query" };

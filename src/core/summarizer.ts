@@ -1,7 +1,7 @@
-import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { LanguageModelV4 } from "@ai-sdk/provider";
 import { generateText } from "ai";
-import { type ConversationMessage, getTextContent } from "./types.ts";
 import { withTimeout } from "../utils/timeout.ts";
+import { type ConversationMessage, getTextContent } from "./types.ts";
 
 const MIN_MESSAGES_FOR_SUMMARY = 4;
 const MAX_SUMMARIZER_CHARS = 16_000;
@@ -15,7 +15,7 @@ Rules:
 - Return ONLY the summary text, no labels or prefixes`;
 
 export class ConversationSummarizer {
-	constructor(private model: LanguageModelV3) {}
+	constructor(private model: LanguageModelV4) {}
 
 	async summarize(messages: ConversationMessage[]): Promise<string | undefined> {
 		if (messages.length < MIN_MESSAGES_FOR_SUMMARY) return undefined;
@@ -39,7 +39,10 @@ export class ConversationSummarizer {
 			const trimmed = result.text.trim();
 			return trimmed || undefined;
 		} catch (error) {
-			console.warn("[Summarizer] Conversation summarization failed:", error instanceof Error ? error.message : error);
+			console.warn(
+				"[Summarizer] Conversation summarization failed:",
+				error instanceof Error ? error.message : error,
+			);
 			return undefined;
 		}
 	}

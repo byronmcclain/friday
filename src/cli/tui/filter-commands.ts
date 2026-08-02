@@ -4,10 +4,7 @@ export interface TypeaheadEntry {
 	aliases: string[];
 }
 
-export function filterCommands(
-	commands: TypeaheadEntry[],
-	query: string,
-): TypeaheadEntry[] {
+export function filterCommands(commands: TypeaheadEntry[], query: string): TypeaheadEntry[] {
 	if (!query) return commands;
 	const q = query.toLowerCase();
 	return commands.filter(

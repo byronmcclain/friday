@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { ConversationSummarizer, SUMMARY_PROMPT } from "../../src/core/summarizer.ts";
 import type { ConversationMessage } from "../../src/core/types.ts";
 import { createMockModel } from "../helpers/stubs.ts";
@@ -16,7 +16,7 @@ describe("ConversationSummarizer", () => {
 		expect(SUMMARY_PROMPT.length).toBeGreaterThan(0);
 	});
 
-	describe("AI SDK path (LanguageModelV3)", () => {
+	describe("AI SDK path (LanguageModelV4)", () => {
 		test("skips summarization for < 4 messages", async () => {
 			const model = createMockModel({ text: "should not be called" });
 			const summarizer = new ConversationSummarizer(model);
@@ -58,7 +58,9 @@ describe("ConversationSummarizer", () => {
 		test("returns undefined on error", async () => {
 			const model = createMockModel({ text: "ok" });
 			// Override doGenerate to throw
-			(model as any).doGenerate = async () => { throw new Error("API down"); };
+			(model as any).doGenerate = async () => {
+				throw new Error("API down");
+			};
 			const summarizer = new ConversationSummarizer(model);
 			const result = await summarizer.summarize(makeMessages(4));
 			expect(result).toBeUndefined();
@@ -76,5 +78,4 @@ describe("ConversationSummarizer", () => {
 			expect(result).toBe("Discussed many topics over a long conversation.");
 		});
 	});
-
 });

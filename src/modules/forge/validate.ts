@@ -1,7 +1,7 @@
-import { resolve } from "node:path";
 import { readdir, realpath } from "node:fs/promises";
-import type { FridayTool, ToolContext, ToolResult, FridayModule } from "../types.ts";
+import { resolve } from "node:path";
 import { validateModule } from "../loader.ts";
+import type { FridayModule, FridayTool, ToolContext, ToolResult } from "../types.ts";
 import type { ForgeValidationResult, ForgeValidationStep } from "./types.ts";
 
 /** Known HTML entity patterns LLMs emit inside TypeScript code */
@@ -21,24 +21,25 @@ async function sanitizeLlmArtifacts(moduleDir: string): Promise<string[]> {
 	const fixed: string[] = [];
 	let entries: string[];
 	try {
-		entries = (await readdir(moduleDir, { recursive: true }))
-			.filter((e) => e.endsWith(".ts"));
+		entries = (await readdir(moduleDir, { recursive: true })).filter((e) => e.endsWith(".ts"));
 	} catch {
 		return fixed;
 	}
 
-	await Promise.all(entries.map(async (entry) => {
-		const filePath = resolve(moduleDir, entry);
-		const content = await Bun.file(filePath).text();
-		let sanitized = content;
-		for (const [pattern, replacement] of HTML_ENTITY_PAIRS) {
-			sanitized = sanitized.replace(pattern, replacement);
-		}
-		if (sanitized !== content) {
-			await Bun.write(filePath, sanitized);
-			fixed.push(entry);
-		}
-	}));
+	await Promise.all(
+		entries.map(async (entry) => {
+			const filePath = resolve(moduleDir, entry);
+			const content = await Bun.file(filePath).text();
+			let sanitized = content;
+			for (const [pattern, replacement] of HTML_ENTITY_PAIRS) {
+				sanitized = sanitized.replace(pattern, replacement);
+			}
+			if (sanitized !== content) {
+				await Bun.write(filePath, sanitized);
+				fixed.push(entry);
+			}
+		}),
+	);
 	return fixed;
 }
 
@@ -56,10 +57,7 @@ export const forgeValidate: FridayTool = {
 	],
 	clearance: ["exec-shell"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const moduleName = args.moduleName as string;
 		const forgeDir = (args.forgeDir as string) ?? resolve(context.workingDirectory, "forge");
 
@@ -70,9 +68,7 @@ export const forgeValidate: FridayTool = {
 			};
 		}
 
-		const resolvedForge = await realpath(forgeDir).catch(
-			() => resolve(forgeDir),
-		);
+		const resolvedForge = await realpath(forgeDir).catch(() => resolve(forgeDir));
 		const moduleDir = resolve(resolvedForge, moduleName);
 		const indexPath = resolve(moduleDir, "index.ts");
 
@@ -128,10 +124,16 @@ export const forgeValidate: FridayTool = {
 				// input files are specified on the command line.
 				const proc = Bun.spawn(
 					[
-						"bunx", "tsc", "--noEmit", "--pretty",
-						"--target", "esnext",
-						"--moduleResolution", "bundler",
-						"--module", "preserve",
+						"bunx",
+						"tsc",
+						"--noEmit",
+						"--pretty",
+						"--target",
+						"esnext",
+						"--moduleResolution",
+						"bundler",
+						"--module",
+						"preserve",
 						"--allowImportingTsExtensions",
 						"--verbatimModuleSyntax",
 						"--skipLibCheck",
@@ -156,7 +158,9 @@ export const forgeValidate: FridayTool = {
 		const lintP = (async (): Promise<ForgeValidationStep> => {
 			try {
 				const proc = Bun.spawn(["bunx", "biome", "check", moduleDir], {
-					cwd: context.workingDirectory, stdout: "pipe", stderr: "pipe",
+					cwd: context.workingDirectory,
+					stdout: "pipe",
+					stderr: "pipe",
 				});
 				const [stdoutBuf] = await Promise.all([
 					new Response(proc.stdout).arrayBuffer(),
@@ -196,15 +200,13 @@ export const forgeValidate: FridayTool = {
 		});
 
 		const report = steps
-			.map(
-				(s) =>
-					`  ${s.passed ? "pass" : "FAIL"} ${s.name}${s.error ? `: ${s.error}` : ""}`,
-			)
+			.map((s) => `  ${s.passed ? "pass" : "FAIL"} ${s.name}${s.error ? `: ${s.error}` : ""}`)
 			.join("\n");
 
-		const sanitizeNote = sanitizedFiles.length > 0
-			? `\n\nAuto-fixed HTML entities in: ${sanitizedFiles.join(", ")}`
-			: "";
+		const sanitizeNote =
+			sanitizedFiles.length > 0
+				? `\n\nAuto-fixed HTML entities in: ${sanitizedFiles.join(", ")}`
+				: "";
 
 		return {
 			success: allPassed,

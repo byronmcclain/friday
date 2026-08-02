@@ -1,10 +1,10 @@
-import { describe, test, expect, beforeEach } from "bun:test";
-import { createEnvironmentTool } from "../../src/sensorium/tool.ts";
-import { Sensorium } from "../../src/sensorium/sensorium.ts";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { SignalBus } from "../../src/core/events.ts";
 import { NotificationManager } from "../../src/core/notifications.ts";
-import { SENSORIUM_DEFAULTS } from "../../src/sensorium/types.ts";
 import type { FridayTool, ToolContext } from "../../src/modules/types.ts";
+import { Sensorium } from "../../src/sensorium/sensorium.ts";
+import { createEnvironmentTool } from "../../src/sensorium/tool.ts";
+import { SENSORIUM_DEFAULTS } from "../../src/sensorium/types.ts";
 
 const stubToolContext: ToolContext = {
 	workingDirectory: "/tmp",
@@ -56,10 +56,7 @@ describe("getEnvironmentStatus tool", () => {
 	});
 
 	test("returns memory section only", async () => {
-		const result = await tool.execute(
-			{ section: "memory" },
-			stubToolContext,
-		);
+		const result = await tool.execute({ section: "memory" }, stubToolContext);
 		expect(result.success).toBe(true);
 		expect(result.artifacts!.memory).toBeDefined();
 	});

@@ -14,10 +14,7 @@ export const telegramSend: FridayTool = {
 		},
 	],
 	clearance: ["network"],
-	async execute(
-		args: Record<string, unknown>,
-		_context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, _context: ToolContext): Promise<ToolResult> {
 		const message = args.message as string;
 		if (!message) {
 			return { success: false, output: "Missing required parameter: message" };
@@ -35,8 +32,7 @@ export const telegramSend: FridayTool = {
 		if (!chatId) {
 			return {
 				success: false,
-				output:
-					"Telegram owner chat ID not known yet. The Boss needs to message the bot first.",
+				output: "Telegram owner chat ID not known yet. The Boss needs to message the bot first.",
 			};
 		}
 

@@ -1,10 +1,5 @@
-import { describe, test, expect } from "bun:test";
-import {
-	appReducer,
-	initialState,
-	isExitWord,
-	createMessage,
-} from "../../src/cli/tui/state.ts";
+import { describe, expect, test } from "bun:test";
+import { appReducer, createMessage, initialState, isExitWord } from "../../src/cli/tui/state.ts";
 
 describe("TUI state reducer", () => {
 	test("initialState has correct defaults", () => {
@@ -146,11 +141,9 @@ describe("isExitWord", () => {
 	test("detects bye", () => expect(isExitWord("bye")).toBe(true));
 	test("case insensitive", () => expect(isExitWord("EXIT")).toBe(true));
 	test("trims whitespace", () => expect(isExitWord("  quit  ")).toBe(true));
-	test("rejects normal input", () =>
-		expect(isExitWord("hello")).toBe(false));
+	test("rejects normal input", () => expect(isExitWord("hello")).toBe(false));
 	test("rejects empty string", () => expect(isExitWord("")).toBe(false));
-	test("rejects partial match", () =>
-		expect(isExitWord("exiting")).toBe(false));
+	test("rejects partial match", () => expect(isExitWord("exiting")).toBe(false));
 });
 
 describe("createMessage", () => {

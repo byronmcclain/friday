@@ -1,7 +1,7 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { TextWorker } from "../../src/core/workers/text-worker.ts";
-import { createMockModel } from "../helpers/stubs.ts";
 import type { WorkerRequest } from "../../src/core/workers/types.ts";
+import { createMockModel } from "../helpers/stubs.ts";
 
 function makeRequest(overrides: Partial<WorkerRequest> = {}): WorkerRequest {
 	return {
@@ -68,13 +68,17 @@ describe("TextWorker", () => {
 	test("passes tools to model when provided", async () => {
 		const model = createMockModel({ text: "ok" });
 		const worker = new TextWorker(model);
-		const result = worker.process(makeRequest({
-			tools: [{
-				name: "test-tool",
-				description: "A test",
-				parameters: [{ name: "input", type: "string", description: "x", required: true }],
-			}],
-		}));
+		const result = worker.process(
+			makeRequest({
+				tools: [
+					{
+						name: "test-tool",
+						description: "A test",
+						parameters: [{ name: "input", type: "string", description: "x", required: true }],
+					},
+				],
+			}),
+		);
 
 		// Consume stream to trigger doStream call
 		await result.fullText;

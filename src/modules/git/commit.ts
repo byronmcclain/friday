@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
+import { assertContained } from "../filesystem/containment.ts";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
 import { assertSafeArg } from "../validation.ts";
-import { assertContained } from "../filesystem/containment.ts";
 
 export const gitCommit: FridayTool = {
 	name: "git.commit",
@@ -32,10 +32,7 @@ export const gitCommit: FridayTool = {
 	],
 	clearance: ["git-write"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const message = args.message as string;
 		if (!message) {
 			return {
@@ -64,10 +61,9 @@ export const gitCommit: FridayTool = {
 
 			// Stage files if specified
 			if (files.length > 0) {
-				const addResult =
-					await Bun.$`git -C ${context.workingDirectory} add ${files}`
-						.quiet()
-						.nothrow();
+				const addResult = await Bun.$`git -C ${context.workingDirectory} add ${files}`
+					.quiet()
+					.nothrow();
 
 				if (addResult.exitCode !== 0) {
 					const stderr = addResult.stderr.toString().trim();
@@ -79,20 +75,9 @@ export const gitCommit: FridayTool = {
 			}
 
 			// Emit pre-commit signal
-			await context.signal.emit(
-				"command:pre-commit",
-				"git.commit",
-				{ message },
-			);
+			await context.signal.emit("command:pre-commit", "git.commit", { message });
 
-			const commitParts = [
-				"git",
-				"-C",
-				context.workingDirectory,
-				"commit",
-				"-m",
-				message,
-			];
+			const commitParts = ["git", "-C", context.workingDirectory, "commit", "-m", message];
 			if (allowEmpty) commitParts.push("--allow-empty");
 
 			const result = await Bun.$`${commitParts}`.quiet().nothrow();

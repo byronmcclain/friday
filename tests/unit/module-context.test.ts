@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import type { FridayModule, ModuleContext } from "../../src/modules/types.ts";
 
 describe("ModuleContext", () => {

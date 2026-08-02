@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { AuditLogger } from "../../src/audit/logger.ts";
 import type { AuditEntry } from "../../src/audit/types.ts";
 

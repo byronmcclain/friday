@@ -1,10 +1,6 @@
 // tests/unit/arc-rhythm-types.test.ts
-import { describe, test, expect } from "bun:test";
-import type {
-	Rhythm,
-	RhythmAction,
-	RhythmExecution,
-} from "../../src/arc-rhythm/types.ts";
+import { describe, expect, test } from "bun:test";
+import type { Rhythm, RhythmAction, RhythmExecution } from "../../src/arc-rhythm/types.ts";
 
 describe("Arc Rhythm types", () => {
 	test("Rhythm interface accepts prompt action", () => {

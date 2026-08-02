@@ -1,11 +1,11 @@
-import type { Command } from "commander";
 import chalk from "chalk";
+import type { Command } from "commander";
 import {
-	resolveGenesisPath,
+	checkGenesis,
 	loadGenesis,
+	resolveGenesisPath,
 	seedGenesis,
 	updateGenesis,
-	checkGenesis,
 } from "../../core/genesis.ts";
 
 export function genesisCommand(program: Command): void {
@@ -22,9 +22,7 @@ export function genesisCommand(program: Command): void {
 				const content = await loadGenesis(path);
 				console.log(content);
 			} catch (err) {
-				console.error(
-					chalk.red(err instanceof Error ? err.message : String(err)),
-				);
+				console.error(chalk.red(err instanceof Error ? err.message : String(err)));
 				process.exit(1);
 			}
 		});
@@ -38,29 +36,21 @@ export function genesisCommand(program: Command): void {
 
 	genesis
 		.command("init")
-		.description(
-			"Seed GENESIS.md from the built-in template (won't overwrite existing)",
-		)
+		.description("Seed GENESIS.md from the built-in template (won't overwrite existing)")
 		.action(async () => {
 			const path = resolveGenesisPath();
 			const created = await seedGenesis(path);
 			if (created) {
 				console.log(chalk.green(`Created ${path}`));
-				console.log(
-					chalk.hex("#8B6914")("Edit with: friday genesis edit"),
-				);
+				console.log(chalk.hex("#8B6914")("Edit with: friday genesis edit"));
 			} else {
-				console.log(
-					chalk.yellow(`${path} already exists — not overwriting`),
-				);
+				console.log(chalk.yellow(`${path} already exists — not overwriting`));
 			}
 		});
 
 	genesis
 		.command("update")
-		.description(
-			"Overwrite GENESIS.md with the latest built-in template",
-		)
+		.description("Overwrite GENESIS.md with the latest built-in template")
 		.action(async () => {
 			const path = resolveGenesisPath();
 			await updateGenesis(path);
@@ -83,9 +73,7 @@ export function genesisCommand(program: Command): void {
 
 	genesis
 		.command("check")
-		.description(
-			"Validate GENESIS.md exists, permissions are correct, and content is non-empty",
-		)
+		.description("Validate GENESIS.md exists, permissions are correct, and content is non-empty")
 		.action(async () => {
 			const path = resolveGenesisPath();
 			const result = await checkGenesis(path);

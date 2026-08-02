@@ -1,8 +1,5 @@
-import { describe, test, expect } from "bun:test";
-import {
-	parseAnsiLine,
-	parseAnsiOutput,
-} from "../../src/cli/tui/lib/ansi-parser.ts";
+import { describe, expect, test } from "bun:test";
+import { parseAnsiLine, parseAnsiOutput } from "../../src/cli/tui/lib/ansi-parser.ts";
 
 describe("parseAnsiLine", () => {
 	test("plain text returns single span", () => {
@@ -16,9 +13,7 @@ describe("parseAnsiLine", () => {
 	});
 
 	test("truecolor fg + bg", () => {
-		const spans = parseAnsiLine(
-			"\x1b[38;2;255;0;0m\x1b[48;2;0;0;255mAB\x1b[0m",
-		);
+		const spans = parseAnsiLine("\x1b[38;2;255;0;0m\x1b[48;2;0;0;255mAB\x1b[0m");
 		expect(spans).toEqual([{ text: "AB", fg: "#ff0000", bg: "#0000ff" }]);
 	});
 
@@ -35,9 +30,7 @@ describe("parseAnsiLine", () => {
 	});
 
 	test("merges adjacent spans with same colors", () => {
-		const spans = parseAnsiLine(
-			"\x1b[38;2;255;0;0mA\x1b[38;2;255;0;0mB\x1b[0m",
-		);
+		const spans = parseAnsiLine("\x1b[38;2;255;0;0mA\x1b[38;2;255;0;0mB\x1b[0m");
 		expect(spans).toEqual([{ text: "AB", fg: "#ff0000" }]);
 	});
 
@@ -55,10 +48,7 @@ describe("parseAnsiLine", () => {
 
 describe("parseAnsiOutput", () => {
 	test("parses multiple lines", () => {
-		const result = parseAnsiOutput([
-			"hello",
-			"\x1b[38;2;255;0;0mworld\x1b[0m",
-		]);
+		const result = parseAnsiOutput(["hello", "\x1b[38;2;255;0;0mworld\x1b[0m"]);
 		expect(result).toHaveLength(2);
 		expect(result[0]).toEqual([{ text: "hello" }]);
 		expect(result[1]).toEqual([{ text: "world", fg: "#ff0000" }]);

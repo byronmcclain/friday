@@ -1,10 +1,7 @@
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
-import type { ForgeProposal, ForgeFile } from "./types.ts";
+import type { ForgeFile, ForgeProposal } from "./types.ts";
 
-function generateModuleTemplate(
-	moduleName: string,
-	description: string,
-): ForgeFile[] {
+function generateModuleTemplate(moduleName: string, description: string): ForgeFile[] {
 	const toolName = moduleName.replace(/-/g, "_");
 	return [
 		{
@@ -63,8 +60,7 @@ export const forgePropose: FridayTool = {
 		{
 			name: "action",
 			type: "string",
-			description:
-				'"create" for a new module or "patch" to modify an existing one',
+			description: '"create" for a new module or "patch" to modify an existing one',
 			required: true,
 		},
 		{
@@ -76,17 +72,13 @@ export const forgePropose: FridayTool = {
 		{
 			name: "description",
 			type: "string",
-			description:
-				"What the module should do (for create) or what to change (for patch)",
+			description: "What the module should do (for create) or what to change (for patch)",
 			required: true,
 		},
 	],
 	clearance: [],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const action = args.action as string;
 		const moduleName = args.moduleName as string;
 		const description = args.description as string;
@@ -94,8 +86,7 @@ export const forgePropose: FridayTool = {
 		if (!action || !["create", "patch"].includes(action)) {
 			return {
 				success: false,
-				output:
-					"Missing or invalid required parameter: action (must be 'create' or 'patch')",
+				output: "Missing or invalid required parameter: action (must be 'create' or 'patch')",
 			};
 		}
 		if (!moduleName) {
@@ -107,8 +98,7 @@ export const forgePropose: FridayTool = {
 		if (/[/\\]/.test(moduleName) || moduleName.includes("..")) {
 			return {
 				success: false,
-				output:
-					"Invalid moduleName: must not contain path separators or '..'",
+				output: "Invalid moduleName: must not contain path separators or '..'",
 			};
 		}
 		if (!description) {
@@ -127,7 +117,8 @@ export const forgePropose: FridayTool = {
 			}
 			for (const f of args.files) {
 				if (
-					typeof f !== "object" || f === null ||
+					typeof f !== "object" ||
+					f === null ||
 					typeof (f as ForgeFile).path !== "string" ||
 					typeof (f as ForgeFile).content !== "string"
 				) {
@@ -161,9 +152,7 @@ export const forgePropose: FridayTool = {
 			success: true,
 		});
 
-		const fileList = files
-			.map((f) => `--- ${moduleName}/${f.path} ---\n${f.content}`)
-			.join("\n\n");
+		const fileList = files.map((f) => `--- ${moduleName}/${f.path} ---\n${f.content}`).join("\n\n");
 
 		return {
 			success: true,

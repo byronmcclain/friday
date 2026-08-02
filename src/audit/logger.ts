@@ -29,10 +29,7 @@ export class AuditLogger {
 
 	entries(filter?: AuditFilter): AuditEntry[] {
 		const result: AuditEntry[] = [];
-		const start =
-			this.count < AuditLogger.MAX_ENTRIES
-				? 0
-				: this.head;
+		const start = this.count < AuditLogger.MAX_ENTRIES ? 0 : this.head;
 		for (let i = 0; i < this.count; i++) {
 			const idx = (start + i) % AuditLogger.MAX_ENTRIES;
 			const e = this.buffer[idx]!;

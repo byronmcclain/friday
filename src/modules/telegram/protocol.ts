@@ -1,8 +1,4 @@
-import type {
-	FridayProtocol,
-	ProtocolContext,
-	ProtocolResult,
-} from "../types.ts";
+import type { FridayProtocol, ProtocolContext, ProtocolResult } from "../types.ts";
 import { getTelegramClient, getTelegramListener } from "./state.ts";
 
 export const telegramProtocol: FridayProtocol = {
@@ -19,10 +15,7 @@ export const telegramProtocol: FridayProtocol = {
 	],
 	clearance: ["network"],
 
-	async execute(
-		args: Record<string, unknown>,
-		_context: ProtocolContext,
-	): Promise<ProtocolResult> {
+	async execute(args: Record<string, unknown>, _context: ProtocolContext): Promise<ProtocolResult> {
 		const rawArgs = (args.rawArgs as string) ?? "";
 		const parts = rawArgs.trim().split(/\s+/);
 		const subcommand = parts[0] ?? "status";
@@ -43,7 +36,9 @@ export const telegramProtocol: FridayProtocol = {
 				try {
 					const me = await client.getMe();
 					botInfo = `@${me.username}`;
-				} catch { /* bot not initialized */ }
+				} catch {
+					/* bot not initialized */
+				}
 				return {
 					success: true,
 					summary: `Telegram: ${botInfo} — ${mode} mode${ownerId ? ` — owner chat: ${ownerId}` : " — owner not yet identified"}`,
@@ -63,10 +58,18 @@ export const telegramProtocol: FridayProtocol = {
 			}
 
 			case "webhook":
-				return { success: false, summary: "Runtime mode switching not yet implemented. Restart server with TELEGRAM_WEBHOOK_URL set." };
+				return {
+					success: false,
+					summary:
+						"Runtime mode switching not yet implemented. Restart server with TELEGRAM_WEBHOOK_URL set.",
+				};
 
 			case "polling":
-				return { success: false, summary: "Runtime mode switching not yet implemented. Restart server without TELEGRAM_WEBHOOK_URL." };
+				return {
+					success: false,
+					summary:
+						"Runtime mode switching not yet implemented. Restart server without TELEGRAM_WEBHOOK_URL.",
+				};
 
 			default:
 				return {

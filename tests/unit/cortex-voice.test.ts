@@ -1,11 +1,8 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { Cortex } from "../../src/core/cortex.ts";
-import {
-	VoiceWorker,
-	type VoiceWorkerConfig,
-} from "../../src/core/workers/voice-worker.ts";
-import { createMockModel } from "../helpers/stubs.ts";
 import type { VoiceChatStream } from "../../src/core/stream-types.ts";
+import { VoiceWorker, type VoiceWorkerConfig } from "../../src/core/workers/voice-worker.ts";
+import { createMockModel } from "../helpers/stubs.ts";
 
 describe("Cortex.chatStreamVoice", () => {
 	test("returns VoiceChatStream with audioStream", async () => {
@@ -18,10 +15,7 @@ describe("Cortex.chatStreamVoice", () => {
 		};
 		const worker = new VoiceWorker(workerConfig);
 
-		const stream: VoiceChatStream = await cortex.chatStreamVoice(
-			"Hello",
-			worker,
-		);
+		const stream: VoiceChatStream = await cortex.chatStreamVoice("Hello", worker);
 
 		expect(stream.audioStream).toBeDefined();
 		expect(stream.toolEvents).toBeDefined();
@@ -29,9 +23,7 @@ describe("Cortex.chatStreamVoice", () => {
 		expect(stream.fullText).toBeDefined();
 
 		// session.update should contain enriched system prompt
-		const sessionUpdate = sent
-			.map((s) => JSON.parse(s))
-			.find((m) => m.type === "session.update");
+		const sessionUpdate = sent.map((s) => JSON.parse(s)).find((m) => m.type === "session.update");
 		expect(sessionUpdate).toBeDefined();
 		// System prompt should contain the genesis template (default)
 		expect(sessionUpdate.session.instructions).toContain("FRIDAY");
@@ -104,9 +96,7 @@ describe("Cortex.chatStreamVoice", () => {
 		const worker = new VoiceWorker({ send: (d) => sent.push(d) });
 		const stream = await cortex.chatStreamVoice("Check git", worker);
 
-		const sessionUpdate = sent
-			.map((s) => JSON.parse(s))
-			.find((m) => m.type === "session.update");
+		const sessionUpdate = sent.map((s) => JSON.parse(s)).find((m) => m.type === "session.update");
 		expect(sessionUpdate.session.tools).toHaveLength(1);
 		expect(sessionUpdate.session.tools[0].name).toBe("git.status");
 

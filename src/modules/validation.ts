@@ -29,7 +29,10 @@ export function assertAllowedProtocol(url: string): ToolResult | null {
 		return { success: false, output: `Invalid URL: ${url}` };
 	}
 	if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-		return { success: false, output: `Disallowed protocol: ${parsed.protocol}. Only http: and https: are permitted.` };
+		return {
+			success: false,
+			output: `Disallowed protocol: ${parsed.protocol}. Only http: and https: are permitted.`,
+		};
 	}
 	return null;
 }
@@ -70,8 +73,7 @@ export function assertNotPrivateIP(url: string): ToolResult | null {
 		) {
 			return {
 				success: false,
-				output:
-					"Requests to private/link-local addresses are not permitted",
+				output: "Requests to private/link-local addresses are not permitted",
 			};
 		}
 	}

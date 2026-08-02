@@ -1,6 +1,6 @@
-import { describe, test, expect } from "bun:test";
-import { SessionHub } from "../../src/server/session-hub.ts";
+import { describe, expect, test } from "bun:test";
 import type { ServerMessage } from "../../src/server/protocol.ts";
+import { SessionHub } from "../../src/server/session-hub.ts";
 
 function createMockRuntime(history: { role: string; content: string }[] = []) {
 	return {
@@ -73,10 +73,7 @@ describe("SessionHub", () => {
 		hub.registerClient(c1.client);
 
 		// Simulate chat activity during session
-		history.push(
-			{ role: "user", content: "hello" },
-			{ role: "assistant", content: "hi there" },
-		);
+		history.push({ role: "user", content: "hello" }, { role: "assistant", content: "hi there" });
 
 		// Second client connects — gets hydrated with current session history
 		const c2 = createMockClient("c2");
@@ -133,10 +130,7 @@ describe("SessionHub", () => {
 		hub.registerClient(client);
 
 		// Simulate chat activity
-		history.push(
-			{ role: "user", content: "hello" },
-			{ role: "assistant", content: "hi" },
-		);
+		history.push({ role: "user", content: "hello" }, { role: "assistant", content: "hi" });
 
 		await hub.unregisterClient("c1");
 
@@ -178,10 +172,7 @@ describe("SessionHub", () => {
 		hub.registerClient(client);
 
 		// Simulate chat activity
-		history.push(
-			{ role: "user", content: "hello" },
-			{ role: "assistant", content: "hi" },
-		);
+		history.push({ role: "user", content: "hello" }, { role: "assistant", content: "hi" });
 
 		await hub.unregisterClient("c1");
 
@@ -203,10 +194,7 @@ describe("SessionHub", () => {
 		hub.registerClient(c1.client);
 
 		// Simulate chat activity
-		history.push(
-			{ role: "user", content: "hello" },
-			{ role: "assistant", content: "hi" },
-		);
+		history.push({ role: "user", content: "hello" }, { role: "assistant", content: "hi" });
 
 		// Start unregister (triggers async save)
 		const unregisterPromise = hub.unregisterClient("c1");

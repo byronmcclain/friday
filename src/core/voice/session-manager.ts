@@ -1,14 +1,9 @@
 import type { Cortex } from "../cortex.ts";
-import type { GrokVoice } from "./types.ts";
 import { VoiceWorker } from "../workers/voice-worker.ts";
+import type { GrokVoice } from "./types.ts";
 import { openGrokWebSocket } from "./ws.ts";
 
-export type VoiceState =
-	| "idle"
-	| "listening"
-	| "thinking"
-	| "speaking"
-	| "error";
+export type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "error";
 
 export interface VoiceSessionConfig {
 	voice: GrokVoice;
@@ -47,11 +42,7 @@ export class VoiceSessionManager {
 	private voiceWorker: VoiceWorker | null = null;
 	private debug: boolean;
 
-	constructor(
-		cortex: Cortex,
-		config: VoiceSessionConfig,
-		callbacks: VoiceSessionCallbacks,
-	) {
+	constructor(cortex: Cortex, config: VoiceSessionConfig, callbacks: VoiceSessionCallbacks) {
 		this.cortex = cortex;
 		this.config = config;
 		this.callbacks = callbacks;
@@ -159,9 +150,7 @@ export class VoiceSessionManager {
 		if (!this.active) return;
 		// Template literal avoids JSON.stringify on every audio frame (~50-100Hz).
 		// Base64 chars [A-Za-z0-9+/=] need no JSON escaping.
-		this.sendToGrok(
-			`{"type":"input_audio_buffer.append","audio":"${pcmBase64}"}`,
-		);
+		this.sendToGrok(`{"type":"input_audio_buffer.append","audio":"${pcmBase64}"}`);
 	}
 
 	async stop(): Promise<void> {
@@ -280,10 +269,7 @@ export class VoiceSessionManager {
 				}
 				if (data.type === "response.done") {
 					const status = data.response?.status ?? "completed";
-					if (
-						status !== "cancelled" &&
-						!this.voiceWorker?.isProcessing
-					) {
+					if (status !== "cancelled" && !this.voiceWorker?.isProcessing) {
 						this.emitStateChange("idle");
 					}
 				}
@@ -303,16 +289,10 @@ export class VoiceSessionManager {
 		this.emitStateChange("thinking");
 
 		try {
-			const stream = await this.cortex.chatStreamVoice(
-				transcript,
-				this.voiceWorker,
-			);
+			const stream = await this.cortex.chatStreamVoice(transcript, this.voiceWorker);
 			await stream.fullText;
 		} catch (err) {
-			this.log(
-				"ERROR",
-				err instanceof Error ? err.message : String(err),
-			);
+			this.log("ERROR", err instanceof Error ? err.message : String(err));
 			this.emitStateChange("error");
 		} finally {
 			this._activeTurn = null;

@@ -1,9 +1,9 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { WebSocketHandler } from "../../src/server/handler.ts";
-import { SessionHub } from "../../src/server/session-hub.ts";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { FridayRuntime } from "../../src/core/runtime.ts";
-import { createMockModel } from "../helpers/stubs.ts";
+import { WebSocketHandler } from "../../src/server/handler.ts";
 import type { ServerMessage } from "../../src/server/protocol.ts";
+import { SessionHub } from "../../src/server/session-hub.ts";
+import { createMockModel } from "../helpers/stubs.ts";
 
 describe("WebSocketHandler", () => {
 	let runtime: FridayRuntime;
@@ -37,10 +37,7 @@ describe("WebSocketHandler", () => {
 	});
 
 	test("handles legacy session:boot by responding with session:booted", async () => {
-		await handler.handle(
-			'{"type":"session:boot","id":"1"}',
-			mockSend,
-		);
+		await handler.handle('{"type":"session:boot","id":"1"}', mockSend);
 		expect(sent).toHaveLength(1);
 		expect(sent[0]!.type).toBe("session:booted");
 		// Runtime was already booted — it stays booted
@@ -48,10 +45,7 @@ describe("WebSocketHandler", () => {
 	});
 
 	test("handles session:identify and responds with session:ready", async () => {
-		await handler.handle(
-			'{"type":"session:identify","id":"1","clientType":"voice"}',
-			mockSend,
-		);
+		await handler.handle('{"type":"session:identify","id":"1","clientType":"voice"}', mockSend);
 		expect(sent).toHaveLength(1);
 		expect(sent[0]!.type).toBe("session:ready");
 		const ready = sent[0] as any;
@@ -62,15 +56,9 @@ describe("WebSocketHandler", () => {
 	});
 
 	test("handles chat after identify — streams chunks then final response", async () => {
-		await handler.handle(
-			'{"type":"session:identify","id":"0","clientType":"chat"}',
-			mockSend,
-		);
+		await handler.handle('{"type":"session:identify","id":"0","clientType":"chat"}', mockSend);
 		sent = [];
-		await handler.handle(
-			'{"type":"chat","id":"2","content":"hello"}',
-			mockSend,
-		);
+		await handler.handle('{"type":"chat","id":"2","content":"hello"}', mockSend);
 		// Streaming: at least 1 chat:chunk + 1 final chat:response
 		expect(sent.length).toBeGreaterThanOrEqual(2);
 
@@ -97,10 +85,7 @@ describe("WebSocketHandler", () => {
 			clearance: [],
 			execute: async () => ({ success: true, summary: "Test OK" }),
 		});
-		await handler.handle(
-			'{"type":"protocol","id":"3","command":"/test"}',
-			mockSend,
-		);
+		await handler.handle('{"type":"protocol","id":"3","command":"/test"}', mockSend);
 		expect(sent).toHaveLength(1);
 		expect(sent[0]!.type).toBe("protocol:response");
 		expect((sent[0] as any).content).toContain("Test OK");

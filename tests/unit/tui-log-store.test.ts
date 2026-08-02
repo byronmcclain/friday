@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { LogStore } from "../../src/cli/tui/log-store.ts";
 import type { LogEntry } from "../../src/cli/tui/log-types.ts";
 

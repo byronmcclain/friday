@@ -1,5 +1,5 @@
-import { describe, test, expect } from "bun:test";
-import { formatTimestamp, levelIcon, levelColor } from "../../src/cli/tui/components/log-panel.tsx";
+import { describe, expect, test } from "bun:test";
+import { formatTimestamp, levelColor, levelIcon } from "../../src/cli/tui/components/log-panel.tsx";
 import { PALETTE } from "../../src/cli/tui/theme.ts";
 
 describe("formatTimestamp", () => {

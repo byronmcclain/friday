@@ -22,26 +22,21 @@ export const gitPull: FridayTool = {
 		{
 			name: "rebase",
 			type: "boolean",
-			description:
-				"Rebase instead of merge (default: false)",
+			description: "Rebase instead of merge (default: false)",
 			required: false,
 			default: false,
 		},
 		{
 			name: "autostash",
 			type: "boolean",
-			description:
-				"Auto-stash dirty changes before pull, reapply after (default: true)",
+			description: "Auto-stash dirty changes before pull, reapply after (default: true)",
 			required: false,
 			default: true,
 		},
 	],
 	clearance: ["git-write", "network"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		try {
 			const remote = (args.remote as string) ?? "origin";
 			const branch = args.branch as string | undefined;
@@ -55,12 +50,7 @@ export const gitPull: FridayTool = {
 				if (branchCheck) return branchCheck;
 			}
 
-			const cmdParts = [
-				"git",
-				"-C",
-				context.workingDirectory,
-				"pull",
-			];
+			const cmdParts = ["git", "-C", context.workingDirectory, "pull"];
 			if (rebase) cmdParts.push("--rebase");
 			if (autostash) cmdParts.push("--autostash");
 			cmdParts.push(remote);

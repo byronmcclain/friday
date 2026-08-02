@@ -1,16 +1,11 @@
-import type {
-	FridayProtocol,
-	ProtocolResult,
-	ProtocolContext,
-} from "../modules/types.ts";
-import type { Sensorium } from "./sensorium.ts";
+import type { FridayProtocol, ProtocolContext, ProtocolResult } from "../modules/types.ts";
 import { formatBytes, formatUptime } from "./format.ts";
+import type { Sensorium } from "./sensorium.ts";
 
 export function createEnvProtocol(sensorium: Sensorium): FridayProtocol {
 	return {
 		name: "env",
-		description:
-			"View system environment: CPU, memory, containers, ports, git",
+		description: "View system environment: CPU, memory, containers, ports, git",
 		aliases: ["environment", "sys"],
 		parameters: [],
 		clearance: [],
@@ -59,10 +54,7 @@ export function createEnvProtocol(sensorium: Sensorium): FridayProtocol {
 function handleStatus(sensorium: Sensorium): ProtocolResult {
 	const s = sensorium.currentSnapshot!;
 	const m = s.machine;
-	const memPercent =
-		m.memory.total > 0
-			? Math.round((m.memory.used / m.memory.total) * 100)
-			: 0;
+	const memPercent = m.memory.total > 0 ? Math.round((m.memory.used / m.memory.total) * 100) : 0;
 
 	const lines: string[] = [
 		`System: ${m.osVersion} ${m.arch} (${m.hostname})`,
@@ -84,15 +76,11 @@ function handleStatus(sensorium: Sensorium): ProtocolResult {
 	}
 
 	if (s.dev.ports.length > 0) {
-		lines.push(
-			`Ports: ${s.dev.ports.map((p) => `${p.port} (${p.process})`).join(", ")}`,
-		);
+		lines.push(`Ports: ${s.dev.ports.map((p) => `${p.port} (${p.process})`).join(", ")}`);
 	}
 
 	if (s.dev.runtimes.length > 0) {
-		lines.push(
-			`Runtimes: ${s.dev.runtimes.map((r) => `${r.name} ${r.version}`).join(", ")}`,
-		);
+		lines.push(`Runtimes: ${s.dev.runtimes.map((r) => `${r.name} ${r.version}`).join(", ")}`);
 	}
 
 	return { success: true, summary: lines.join("\n") };
@@ -110,8 +98,7 @@ function handleCpu(sensorium: Sensorium): ProtocolResult {
 
 function handleMemory(sensorium: Sensorium): ProtocolResult {
 	const m = sensorium.currentSnapshot!.machine.memory;
-	const percent =
-		m.total > 0 ? Math.round((m.used / m.total) * 100) : 0;
+	const percent = m.total > 0 ? Math.round((m.used / m.total) * 100) : 0;
 	const lines = [
 		`Total: ${formatBytes(m.total)}`,
 		`Used:  ${formatBytes(m.used)} (${percent}%)`,
@@ -147,9 +134,7 @@ function handlePorts(sensorium: Sensorium): ProtocolResult {
 	if (ports.length === 0) {
 		return { success: true, summary: "No listening ports detected." };
 	}
-	const lines = ports.map(
-		(p) => `  :${p.port}  PID:${p.pid}  ${p.process}`,
-	);
+	const lines = ports.map((p) => `  :${p.port}  PID:${p.pid}  ${p.process}`);
 	return {
 		success: true,
 		summary: `Listening ports (${ports.length}):\n${lines.join("\n")}`,

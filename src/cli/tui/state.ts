@@ -92,10 +92,7 @@ export function isExitWord(input: string): boolean {
 	return ["exit", "quit", "bye"].includes(trimmed);
 }
 
-export function createMessage(
-	role: Message["role"],
-	content: string,
-): Message {
+export function createMessage(role: Message["role"], content: string): Message {
 	return {
 		id: crypto.randomUUID(),
 		role,

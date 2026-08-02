@@ -1,10 +1,10 @@
-import { describe, test, expect, mock } from "bun:test";
-import {
-	VoiceSessionManager,
-	type VoiceSessionConfig,
-	type VoiceSessionCallbacks,
-} from "../../src/core/voice/session-manager.ts";
+import { describe, expect, mock, test } from "bun:test";
 import { Cortex } from "../../src/core/cortex.ts";
+import {
+	type VoiceSessionCallbacks,
+	type VoiceSessionConfig,
+	VoiceSessionManager,
+} from "../../src/core/voice/session-manager.ts";
 import { VoiceWorker } from "../../src/core/workers/voice-worker.ts";
 import { createMockModel } from "../helpers/stubs.ts";
 
@@ -26,9 +26,7 @@ function attachMockWs(manager: VoiceSessionManager): string[] {
 			const parsed = JSON.parse(d);
 			if (parsed.type === "session.update") {
 				setTimeout(() => {
-					(manager as any).handleGrokMessage(
-						JSON.stringify({ type: "session.updated" }),
-					);
+					(manager as any).handleGrokMessage(JSON.stringify({ type: "session.updated" }));
 				}, 0);
 			}
 			if (parsed.type === "response.create") {
@@ -64,11 +62,7 @@ describe("VoiceSessionManager", () => {
 			sampleRate: 48000,
 			instructions: "Test",
 		};
-		const manager = new VoiceSessionManager(
-			cortex,
-			config,
-			makeMockCallbacks(),
-		);
+		const manager = new VoiceSessionManager(cortex, config, makeMockCallbacks());
 		expect(manager).toBeDefined();
 		expect(manager.isActive).toBe(false);
 	});
@@ -81,11 +75,7 @@ describe("VoiceSessionManager", () => {
 			sampleRate: 48000,
 			instructions: "Test",
 		};
-		const manager = new VoiceSessionManager(
-			cortex,
-			config,
-			makeMockCallbacks(),
-		);
+		const manager = new VoiceSessionManager(cortex, config, makeMockCallbacks());
 		const sent = attachMockWs(manager);
 
 		manager.appendAudio("base64pcm");
@@ -139,9 +129,7 @@ describe("VoiceSessionManager", () => {
 		// Should have called cortex.chatStreamVoice -> VoiceWorker -> session.update + response.create
 		const parsed = sent.map((s) => JSON.parse(s));
 		const sessionUpdate = parsed.find(
-			(m) =>
-				m.type === "session.update" &&
-				m.session?.instructions?.includes("FRIDAY"),
+			(m) => m.type === "session.update" && m.session?.instructions?.includes("FRIDAY"),
 		);
 		expect(sessionUpdate).toBeDefined();
 
@@ -172,9 +160,7 @@ describe("VoiceSessionManager", () => {
 			}),
 		);
 
-		const cancel = sent
-			.map((s) => JSON.parse(s))
-			.find((m) => m.type === "response.cancel");
+		const cancel = sent.map((s) => JSON.parse(s)).find((m) => m.type === "response.cancel");
 		expect(cancel).toBeDefined();
 	});
 

@@ -1,7 +1,4 @@
-import type {
-	NotificationChannel,
-	FridayNotification,
-} from "../../core/notifications.ts";
+import type { FridayNotification, NotificationChannel } from "../../core/notifications.ts";
 import type { TelegramClient } from "./client.ts";
 
 const LEVEL_EMOJI: Record<string, string> = {

@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync, realpathSync } from "node:fs";
+import { mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { AuditLogger } from "../../src/audit/logger.ts";
-import codeExecModule from "../../src/modules/code-exec/index.ts";
 import { codeEval } from "../../src/modules/code-exec/eval.ts";
+import codeExecModule from "../../src/modules/code-exec/index.ts";
 import { codeRunFile } from "../../src/modules/code-exec/run-file.ts";
 import type { ToolContext } from "../../src/modules/types.ts";
 
@@ -55,10 +55,7 @@ describe("code-exec module", () => {
 // ─── code.eval ──────────────────────────────────────────────────────
 describe("code.eval", () => {
 	test("executes typescript code", async () => {
-		const result = await codeEval.execute(
-			{ code: 'console.log("hello from ts");' },
-			ctx,
-		);
+		const result = await codeEval.execute({ code: 'console.log("hello from ts");' }, ctx);
 		expect(result.success).toBe(true);
 		expect(result.output).toContain("hello from ts");
 		expect(result.output).toContain("[exit 0]");
@@ -67,7 +64,7 @@ describe("code.eval", () => {
 	test("executes javascript code", async () => {
 		const result = await codeEval.execute(
 			{
-				code: 'console.log(2 + 2);',
+				code: "console.log(2 + 2);",
 				language: "javascript",
 			},
 			ctx,
@@ -77,10 +74,7 @@ describe("code.eval", () => {
 	});
 
 	test("executes bash code", async () => {
-		const result = await codeEval.execute(
-			{ code: 'echo "hello bash"', language: "bash" },
-			ctx,
-		);
+		const result = await codeEval.execute({ code: 'echo "hello bash"', language: "bash" }, ctx);
 		expect(result.success).toBe(true);
 		expect(result.output).toContain("hello bash");
 	});
@@ -95,10 +89,7 @@ describe("code.eval", () => {
 	});
 
 	test("rejects unsupported language", async () => {
-		const result = await codeEval.execute(
-			{ code: "code", language: "cobol" },
-			ctx,
-		);
+		const result = await codeEval.execute({ code: "code", language: "cobol" }, ctx);
 		expect(result.success).toBe(false);
 		expect(result.output).toContain("Unsupported language");
 	});
@@ -110,10 +101,7 @@ describe("code.eval", () => {
 	});
 
 	test("sandbox is created under tmpdir, not working directory", async () => {
-		const result = await codeEval.execute(
-			{ code: 'console.log(process.cwd());' },
-			ctx,
-		);
+		const result = await codeEval.execute({ code: "console.log(process.cwd());" }, ctx);
 		expect(result.success).toBe(true);
 		// The CWD printed by the sandbox script should be under OS tmpdir, not the working directory
 		const osTmpdir = realpathSync(tmpdir());
@@ -128,10 +116,7 @@ describe("code.eval", () => {
 	});
 
 	test("cleans up sandbox directory", async () => {
-		await codeEval.execute(
-			{ code: 'console.log("cleanup test");' },
-			ctx,
-		);
+		await codeEval.execute({ code: 'console.log("cleanup test");' }, ctx);
 		// Verify no sandbox dirs remain in working directory
 		const { readdirSync } = await import("node:fs");
 		const entries = readdirSync(testDir);
@@ -147,10 +132,7 @@ describe("code.eval", () => {
 // ─── code.run_file ──────────────────────────────────────────────────
 describe("code.run_file", () => {
 	test("runs a typescript file", async () => {
-		writeFileSync(
-			resolve(testDir, "hello.ts"),
-			'console.log("file runner ts");',
-		);
+		writeFileSync(resolve(testDir, "hello.ts"), 'console.log("file runner ts");');
 		const result = await codeRunFile.execute({ path: "hello.ts" }, ctx);
 		expect(result.success).toBe(true);
 		expect(result.output).toContain("file runner ts");
@@ -164,14 +146,8 @@ describe("code.run_file", () => {
 	});
 
 	test("passes arguments to script", async () => {
-		writeFileSync(
-			resolve(testDir, "args.ts"),
-			"console.log(Bun.argv.slice(2).join(','));",
-		);
-		const result = await codeRunFile.execute(
-			{ path: "args.ts", args: ["foo", "bar"] },
-			ctx,
-		);
+		writeFileSync(resolve(testDir, "args.ts"), "console.log(Bun.argv.slice(2).join(','));");
+		const result = await codeRunFile.execute({ path: "args.ts", args: ["foo", "bar"] }, ctx);
 		expect(result.success).toBe(true);
 		expect(result.output).toContain("foo,bar");
 	});

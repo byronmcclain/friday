@@ -1,53 +1,57 @@
-import type { LanguageModelV3 } from "@ai-sdk/provider";
-import type { FridayConfig } from "./types.ts";
-import { Cortex } from "./cortex.ts";
-import { createModel, GROK_DEFAULTS } from "../providers/index.ts";
-import { SignalBus } from "./events.ts";
-import { ClearanceManager } from "./clearance.ts";
+import { mkdir } from "node:fs/promises";
+import type { LanguageModelV4 } from "@ai-sdk/provider";
+import { RhythmExecutor } from "../arc-rhythm/executor.ts";
+import { createArcProtocol } from "../arc-rhythm/protocol.ts";
+import { RhythmScheduler } from "../arc-rhythm/scheduler.ts";
+import { RhythmStore } from "../arc-rhythm/store.ts";
+import { createManageRhythmTool } from "../arc-rhythm/tool.ts";
 import { AuditLogger } from "../audit/logger.ts";
-import { ProtocolRegistry } from "../protocols/registry.ts";
-import { DirectiveStore } from "../directives/store.ts";
 import { DirectiveEngine } from "../directives/engine.ts";
-import { NotificationManager, TerminalChannel, AuditLogChannel, type NotificationChannel } from "./notifications.ts";
-import { discoverModules, discoverForgeModules } from "../modules/loader.ts";
+import { DirectiveStore } from "../directives/store.ts";
+import { createHistoryProtocol } from "../history/protocol.ts";
+import { setProtectedPaths } from "../modules/filesystem/containment.ts";
+import { ForgeManifestManager } from "../modules/forge/manifest.ts";
+import { createForgeProtocol } from "../modules/forge/protocol.ts";
+import type { ForgeHealthReport } from "../modules/forge/types.ts";
+import { discoverForgeModules, discoverModules } from "../modules/loader.ts";
 import type { FridayModule } from "../modules/types.ts";
-import { SmartsStore } from "../smarts/store.ts";
-import { SQLiteMemory, NOOP_SCOPED_MEMORY, type ScopedMemory } from "./memory.ts";
-import { SMARTS_DEFAULTS } from "../smarts/types.ts";
-import { createSmartProtocol } from "../smarts/protocol.ts";
-import { SmartsCurator } from "../smarts/curator.ts";
-import { PsycheStore } from "../psyche/store.ts";
+import { ProtocolRegistry } from "../protocols/registry.ts";
+import { createModel, GROK_DEFAULTS } from "../providers/index.ts";
 import { PsycheCurator } from "../psyche/curator.ts";
 import { createPsycheProtocol } from "../psyche/protocol.ts";
+import { PsycheStore } from "../psyche/store.ts";
 import { PSYCHE_DEFAULTS } from "../psyche/types.ts";
-import { ConversationSummarizer } from "./summarizer.ts";
-import { createHistoryProtocol } from "../history/protocol.ts";
-import { Sensorium } from "../sensorium/sensorium.ts";
 import { createEnvProtocol } from "../sensorium/protocol.ts";
+import { Sensorium } from "../sensorium/sensorium.ts";
 import { createEnvironmentTool } from "../sensorium/tool.ts";
 import { SENSORIUM_DEFAULTS } from "../sensorium/types.ts";
-import { createForgeProtocol } from "../modules/forge/protocol.ts";
-import { ForgeManifestManager } from "../modules/forge/manifest.ts";
-import type { ForgeHealthReport } from "../modules/forge/types.ts";
+import { SmartsCurator } from "../smarts/curator.ts";
+import { createSmartProtocol } from "../smarts/protocol.ts";
+import { SmartsStore } from "../smarts/store.ts";
+import { SMARTS_DEFAULTS } from "../smarts/types.ts";
+import { ClearanceManager } from "./clearance.ts";
+import { Cortex } from "./cortex.ts";
+import { SignalBus } from "./events.ts";
+import { enforceGenesisPermissions, loadGenesis } from "./genesis.ts";
+import { NOOP_SCOPED_MEMORY, type ScopedMemory, SQLiteMemory } from "./memory.ts";
+import {
+	AuditLogChannel,
+	type NotificationChannel,
+	NotificationManager,
+	TerminalChannel,
+} from "./notifications.ts";
 import { createRecallTool } from "./recall-tool.ts";
-import { RhythmStore } from "../arc-rhythm/store.ts";
-import { RhythmExecutor } from "../arc-rhythm/executor.ts";
-import { RhythmScheduler } from "../arc-rhythm/scheduler.ts";
-import { createArcProtocol } from "../arc-rhythm/protocol.ts";
-import { createManageRhythmTool } from "../arc-rhythm/tool.ts";
-import { mkdir } from "node:fs/promises";
-import { loadGenesis, enforceGenesisPermissions } from "./genesis.ts";
-import { setProtectedPaths } from "../modules/filesystem/containment.ts";
-import { Vox } from "./voice/vox.ts";
-import { VOX_DEFAULTS } from "./voice/types.ts";
+import { ConversationSummarizer } from "./summarizer.ts";
+import type { FridayConfig } from "./types.ts";
 import { VoiceChannel } from "./voice/channel.ts";
 import { createVoiceProtocol } from "./voice/protocol.ts";
-import { isGrokVoice, type GrokVoice } from "./voice/types.ts";
+import { type GrokVoice, isGrokVoice, VOX_DEFAULTS } from "./voice/types.ts";
+import { Vox } from "./voice/vox.ts";
 
 export interface RuntimeConfig extends Partial<FridayConfig> {
 	modulesDir?: string;
-	injectedModel?: LanguageModelV3;
-	injectedFastModel?: LanguageModelV3;
+	injectedModel?: LanguageModelV4;
+	injectedFastModel?: LanguageModelV4;
 	smartsDir?: string;
 	dataDir?: string;
 	forgeDir?: string;
@@ -65,11 +69,27 @@ export interface ProcessResult {
 }
 
 export type BootStep =
-	| "signals" | "memory" | "smarts" | "psyche" | "sensorium"
-	| "genesis" | "vox" | "cortex" | "arc-rhythm"
-	| "modules" | "ready";
+	| "signals"
+	| "memory"
+	| "smarts"
+	| "psyche"
+	| "sensorium"
+	| "genesis"
+	| "vox"
+	| "cortex"
+	| "arc-rhythm"
+	| "modules"
+	| "ready";
 
-export type ShutdownStep = "arc-rhythm" | "vox" | "sensorium" | "conversation" | "psyche" | "knowledge" | "modules" | "cleanup";
+export type ShutdownStep =
+	| "arc-rhythm"
+	| "vox"
+	| "sensorium"
+	| "conversation"
+	| "psyche"
+	| "knowledge"
+	| "modules"
+	| "cleanup";
 
 export class FridayRuntime {
 	private _cortex!: Cortex;
@@ -183,60 +203,60 @@ export class FridayRuntime {
 		if (this._booting) throw new Error("Boot already in progress");
 		this._booting = true;
 		try {
-		if (this._booted) await this.shutdown();
+			if (this._booted) await this.shutdown();
 
-		try {
-			this._signals = new SignalBus();
-			this._clearance = new ClearanceManager([
-				"read-fs",
-				"write-fs",
-				"delete-fs",
-				"exec-shell",
-				"network",
-				"git-read",
-				"git-write",
-				"provider",
-				"system",
-				"forge-modify",
-				"audio-output",
-			]);
-			this._audit = new AuditLogger();
-			this._notifications = new NotificationManager(config.channels ?? [new TerminalChannel(), new AuditLogChannel(this._audit)]);
-			this._protocols = new ProtocolRegistry();
-			this._directives = new DirectiveStore();
-			this._directiveEngine = new DirectiveEngine({
-				store: this._directives,
-				signals: this._signals,
-				audit: this._audit,
-				clearance: this._clearance,
-			});
-			this._directiveEngine.start();
-			onProgress?.("signals", "Core systems initialized");
+			try {
+				this._signals = new SignalBus();
+				this._clearance = new ClearanceManager([
+					"read-fs",
+					"write-fs",
+					"delete-fs",
+					"exec-shell",
+					"network",
+					"git-read",
+					"git-write",
+					"provider",
+					"system",
+					"forge-modify",
+					"audio-output",
+				]);
+				this._audit = new AuditLogger();
+				this._notifications = new NotificationManager(
+					config.channels ?? [new TerminalChannel(), new AuditLogChannel(this._audit)],
+				);
+				this._protocols = new ProtocolRegistry();
+				this._directives = new DirectiveStore();
+				this._directiveEngine = new DirectiveEngine({
+					store: this._directives,
+					signals: this._signals,
+					audit: this._audit,
+					clearance: this._clearance,
+				});
+				this._directiveEngine.start();
+				onProgress?.("signals", "Core systems initialized");
 
-			// Wire directive action dispatch — routes actions to the appropriate subsystem.
-			// This must be set after Cortex/protocols are available, but the handler
-			// captures `this` so late-binding is fine. The engine buffers until a handler
-			// is registered, and directives won't fire until signals are emitted (post-boot).
-			this._directiveEngine.onDirectiveAction(async (_directive, action) => {
-				switch (action.type) {
-					case "protocol": {
-						const protocol = this._protocols.get(action.protocol);
-						if (!protocol) break;
-						if (protocol.clearance.length > 0) {
-							const pCheck = this._clearance.checkAll(protocol.clearance);
-							if (!pCheck.granted) {
-								this._audit.log({
-									action: "protocol:blocked",
-									source: protocol.name,
-									detail: pCheck.reason ?? `Clearance denied for protocol: ${protocol.name}`,
-									success: false,
-								});
-								break;
+				// Wire directive action dispatch — routes actions to the appropriate subsystem.
+				// This must be set after Cortex/protocols are available, but the handler
+				// captures `this` so late-binding is fine. The engine buffers until a handler
+				// is registered, and directives won't fire until signals are emitted (post-boot).
+				this._directiveEngine.onDirectiveAction(async (_directive, action) => {
+					switch (action.type) {
+						case "protocol": {
+							const protocol = this._protocols.get(action.protocol);
+							if (!protocol) break;
+							if (protocol.clearance.length > 0) {
+								const pCheck = this._clearance.checkAll(protocol.clearance);
+								if (!pCheck.granted) {
+									this._audit.log({
+										action: "protocol:blocked",
+										source: protocol.name,
+										detail: pCheck.reason ?? `Clearance denied for protocol: ${protocol.name}`,
+										success: false,
+									});
+									break;
+								}
 							}
-						}
-						await protocol.execute(
-							action.args ?? { rawArgs: "" },
-							{
+							await protocol.execute(action.args ?? { rawArgs: "" }, {
 								workingDirectory: process.cwd(),
 								audit: this._audit,
 								signal: this._signals,
@@ -247,410 +267,435 @@ export class FridayRuntime {
 									list: async () => [],
 								},
 								tools: new Map(),
-							},
-						);
-						break;
+							});
+							break;
+						}
+						case "prompt": {
+							await this._cortex.chat(action.prompt);
+							break;
+						}
+						case "tool": {
+							const tool = this._cortex.availableTools.find((t) => t.name === action.tool);
+							if (!tool) break;
+							if (tool.clearance.length > 0) {
+								const tCheck = this._clearance.checkAll(tool.clearance);
+								if (!tCheck.granted) {
+									this._audit.log({
+										action: "tool:blocked",
+										source: tool.name,
+										detail: tCheck.reason ?? `Clearance denied for tool: ${tool.name}`,
+										success: false,
+									});
+									break;
+								}
+							}
+							await tool.execute(action.args ?? {}, {
+								workingDirectory: process.cwd(),
+								audit: this._audit,
+								signal: this._signals,
+								memory: this._memory?.scoped("directive") ?? {
+									get: async () => undefined,
+									set: async () => {},
+									delete: async () => {},
+									list: async () => [],
+								},
+							});
+							break;
+						}
+						case "sequence": {
+							// Sequence actions are not yet dispatched — each step
+							// would need recursive handling. Leave as a no-op for now.
+							break;
+						}
 					}
-					case "prompt": {
-						await this._cortex.chat(action.prompt);
-						break;
-					}
-					case "tool": {
-						const tool = this._cortex.availableTools.find(
-							(t) => t.name === action.tool,
-						);
-						if (!tool) break;
-						if (tool.clearance.length > 0) {
-							const tCheck = this._clearance.checkAll(tool.clearance);
-							if (!tCheck.granted) {
-								this._audit.log({
-									action: "tool:blocked",
-									source: tool.name,
-									detail: tCheck.reason ?? `Clearance denied for tool: ${tool.name}`,
-									success: false,
-								});
-								break;
+				});
+
+				if (config.dataDir) {
+					await mkdir(config.dataDir, { recursive: true });
+					const dbPath = `${config.dataDir}/friday.db`;
+					this._memory = new SQLiteMemory(dbPath);
+					this._sessionId = crypto.randomUUID();
+					this._sessionStartedAt = new Date();
+					this._protocols.register(createHistoryProtocol(this._memory));
+					onProgress?.("memory", "Memory database opened");
+				}
+
+				// Backfill conversation FTS5 index (one-time migration)
+				if (this._memory) {
+					const backfillDone = await this._memory.get<boolean>("conversations", "backfill-done");
+					if (!backfillDone) {
+						const sessions = await this._memory.getConversationHistory(500);
+						for (const session of sessions) {
+							if (session.summary) {
+								await this._memory.indexConversation(session);
 							}
 						}
-						await tool.execute(action.args ?? {}, {
-							workingDirectory: process.cwd(),
-							audit: this._audit,
-							signal: this._signals,
-							memory: this._memory?.scoped("directive") ?? {
-								get: async () => undefined,
-								set: async () => {},
-								delete: async () => {},
-								list: async () => [],
-							},
-						});
-						break;
-					}
-					case "sequence": {
-						// Sequence actions are not yet dispatched — each step
-						// would need recursive handling. Leave as a no-op for now.
-						break;
+						await this._memory.set("conversations", "backfill-done", true);
 					}
 				}
-			});
 
-			if (config.dataDir) {
-				await mkdir(config.dataDir, { recursive: true });
-				const dbPath = `${config.dataDir}/friday.db`;
-				this._memory = new SQLiteMemory(dbPath);
-				this._sessionId = crypto.randomUUID();
-				this._sessionStartedAt = new Date();
-				this._protocols.register(createHistoryProtocol(this._memory));
-				onProgress?.("memory", "Memory database opened");
-			}
+				if (config.smartsDir) {
+					await mkdir(config.smartsDir, { recursive: true });
+					const dbPath = `${config.smartsDir}/.smarts-index.db`;
+					this._smartsMemory = new SQLiteMemory(dbPath);
+					this._smarts = new SmartsStore();
+					await this._smarts.initialize(
+						{ ...SMARTS_DEFAULTS, smartsDir: config.smartsDir },
+						this._smartsMemory,
+					);
+					this._protocols.register(createSmartProtocol(this._smarts));
+					onProgress?.("smarts", "SMARTS knowledge indexed");
+				}
 
-			// Backfill conversation FTS5 index (one-time migration)
-			if (this._memory) {
-				const backfillDone = await this._memory.get<boolean>("conversations", "backfill-done");
-				if (!backfillDone) {
-					const sessions = await this._memory.getConversationHistory(500);
-					for (const session of sessions) {
-						if (session.summary) {
-							await this._memory.indexConversation(session);
+				// Psyche — emotional intelligence (shares Memory's database)
+				if (this._memory) {
+					this._psyche = new PsycheStore(this._memory.database, PSYCHE_DEFAULTS);
+					this._psyche.decayMilestones();
+					this._protocols.register(createPsycheProtocol(this._psyche));
+					onProgress?.("psyche", "Psyche emotional state loaded");
+				}
+
+				// Resolve dual models: CLI flag > env var > default
+				const reasoningModel =
+					config.model ?? process.env.FRIDAY_REASONING_MODEL ?? GROK_DEFAULTS.model;
+				this._fastModel =
+					config.fastModel ?? process.env.FRIDAY_FAST_MODEL ?? GROK_DEFAULTS.fastModel;
+
+				// Sensorium — before Cortex so context block is available from first chat()
+				if (config.enableSensorium !== false) {
+					this._sensorium = new Sensorium({
+						config: SENSORIUM_DEFAULTS,
+						signals: this._signals,
+						notifications: this._notifications,
+					});
+					await this._sensorium.poll();
+					this._sensorium.start();
+					this._protocols.register(createEnvProtocol(this._sensorium));
+					onProgress?.("sensorium", "Sensorium polling started");
+				}
+
+				// Load GENESIS.md — Friday's identity prompt (before Cortex)
+				let genesisPrompt: string | undefined;
+				if (config.genesisPath) {
+					genesisPrompt = await loadGenesis(config.genesisPath);
+					await enforceGenesisPermissions(config.genesisPath);
+					setProtectedPaths([config.genesisPath]);
+					this._audit.log({
+						action: "genesis:loaded",
+						source: "runtime",
+						detail: `Identity loaded from ${config.genesisPath} (${genesisPrompt.length} chars)`,
+						success: true,
+					});
+					onProgress?.(
+						"genesis",
+						`Genesis identity loaded (${genesisPrompt.length.toLocaleString()} chars)`,
+					);
+				}
+
+				// Vox — voice output (before Cortex so vox ref can be passed in)
+				if (config.enableVox !== false) {
+					const envVoice = process.env.FRIDAY_VOICE;
+					const voice: GrokVoice =
+						envVoice && isGrokVoice(envVoice) ? envVoice : VOX_DEFAULTS.defaultVoice;
+					this._vox = new Vox({
+						config: { ...VOX_DEFAULTS, defaultVoice: voice },
+						signals: this._signals,
+						notifications: this._notifications,
+						clearance: this._clearance,
+						audit: this._audit,
+					});
+					this._notifications.addChannel(new VoiceChannel(this._vox));
+					this._protocols.register(createVoiceProtocol(this._vox));
+					onProgress?.("vox", "Vox voice engine ready");
+				}
+
+				const cacheSessionId = this._sessionId ?? crypto.randomUUID();
+
+				// Per-tool memory map — shared by reference with Cortex so entries
+				// added during module registration are visible when the executor is created.
+				const toolMemoryMap = new Map<string, ScopedMemory>();
+
+				this._cortex = new Cortex({
+					model: reasoningModel,
+					maxTokens: config.maxTokens,
+					injectedModel: config.injectedModel,
+					sessionId: cacheSessionId,
+
+					smartsStore: this._smarts,
+					psyche: this._psyche,
+					sensorium: this._sensorium,
+					clearance: this._clearance,
+					audit: this._audit,
+					signals: this._signals,
+					toolMemory: this._memory?.scoped("tools"),
+					toolMemoryMap,
+					notifications: this._notifications,
+					genesisPrompt,
+					vox: this._vox,
+					debug: config.debug,
+					projectRoot: process.cwd(),
+				});
+
+				// Register sensorium tool on Cortex (needs Cortex to exist)
+				if (this._sensorium) {
+					this._cortex.registerTool(createEnvironmentTool(this._sensorium));
+				}
+
+				// Register recall tool for conversation memory search
+				if (this._memory) {
+					this._cortex.registerTool(createRecallTool(this._memory));
+				}
+				onProgress?.("cortex", `Cortex online (${reasoningModel})`);
+
+				// Arc Rhythm — after Cortex and recall tool, before modules
+				if (this._memory) {
+					this._rhythmStore = new RhythmStore(this._memory.database);
+					const rhythmExecutor = new RhythmExecutor({
+						cortex: this._cortex,
+						protocols: this._protocols,
+						clearance: this._clearance,
+						audit: this._audit,
+						signals: this._signals,
+						memory: this._memory?.scoped("arc-rhythm"),
+					});
+					this._rhythmScheduler = new RhythmScheduler({
+						store: this._rhythmStore,
+						executor: rhythmExecutor,
+						signals: this._signals,
+						notifications: this._notifications,
+						audit: this._audit,
+					});
+					this._protocols.register(createArcProtocol(this._rhythmStore, this._rhythmScheduler));
+					this._cortex.registerTool(createManageRhythmTool(this._rhythmStore));
+					this._rhythmScheduler.start();
+					onProgress?.("arc-rhythm", "Arc Rhythm scheduler started");
+				}
+
+				// Subsystem model for curator/summarizer.
+				const subsystemModel: LanguageModelV4 =
+					config.injectedFastModel ?? config.injectedModel ?? createModel(this._fastModel);
+
+				if (this._smarts) {
+					this._curator = new SmartsCurator(this._smarts, subsystemModel);
+				}
+				this._summarizer = new ConversationSummarizer(subsystemModel);
+
+				if (this._psyche) {
+					this._psycheCurator = new PsycheCurator(this._psyche, subsystemModel);
+					// Bootstrap from history if Psyche has no existing state
+					if (!this._psyche.hasDimensions() && this._memory) {
+						const recent = await this._memory.getConversationHistory(3);
+						const smartsEntries = this._smarts?.all() ?? [];
+						const smartsSummary = smartsEntries
+							.map((e) => `[${e.domain}] ${e.name}: ${e.content.slice(0, 200)}`)
+							.join("\n");
+						if (recent.length > 0 || smartsSummary.length > 0) {
+							await this._psycheCurator.bootstrapFromHistory(recent, smartsSummary);
+							onProgress?.("psyche", "Psyche bootstrapped from conversation history");
+						} else {
+							this._psyche.seedNeutralDefaults();
 						}
 					}
-					await this._memory.set("conversations", "backfill-done", true);
 				}
-			}
 
-			if (config.smartsDir) {
-				await mkdir(config.smartsDir, { recursive: true });
-				const dbPath = `${config.smartsDir}/.smarts-index.db`;
-				this._smartsMemory = new SQLiteMemory(dbPath);
-				this._smarts = new SmartsStore();
-				await this._smarts.initialize(
-					{ ...SMARTS_DEFAULTS, smartsDir: config.smartsDir },
-					this._smartsMemory,
-				);
-				this._protocols.register(createSmartProtocol(this._smarts));
-				onProgress?.("smarts", "SMARTS knowledge indexed");
-			}
+				// Wire emotion engine into Vox for dynamic voice
+				if (this._vox && this._cortex) {
+					this._vox.setEmotionEngine(
+						subsystemModel,
+						() => this._cortex!.getRecentHistory(5),
+						this._psyche ? () => this._psyche!.getDimensionSummary() : undefined,
+					);
+				}
 
-			// Psyche — emotional intelligence (shares Memory's database)
-			if (this._memory) {
-				this._psyche = new PsycheStore(this._memory.database, PSYCHE_DEFAULTS);
-				this._psyche.decayMilestones();
-				this._protocols.register(createPsycheProtocol(this._psyche));
-				onProgress?.("psyche", "Psyche emotional state loaded");
-			}
-
-			// Resolve dual models: CLI flag > env var > default
-			const reasoningModel = config.model ?? process.env.FRIDAY_REASONING_MODEL ?? GROK_DEFAULTS.model;
-			this._fastModel = config.fastModel ?? process.env.FRIDAY_FAST_MODEL ?? GROK_DEFAULTS.fastModel;
-
-			// Sensorium — before Cortex so context block is available from first chat()
-			if (config.enableSensorium !== false) {
-				this._sensorium = new Sensorium({
-					config: SENSORIUM_DEFAULTS,
-					signals: this._signals,
-					notifications: this._notifications,
-				});
-				await this._sensorium.poll();
-				this._sensorium.start();
-				this._protocols.register(createEnvProtocol(this._sensorium));
-				onProgress?.("sensorium", "Sensorium polling started");
-			}
-
-			// Load GENESIS.md — Friday's identity prompt (before Cortex)
-			let genesisPrompt: string | undefined;
-			if (config.genesisPath) {
-				genesisPrompt = await loadGenesis(config.genesisPath);
-				await enforceGenesisPermissions(config.genesisPath);
-				setProtectedPaths([config.genesisPath]);
-				this._audit.log({
-					action: "genesis:loaded",
-					source: "runtime",
-					detail: `Identity loaded from ${config.genesisPath} (${genesisPrompt.length} chars)`,
-					success: true,
-				});
-				onProgress?.("genesis", `Genesis identity loaded (${genesisPrompt.length.toLocaleString()} chars)`);
-			}
-
-			// Vox — voice output (before Cortex so vox ref can be passed in)
-			if (config.enableVox !== false) {
-				const envVoice = process.env.FRIDAY_VOICE;
-			const voice: GrokVoice = envVoice && isGrokVoice(envVoice) ? envVoice : VOX_DEFAULTS.defaultVoice;
-				this._vox = new Vox({
-					config: { ...VOX_DEFAULTS, defaultVoice: voice },
-					signals: this._signals,
-					notifications: this._notifications,
-					clearance: this._clearance,
-					audit: this._audit,
-				});
-				this._notifications.addChannel(new VoiceChannel(this._vox));
-				this._protocols.register(createVoiceProtocol(this._vox));
-				onProgress?.("vox", "Vox voice engine ready");
-			}
-
-			const cacheSessionId = this._sessionId ?? crypto.randomUUID();
-
-			// Per-tool memory map — shared by reference with Cortex so entries
-			// added during module registration are visible when the executor is created.
-			const toolMemoryMap = new Map<string, ScopedMemory>();
-
-			this._cortex = new Cortex({
-				model: reasoningModel,
-				maxTokens: config.maxTokens,
-				injectedModel: config.injectedModel,
-				sessionId: cacheSessionId,
-
-				smartsStore: this._smarts,
-				psyche: this._psyche,
-				sensorium: this._sensorium,
-				clearance: this._clearance,
-				audit: this._audit,
-				signals: this._signals,
-				toolMemory: this._memory?.scoped("tools"),
-				toolMemoryMap,
-				notifications: this._notifications,
-				genesisPrompt,
-				vox: this._vox,
-				debug: config.debug,
-				projectRoot: process.cwd(),
-			});
-
-			// Register sensorium tool on Cortex (needs Cortex to exist)
-			if (this._sensorium) {
-				this._cortex.registerTool(createEnvironmentTool(this._sensorium));
-			}
-
-			// Register recall tool for conversation memory search
-			if (this._memory) {
-				this._cortex.registerTool(createRecallTool(this._memory));
-			}
-			onProgress?.("cortex", `Cortex online (${reasoningModel})`);
-
-			// Arc Rhythm — after Cortex and recall tool, before modules
-			if (this._memory) {
-				this._rhythmStore = new RhythmStore(this._memory.database);
-				const rhythmExecutor = new RhythmExecutor({
-					cortex: this._cortex,
-					protocols: this._protocols,
-					clearance: this._clearance,
-					audit: this._audit,
-					signals: this._signals,
-					memory: this._memory?.scoped("arc-rhythm"),
-				});
-				this._rhythmScheduler = new RhythmScheduler({
-					store: this._rhythmStore,
-					executor: rhythmExecutor,
-					signals: this._signals,
-					notifications: this._notifications,
-					audit: this._audit,
-				});
-				this._protocols.register(createArcProtocol(this._rhythmStore, this._rhythmScheduler));
-				this._cortex.registerTool(createManageRhythmTool(this._rhythmStore));
-				this._rhythmScheduler.start();
-				onProgress?.("arc-rhythm", "Arc Rhythm scheduler started");
-			}
-
-			// Subsystem model for curator/summarizer.
-			const subsystemModel: LanguageModelV3 =
-				config.injectedFastModel ?? config.injectedModel ?? createModel(this._fastModel);
-
-			if (this._smarts) {
-				this._curator = new SmartsCurator(this._smarts, subsystemModel);
-			}
-			this._summarizer = new ConversationSummarizer(subsystemModel);
-
-			if (this._psyche) {
-				this._psycheCurator = new PsycheCurator(this._psyche, subsystemModel);
-				// Bootstrap from history if Psyche has no existing state
-				if (!this._psyche.hasDimensions() && this._memory) {
-					const recent = await this._memory.getConversationHistory(3);
-					const smartsEntries = this._smarts?.all() ?? [];
-					const smartsSummary = smartsEntries
-						.map((e) => `[${e.domain}] ${e.name}: ${e.content.slice(0, 200)}`)
-						.join("\n");
-					if (recent.length > 0 || smartsSummary.length > 0) {
-						await this._psycheCurator.bootstrapFromHistory(recent, smartsSummary);
-						onProgress?.("psyche", "Psyche bootstrapped from conversation history");
-					} else {
-						this._psyche.seedNeutralDefaults();
+				if (this._memory && !config.fresh) {
+					const recent = await this._memory.getConversationHistory(1);
+					if (recent.length > 0) {
+						this._cortex.setHistory(recent[0]!.messages);
 					}
 				}
-			}
 
-			// Wire emotion engine into Vox for dynamic voice
-			if (this._vox && this._cortex) {
-				this._vox.setEmotionEngine(
-					subsystemModel,
-					() => this._cortex!.getRecentHistory(5),
-					this._psyche
-						? () => this._psyche!.getDimensionSummary()
-						: undefined,
-				);
-			}
-
-			if (this._memory && !config.fresh) {
-				const recent = await this._memory.getConversationHistory(1);
-				if (recent.length > 0) {
-					this._cortex.setHistory(recent[0]!.messages);
+				if (config.modulesDir) {
+					this._modules = await discoverModules(config.modulesDir);
+					for (const mod of this._modules) {
+						const modMemory = this._memory?.scoped(mod.name);
+						for (const tool of mod.tools) {
+							if (modMemory) toolMemoryMap.set(tool.name, modMemory);
+							this._cortex.registerTool(tool);
+						}
+						for (const protocol of mod.protocols) {
+							this._protocols.register(protocol);
+						}
+						if (mod.onLoad) {
+							await mod.onLoad({
+								memory: this._memory?.scoped(mod.name) ?? {
+									get: async () => undefined,
+									set: async () => {},
+									delete: async () => {},
+									list: async () => [],
+								},
+								cortex: this._cortex
+									? { chat: (msg: string) => this._cortex.chat(msg) }
+									: undefined,
+								audit: this._audit,
+								notifications: this._notifications,
+							});
+						}
+					}
 				}
-			}
 
-			if (config.modulesDir) {
-				this._modules = await discoverModules(config.modulesDir);
+				if (config.forgeDir) {
+					await mkdir(config.forgeDir, { recursive: true });
+					this._protocols.register(createForgeProtocol(config.forgeDir));
+
+					const forgeResult = await discoverForgeModules(config.forgeDir);
+					this._forgeHealthReport = {
+						loaded: forgeResult.loaded.map((m) => m.name),
+						failed: forgeResult.failed,
+						pending: [],
+					};
+
+					for (const mod of forgeResult.loaded) {
+						const modMemory = this._memory?.scoped(mod.name);
+						for (const tool of mod.tools) {
+							if (modMemory) toolMemoryMap.set(tool.name, modMemory);
+							this._cortex.registerTool(tool);
+						}
+						for (const protocol of mod.protocols) {
+							this._protocols.register(protocol);
+						}
+						if (mod.onLoad) {
+							await mod.onLoad({
+								memory: this._memory?.scoped(mod.name) ?? {
+									get: async () => undefined,
+									set: async () => {},
+									delete: async () => {},
+									list: async () => [],
+								},
+								cortex: this._cortex
+									? { chat: (msg: string) => this._cortex.chat(msg) }
+									: undefined,
+								audit: this._audit,
+								notifications: this._notifications,
+							});
+						}
+						this._modules.push(mod);
+					}
+
+					// Batch-update manifest status (single file read/write)
+					const statusUpdates = [
+						...forgeResult.loaded.map((m) => ({ name: m.name, status: "loaded" as const })),
+						...forgeResult.failed.map((f) => ({ name: f.name, status: "failed" as const })),
+					];
+					if (statusUpdates.length > 0) {
+						const manifest = new ForgeManifestManager(config.forgeDir);
+						try {
+							await manifest.setStatusBatch(statusUpdates);
+						} catch (err) {
+							const msg = err instanceof Error ? err.message : String(err);
+							this._audit.log({
+								action: "forge:manifest-error",
+								source: "runtime",
+								detail: `Failed to update manifest status: ${msg}`,
+								success: false,
+							});
+						}
+					}
+				}
+
+				if (this._modules.length > 0) {
+					const toolCount = this._modules.reduce((sum, m) => sum + m.tools.length, 0);
+					const protoCount = this._modules.reduce((sum, m) => sum + m.protocols.length, 0);
+					onProgress?.(
+						"modules",
+						`${this._modules.length} modules loaded (${toolCount} tools, ${protoCount} protocols)`,
+					);
+				}
+
+				// Listen for forge restart requests (emitted by forge_restart tool via signal bus)
+				this._signals.on("custom:forge-restart-requested", () => {
+					this._restartRequested = true;
+				});
+
+				await this._signals.emit("session:start", "runtime");
+				this._booted = true;
+				onProgress?.("ready", "Friday online");
+
+				this._audit.log({
+					action: "runtime:boot",
+					source: "runtime",
+					detail: `Friday online. Model: ${reasoningModel}, Modules: ${this._modules.length}`,
+					success: true,
+				});
+
+				if (config.debug) {
+					this._audit.log({
+						action: "debug:enabled",
+						source: "runtime",
+						detail:
+							"Debug inference logging active — payloads and responses will be written to last-inference-payload.log and last-inference-response.log",
+						success: true,
+					});
+				}
+			} catch (err) {
+				this._booted = false;
+				// Unload any successfully-loaded modules
 				for (const mod of this._modules) {
-					const modMemory = this._memory?.scoped(mod.name);
-					for (const tool of mod.tools) {
-						if (modMemory) toolMemoryMap.set(tool.name, modMemory);
-						this._cortex.registerTool(tool);
-					}
-					for (const protocol of mod.protocols) {
-						this._protocols.register(protocol);
-					}
-					if (mod.onLoad) {
-						await mod.onLoad({
-							memory: this._memory?.scoped(mod.name) ?? {
-								get: async () => undefined,
-								set: async () => {},
-								delete: async () => {},
-								list: async () => [],
-							},
-							cortex: this._cortex ? { chat: (msg: string) => this._cortex.chat(msg) } : undefined,
-							audit: this._audit,
-							notifications: this._notifications,
-						});
-					}
-				}
-			}
-
-			if (config.forgeDir) {
-				await mkdir(config.forgeDir, { recursive: true });
-				this._protocols.register(createForgeProtocol(config.forgeDir));
-
-				const forgeResult = await discoverForgeModules(config.forgeDir);
-				this._forgeHealthReport = {
-					loaded: forgeResult.loaded.map((m) => m.name),
-					failed: forgeResult.failed,
-					pending: [],
-				};
-
-				for (const mod of forgeResult.loaded) {
-					const modMemory = this._memory?.scoped(mod.name);
-					for (const tool of mod.tools) {
-						if (modMemory) toolMemoryMap.set(tool.name, modMemory);
-						this._cortex.registerTool(tool);
-					}
-					for (const protocol of mod.protocols) {
-						this._protocols.register(protocol);
-					}
-					if (mod.onLoad) {
-						await mod.onLoad({
-							memory: this._memory?.scoped(mod.name) ?? {
-								get: async () => undefined,
-								set: async () => {},
-								delete: async () => {},
-								list: async () => [],
-							},
-							cortex: this._cortex ? { chat: (msg: string) => this._cortex.chat(msg) } : undefined,
-							audit: this._audit,
-							notifications: this._notifications,
-						});
-					}
-					this._modules.push(mod);
-				}
-
-				// Batch-update manifest status (single file read/write)
-				const statusUpdates = [
-					...forgeResult.loaded.map((m) => ({ name: m.name, status: "loaded" as const })),
-					...forgeResult.failed.map((f) => ({ name: f.name, status: "failed" as const })),
-				];
-				if (statusUpdates.length > 0) {
-					const manifest = new ForgeManifestManager(config.forgeDir);
 					try {
-						await manifest.setStatusBatch(statusUpdates);
-					} catch (err) {
-						const msg = err instanceof Error ? err.message : String(err);
-						this._audit.log({
-							action: "forge:manifest-error",
-							source: "runtime",
-							detail: `Failed to update manifest status: ${msg}`,
-							success: false,
-						});
+						if (mod.onUnload) await mod.onUnload();
+					} catch {
+						/* best-effort cleanup */
 					}
 				}
-			}
-
-			if (this._modules.length > 0) {
-				const toolCount = this._modules.reduce((sum, m) => sum + m.tools.length, 0);
-				const protoCount = this._modules.reduce((sum, m) => sum + m.protocols.length, 0);
-				onProgress?.("modules", `${this._modules.length} modules loaded (${toolCount} tools, ${protoCount} protocols)`);
-			}
-
-			// Listen for forge restart requests (emitted by forge_restart tool via signal bus)
-			this._signals.on("custom:forge-restart-requested", () => {
-				this._restartRequested = true;
-			});
-
-			await this._signals.emit("session:start", "runtime");
-			this._booted = true;
-			onProgress?.("ready", "Friday online");
-
-			this._audit.log({
-				action: "runtime:boot",
-				source: "runtime",
-				detail: `Friday online. Model: ${reasoningModel}, Modules: ${this._modules.length}`,
-				success: true,
-			});
-
-			if (config.debug) {
-				this._audit.log({
-					action: "debug:enabled",
-					source: "runtime",
-					detail: "Debug inference logging active — payloads and responses will be written to last-inference-payload.log and last-inference-response.log",
-					success: true,
-				});
-			}
-		} catch (err) {
-			this._booted = false;
-			// Unload any successfully-loaded modules
-			for (const mod of this._modules) {
+				this._modules = [];
 				try {
-					if (mod.onUnload) await mod.onUnload();
-				} catch { /* best-effort cleanup */ }
+					this._directiveEngine?.stop();
+				} catch {
+					/* best-effort */
+				}
+				try {
+					if (this._rhythmScheduler) {
+						this._rhythmScheduler.stop();
+						this._rhythmScheduler = undefined;
+						this._rhythmStore = undefined;
+					}
+				} catch {
+					/* best-effort */
+				}
+				try {
+					if (this._vox) {
+						this._vox.stop();
+						this._vox = undefined;
+					}
+				} catch {
+					/* best-effort */
+				}
+				try {
+					if (this._sensorium) {
+						this._sensorium.stop();
+						this._sensorium = undefined;
+					}
+				} catch {
+					/* best-effort */
+				}
+				try {
+					if (this._smartsMemory) {
+						this._smartsMemory.close();
+						this._smartsMemory = undefined;
+						this._smarts = undefined;
+					}
+				} catch {
+					/* best-effort */
+				}
+				try {
+					if (this._memory) {
+						this._memory.close();
+						this._memory = undefined;
+					}
+				} catch {
+					/* best-effort */
+				}
+				throw err;
 			}
-			this._modules = [];
-			try { this._directiveEngine?.stop(); } catch { /* best-effort */ }
-			try {
-				if (this._rhythmScheduler) {
-					this._rhythmScheduler.stop();
-					this._rhythmScheduler = undefined;
-					this._rhythmStore = undefined;
-				}
-			} catch { /* best-effort */ }
-			try {
-				if (this._vox) {
-					this._vox.stop();
-					this._vox = undefined;
-				}
-			} catch { /* best-effort */ }
-			try {
-				if (this._sensorium) {
-					this._sensorium.stop();
-					this._sensorium = undefined;
-				}
-			} catch { /* best-effort */ }
-			try {
-				if (this._smartsMemory) {
-					this._smartsMemory.close();
-					this._smartsMemory = undefined;
-					this._smarts = undefined;
-				}
-			} catch { /* best-effort */ }
-			try {
-				if (this._memory) {
-					this._memory.close();
-					this._memory = undefined;
-				}
-			} catch { /* best-effort */ }
-			throw err;
-		}
 		} finally {
 			this._booting = false;
 		}
@@ -677,7 +722,10 @@ export class FridayRuntime {
 						detail: check.reason ?? `Clearance denied for protocol: ${protocol.name}`,
 						success: false,
 					});
-					return { output: check.reason ?? `Clearance denied for protocol: ${protocol.name}`, source: "protocol" };
+					return {
+						output: check.reason ?? `Clearance denied for protocol: ${protocol.name}`,
+						source: "protocol",
+					};
 				}
 			}
 			const result = await protocol.execute(
@@ -766,11 +814,12 @@ export class FridayRuntime {
 					})
 				: undefined;
 
-			const psychePromise = this._psycheCurator && this._sessionId
-				? this._psycheCurator.analyzeSession(this._sessionId, history).catch((err) => {
-						console.warn("Psyche analysis failed:", err instanceof Error ? err.message : err);
-					})
-				: undefined;
+			const psychePromise =
+				this._psycheCurator && this._sessionId
+					? this._psycheCurator.analyzeSession(this._sessionId, history).catch((err) => {
+							console.warn("Psyche analysis failed:", err instanceof Error ? err.message : err);
+						})
+					: undefined;
 
 			try {
 				if (this._memory && this._sessionId && this._sessionStartedAt && history.length > 0) {
@@ -807,11 +856,17 @@ export class FridayRuntime {
 		this._forgeHealthReport = undefined;
 
 		onProgress?.("modules", "Unloading modules...");
-		try { await this._signals.emit("session:end", "runtime"); } catch { /* best-effort */ }
+		try {
+			await this._signals.emit("session:end", "runtime");
+		} catch {
+			/* best-effort */
+		}
 		for (const mod of this._modules) {
 			try {
 				if (mod.onUnload) await mod.onUnload();
-			} catch { /* best-effort module cleanup */ }
+			} catch {
+				/* best-effort module cleanup */
+			}
 		}
 		onProgress?.("cleanup", "Closing databases...");
 		try {
@@ -820,14 +875,22 @@ export class FridayRuntime {
 				this._smartsMemory = undefined;
 				this._smarts = undefined;
 			}
-		} catch { /* best-effort */ }
+		} catch {
+			/* best-effort */
+		}
 		try {
 			if (this._memory) {
 				this._memory.close();
 				this._memory = undefined;
 			}
-		} catch { /* best-effort */ }
-		try { this._directiveEngine?.stop(); } catch { /* best-effort */ }
+		} catch {
+			/* best-effort */
+		}
+		try {
+			this._directiveEngine?.stop();
+		} catch {
+			/* best-effort */
+		}
 		this._audit.log({
 			action: "runtime:shutdown",
 			source: "runtime",

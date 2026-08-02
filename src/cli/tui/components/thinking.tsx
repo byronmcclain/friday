@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from "react";
-import { PALETTE, BOLD } from "../theme.ts";
+import { useEffect, useRef, useState } from "react";
 import type { ToolInfo } from "../state.ts";
+import { BOLD, PALETTE } from "../theme.ts";
 
 const BRAILLE_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏";
 const MAX_TRAIL = 5;
@@ -89,17 +89,13 @@ export function ThinkingIndicator({ currentTool }: ThinkingProps) {
 							{`${BRAILLE_FRAMES[frame]} ${formatToolSummary(entry.name, entry.args)}${timeStr}`}
 						</text>
 					) : (
-						<text fg={PALETTE.textMuted}>
-							{`✓ ${formatToolSummary(entry.name, entry.args)}`}
-						</text>
+						<text fg={PALETTE.textMuted}>{`✓ ${formatToolSummary(entry.name, entry.args)}`}</text>
 					)}
 				</box>
 			))}
 			{!hasActiveEntry && (
 				<box paddingLeft={1}>
-					<text fg={PALETTE.amberDim}>
-						{`${BRAILLE_FRAMES[frame]} thinking...${timeStr}`}
-					</text>
+					<text fg={PALETTE.amberDim}>{`${BRAILLE_FRAMES[frame]} thinking...${timeStr}`}</text>
 				</box>
 			)}
 		</box>

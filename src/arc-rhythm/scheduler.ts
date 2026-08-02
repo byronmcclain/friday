@@ -1,10 +1,10 @@
-import type { RhythmStore } from "./store.ts";
-import type { RhythmExecutor } from "./executor.ts";
+import type { AuditLogger } from "../audit/logger.ts";
 import type { SignalBus } from "../core/events.ts";
 import type { NotificationManager } from "../core/notifications.ts";
-import type { AuditLogger } from "../audit/logger.ts";
 import { nextOccurrence } from "./cron.ts";
-import { MAX_CONSECUTIVE_FAILURES, DEFAULT_TICK_INTERVAL } from "./types.ts";
+import type { RhythmExecutor } from "./executor.ts";
+import type { RhythmStore } from "./store.ts";
+import { DEFAULT_TICK_INTERVAL, MAX_CONSECUTIVE_FAILURES } from "./types.ts";
 
 export interface SchedulerConfig {
 	store: RhythmStore;
@@ -94,43 +94,34 @@ export class RhythmScheduler {
 
 			const result = await this.executor.execute(rhythm);
 
-			this.store.completeExecution(
-				exec.id,
-				result.status,
-				result.result,
-				result.error,
-			);
+			this.store.completeExecution(exec.id, result.status, result.result, result.error);
 
 			const computedNext = nextOccurrence(rhythm.cron, new Date());
 			this.store.markExecuted(rhythm.id, result.status, computedNext);
 
 			if (result.status === "success") {
-				await this.signals.emit(
-					"custom:arc-rhythm-executed",
-					"arc-rhythm",
-					{ rhythmId: rhythm.id, name: rhythm.name },
-				);
+				await this.signals.emit("custom:arc-rhythm-executed", "arc-rhythm", {
+					rhythmId: rhythm.id,
+					name: rhythm.name,
+				});
 			} else {
-				await this.signals.emit(
-					"custom:arc-rhythm-failed",
-					"arc-rhythm",
-					{ rhythmId: rhythm.id, name: rhythm.name, error: result.error },
-				);
+				await this.signals.emit("custom:arc-rhythm-failed", "arc-rhythm", {
+					rhythmId: rhythm.id,
+					name: rhythm.name,
+					error: result.error,
+				});
 			}
 
 			// Check auto-pause
 			const updated = this.store.get(rhythmId);
-			if (
-				updated &&
-				updated.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES
-			) {
+			if (updated && updated.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
 				this.store.update(rhythmId, { enabled: false });
 
-				await this.signals.emit(
-					"custom:arc-rhythm-paused",
-					"arc-rhythm",
-					{ rhythmId: rhythm.id, name: rhythm.name, failures: updated.consecutiveFailures },
-				);
+				await this.signals.emit("custom:arc-rhythm-paused", "arc-rhythm", {
+					rhythmId: rhythm.id,
+					name: rhythm.name,
+					failures: updated.consecutiveFailures,
+				});
 
 				await this.notifications.notify({
 					level: "warning",

@@ -1,19 +1,15 @@
 import {
-	cpus,
-	totalmem,
-	freemem,
-	loadavg,
-	uptime,
-	platform,
 	arch,
+	cpus,
+	freemem,
 	hostname,
+	loadavg,
+	platform,
+	totalmem,
+	uptime,
 	version,
 } from "node:os";
-import type {
-	MachineSnapshot,
-	ContainerSnapshot,
-	DevSnapshot,
-} from "./types.ts";
+import type { ContainerSnapshot, DevSnapshot, MachineSnapshot } from "./types.ts";
 
 export interface CpuTimes {
 	idle: number;
@@ -66,12 +62,7 @@ export function getCpuTimes(): CpuTimes {
 	let total = 0;
 	for (const core of cores) {
 		idle += core.times.idle;
-		total +=
-			core.times.user +
-			core.times.nice +
-			core.times.sys +
-			core.times.irq +
-			core.times.idle;
+		total += core.times.user + core.times.nice + core.times.sys + core.times.irq + core.times.idle;
 	}
 	return { idle, total };
 }
@@ -151,32 +142,25 @@ export async function gatherContainers(): Promise<ContainerSnapshot> {
 			return { runtime: "none", running: [], stopped: 0 };
 		}
 
-		const psResult =
-			await Bun.$`docker ps --format '{{json .}}'`.quiet().nothrow();
+		const psResult = await Bun.$`docker ps --format '{{json .}}'`.quiet().nothrow();
 		const running: ContainerSnapshot["running"] = [];
 
 		if (psResult.exitCode === 0 && psResult.stdout.length > 0) {
-			const lines = psResult.stdout
-				.toString()
-				.trim()
-				.split("\n")
-				.filter(Boolean);
+			const lines = psResult.stdout.toString().trim().split("\n").filter(Boolean);
 
-			const statsResult =
-				await Bun.$`docker stats --no-stream --format '{{json .}}'`
-					.quiet()
-					.nothrow();
+			const statsResult = await Bun.$`docker stats --no-stream --format '{{json .}}'`
+				.quiet()
+				.nothrow();
 			const statsMap = new Map<string, { cpu: number; memory: number }>();
 
 			if (statsResult.exitCode === 0 && statsResult.stdout.length > 0) {
-				for (const line of statsResult.stdout
-					.toString()
-					.trim()
-					.split("\n")
-					.filter(Boolean)) {
+				for (const line of statsResult.stdout.toString().trim().split("\n").filter(Boolean)) {
 					try {
 						const stat = JSON.parse(line);
-						const statName = (stat.Name || stat.Names || stat.ID || stat.Container || "").replace(/^\//, "");
+						const statName = (stat.Name || stat.Names || stat.ID || stat.Container || "").replace(
+							/^\//,
+							"",
+						);
 						statsMap.set(statName, {
 							cpu: Number.parseFloat(stat.CPUPerc) || 0,
 							memory: Number.parseFloat(stat.MemPerc) || 0,
@@ -207,12 +191,10 @@ export async function gatherContainers(): Promise<ContainerSnapshot> {
 			}
 		}
 
-		const stoppedResult =
-			await Bun.$`docker ps -a --filter status=exited -q`.quiet().nothrow();
+		const stoppedResult = await Bun.$`docker ps -a --filter status=exited -q`.quiet().nothrow();
 		const stopped =
 			stoppedResult.exitCode === 0
-				? stoppedResult.stdout.toString().trim().split("\n").filter(Boolean)
-						.length
+				? stoppedResult.stdout.toString().trim().split("\n").filter(Boolean).length
 				: 0;
 
 		return { runtime: "docker", running, stopped };
@@ -222,36 +204,21 @@ export async function gatherContainers(): Promise<ContainerSnapshot> {
 }
 
 export async function gatherDev(): Promise<DevSnapshot> {
-	const [git, ports, runtimes] = await Promise.all([
-		gatherGit(),
-		gatherPorts(),
-		gatherRuntimes(),
-	]);
+	const [git, ports, runtimes] = await Promise.all([gatherGit(), gatherPorts(), gatherRuntimes()]);
 	return { git, ports, runtimes };
 }
 
 async function gatherGit(): Promise<DevSnapshot["git"]> {
 	try {
-		const topLevel =
-			await Bun.$`git rev-parse --show-toplevel 2>/dev/null`
-				.quiet()
-				.nothrow();
+		const topLevel = await Bun.$`git rev-parse --show-toplevel 2>/dev/null`.quiet().nothrow();
 		if (topLevel.exitCode !== 0) return undefined;
 
-		const repo =
-			topLevel.stdout.toString().trim().split("/").pop() ?? "";
-		const branchResult =
-			await Bun.$`git rev-parse --abbrev-ref HEAD`.quiet().nothrow();
-		const branch =
-			branchResult.exitCode === 0
-				? branchResult.stdout.toString().trim()
-				: "unknown";
+		const repo = topLevel.stdout.toString().trim().split("/").pop() ?? "";
+		const branchResult = await Bun.$`git rev-parse --abbrev-ref HEAD`.quiet().nothrow();
+		const branch = branchResult.exitCode === 0 ? branchResult.stdout.toString().trim() : "unknown";
 
-		const statusResult =
-			await Bun.$`git status --porcelain`.quiet().nothrow();
-		const dirty =
-			statusResult.exitCode === 0 &&
-			statusResult.stdout.toString().trim().length > 0;
+		const statusResult = await Bun.$`git status --porcelain`.quiet().nothrow();
+		const dirty = statusResult.exitCode === 0 && statusResult.stdout.toString().trim().length > 0;
 
 		let ahead = 0;
 		let behind = 0;
@@ -277,16 +244,9 @@ async function gatherPorts(): Promise<DevSnapshot["ports"]> {
 		const plat = platform();
 
 		if (plat === "darwin") {
-			const result =
-				await Bun.$`lsof -iTCP -sTCP:LISTEN -nP 2>/dev/null`
-					.quiet()
-					.nothrow();
+			const result = await Bun.$`lsof -iTCP -sTCP:LISTEN -nP 2>/dev/null`.quiet().nothrow();
 			if (result.exitCode !== 0) return [];
-			const lines = result.stdout
-				.toString()
-				.trim()
-				.split("\n")
-				.slice(1); // skip header
+			const lines = result.stdout.toString().trim().split("\n").slice(1); // skip header
 			const seen = new Set<number>();
 			for (const line of lines) {
 				const parts = line.split(/\s+/);
@@ -304,14 +264,9 @@ async function gatherPorts(): Promise<DevSnapshot["ports"]> {
 			}
 		} else {
 			// Linux: ss -tlnp
-			const result =
-				await Bun.$`ss -tlnp 2>/dev/null`.quiet().nothrow();
+			const result = await Bun.$`ss -tlnp 2>/dev/null`.quiet().nothrow();
 			if (result.exitCode !== 0) return [];
-			const lines = result.stdout
-				.toString()
-				.trim()
-				.split("\n")
-				.slice(1);
+			const lines = result.stdout.toString().trim().split("\n").slice(1);
 			for (const line of lines) {
 				const parts = line.split(/\s+/);
 				const addrField = parts[3] ?? "";

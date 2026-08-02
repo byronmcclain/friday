@@ -1,8 +1,8 @@
-import { describe, test, expect, afterEach } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { unlink } from "node:fs/promises";
 import { AuditLogger } from "../../src/audit/logger.ts";
-import { FridaySocketServer } from "../../src/server/socket.ts";
 import { SessionHub } from "../../src/server/session-hub.ts";
+import { FridaySocketServer } from "../../src/server/socket.ts";
 
 const TEST_SOCKET = "/tmp/friday-test.sock";
 const TEST_PID = "/tmp/friday-test.pid";
@@ -11,25 +11,41 @@ function createMockHub() {
 	let registered = false;
 	let unregisterCount = 0;
 	const hub = {
-		registerClient: () => { registered = true; },
-		unregisterClient: async () => { unregisterCount++; },
+		registerClient: () => {
+			registered = true;
+		},
+		unregisterClient: async () => {
+			unregisterCount++;
+		},
 		broadcast: () => {},
 		clientCount: 0,
 		getClientById: () => undefined,
-		get wasRegistered() { return registered; },
-		get unregisterCount() { return unregisterCount; },
+		get wasRegistered() {
+			return registered;
+		},
+		get unregisterCount() {
+			return unregisterCount;
+		},
 	} as any;
 	return hub;
 }
 
 afterEach(async () => {
-	try { await unlink(TEST_SOCKET); } catch {}
-	try { await unlink(TEST_PID); } catch {}
+	try {
+		await unlink(TEST_SOCKET);
+	} catch {}
+	try {
+		await unlink(TEST_PID);
+	} catch {}
 });
 
 describe("FridaySocketServer", () => {
 	test("creates socket file on start", async () => {
-		const mockRuntime = { isBooted: true, cortex: { modelName: "test" }, audit: new AuditLogger() } as any;
+		const mockRuntime = {
+			isBooted: true,
+			cortex: { modelName: "test" },
+			audit: new AuditLogger(),
+		} as any;
 		const hub = createMockHub();
 		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
 		await server.start();
@@ -43,7 +59,11 @@ describe("FridaySocketServer", () => {
 	});
 
 	test("cleans up on stop", async () => {
-		const mockRuntime = { isBooted: true, cortex: { modelName: "test" }, audit: new AuditLogger() } as any;
+		const mockRuntime = {
+			isBooted: true,
+			cortex: { modelName: "test" },
+			audit: new AuditLogger(),
+		} as any;
 		const hub = createMockHub();
 		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
 		await server.start();
@@ -66,7 +86,9 @@ describe("FridaySocketServer", () => {
 
 		const { connect } = await import("node:net");
 		const socket = connect({ path: TEST_SOCKET });
-		await new Promise<void>((resolve) => { socket.on("connect", resolve); });
+		await new Promise<void>((resolve) => {
+			socket.on("connect", resolve);
+		});
 		socket.write(JSON.stringify({ type: "session:identify", id: "r1", clientType: "tui" }) + "\n");
 		await new Promise((r) => setTimeout(r, 50));
 
@@ -96,7 +118,9 @@ describe("FridaySocketServer", () => {
 
 		const { connect } = await import("node:net");
 		const socket = connect({ path: TEST_SOCKET });
-		await new Promise<void>((resolve) => { socket.on("connect", resolve); });
+		await new Promise<void>((resolve) => {
+			socket.on("connect", resolve);
+		});
 		socket.write(JSON.stringify({ type: "session:identify", id: "r1", clientType: "tui" }) + "\n");
 
 		await new Promise((r) => setTimeout(r, 100));
@@ -114,7 +138,11 @@ describe("FridaySocketServer", () => {
 			audit,
 		} as any;
 		const broadcasted: any[] = [];
-		const hub = { ...createMockHub(), clientCount: 1, broadcast: (msg: any) => broadcasted.push(msg) } as any;
+		const hub = {
+			...createMockHub(),
+			clientCount: 1,
+			broadcast: (msg: any) => broadcasted.push(msg),
+		} as any;
 		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
 		await server.start();
 
@@ -139,7 +167,11 @@ describe("FridaySocketServer", () => {
 			audit,
 		} as any;
 		const broadcasted: any[] = [];
-		const hub = { ...createMockHub(), clientCount: 0, broadcast: (msg: any) => broadcasted.push(msg) } as any;
+		const hub = {
+			...createMockHub(),
+			clientCount: 0,
+			broadcast: (msg: any) => broadcasted.push(msg),
+		} as any;
 		const server = new FridaySocketServer(mockRuntime, hub, TEST_SOCKET, TEST_PID);
 		await server.start();
 
@@ -169,7 +201,9 @@ describe("FridaySocketServer", () => {
 
 		const { connect } = await import("node:net");
 		const socket = connect({ path: TEST_SOCKET });
-		await new Promise<void>((resolve) => { socket.on("connect", resolve); });
+		await new Promise<void>((resolve) => {
+			socket.on("connect", resolve);
+		});
 		socket.write(JSON.stringify({ type: "session:identify", id: "r1", clientType: "tui" }) + "\n");
 		await new Promise((r) => setTimeout(r, 100));
 

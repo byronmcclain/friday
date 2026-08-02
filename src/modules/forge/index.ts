@@ -1,9 +1,9 @@
 import type { FridayModule } from "../types.ts";
-import { forgePropose } from "./propose.ts";
 import { forgeApply } from "./apply.ts";
-import { forgeValidate } from "./validate.ts";
+import { forgePropose } from "./propose.ts";
 import { forgeRestart } from "./restart.ts";
 import { forgeStatus } from "./status.ts";
+import { forgeValidate } from "./validate.ts";
 
 const forgeModule = {
 	name: "forge",
@@ -14,13 +14,7 @@ const forgeModule = {
 	protocols: [],
 	knowledge: [],
 	triggers: [],
-	clearance: [
-		"write-fs",
-		"read-fs",
-		"exec-shell",
-		"system",
-		"forge-modify",
-	],
+	clearance: ["write-fs", "read-fs", "exec-shell", "system", "forge-modify"],
 } satisfies FridayModule;
 
 export default forgeModule;

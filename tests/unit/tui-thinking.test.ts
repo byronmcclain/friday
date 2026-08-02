@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { formatToolSummary } from "../../src/cli/tui/components/thinking.tsx";
 
 describe("formatToolSummary", () => {
@@ -24,9 +24,7 @@ describe("formatToolSummary", () => {
 	});
 
 	test("skips empty string args", () => {
-		expect(formatToolSummary("test.tool", { empty: "", name: "hello" })).toBe(
-			"test.tool hello",
-		);
+		expect(formatToolSummary("test.tool", { empty: "", name: "hello" })).toBe("test.tool hello");
 	});
 
 	test("picks first string arg when multiple exist", () => {

@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { HistoryManager } from "../../src/core/history-manager.ts";
 
 describe("HistoryManager", () => {
@@ -56,9 +56,7 @@ describe("HistoryManager", () => {
 		expect(msgs.length).toBeLessThan(40);
 		// First message should contain the summary
 		const firstContent =
-			typeof msgs[0]!.content === "string"
-				? msgs[0]!.content
-				: JSON.stringify(msgs[0]!.content);
+			typeof msgs[0]!.content === "string" ? msgs[0]!.content : JSON.stringify(msgs[0]!.content);
 		expect(firstContent).toContain("Summary of earlier conversation");
 	});
 
@@ -116,9 +114,7 @@ describe("HistoryManager", () => {
 		// No summary prefix — first message should be a regular message
 		expect(msgs[0]!.role).toBe("user");
 		const firstContent =
-			typeof msgs[0]!.content === "string"
-				? msgs[0]!.content
-				: JSON.stringify(msgs[0]!.content);
+			typeof msgs[0]!.content === "string" ? msgs[0]!.content : JSON.stringify(msgs[0]!.content);
 		expect(firstContent).not.toContain("Previous context summary");
 	});
 

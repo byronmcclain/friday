@@ -1,6 +1,6 @@
+import type { AuditLogger } from "../audit/logger.ts";
 import type { FridayTool } from "../modules/types.ts";
 import type { ClearanceManager } from "./clearance.ts";
-import type { AuditLogger } from "../audit/logger.ts";
 import type { SignalBus, SignalEmitter } from "./events.ts";
 import { NOOP_SCOPED_MEMORY, type ScopedMemory } from "./memory.ts";
 import type { NotificationManager } from "./notifications.ts";
@@ -9,9 +9,7 @@ import type { NotificationManager } from "./notifications.ts";
 export type ToolDefinition = Pick<FridayTool, "name" | "description" | "parameters">;
 
 /** Convert FridayTool registry to portable definitions */
-export function buildToolDefinitions(
-	tools: Map<string, FridayTool>,
-): ToolDefinition[] {
+export function buildToolDefinitions(tools: Map<string, FridayTool>): ToolDefinition[] {
 	const defs: ToolDefinition[] = [];
 	for (const [name, tool] of tools) {
 		defs.push({
@@ -24,10 +22,7 @@ export function buildToolDefinitions(
 }
 
 /** Function signature for executing a tool by name */
-export type ToolExecutor = (
-	name: string,
-	args: Record<string, unknown>,
-) => Promise<string>;
+export type ToolExecutor = (name: string, args: Record<string, unknown>) => Promise<string>;
 
 /** Configuration for creating a tool executor */
 export interface ToolExecutorConfig {

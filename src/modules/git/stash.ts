@@ -9,8 +9,7 @@ export const gitStash: FridayTool = {
 		{
 			name: "action",
 			type: "string",
-			description:
-				'Action: "push", "pop", "list", "drop" (default: "push")',
+			description: 'Action: "push", "pop", "list", "drop" (default: "push")',
 			required: false,
 			default: "push",
 		},
@@ -30,23 +29,14 @@ export const gitStash: FridayTool = {
 	],
 	clearance: ["git-write"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const action = (args.action as string) ?? "push";
 
 		try {
 			switch (action) {
 				case "push": {
 					const message = args.message as string | undefined;
-					const cmdParts = [
-						"git",
-						"-C",
-						context.workingDirectory,
-						"stash",
-						"push",
-					];
+					const cmdParts = ["git", "-C", context.workingDirectory, "stash", "push"];
 					if (message) {
 						cmdParts.push("-m", message);
 					}
@@ -80,10 +70,9 @@ export const gitStash: FridayTool = {
 					const indexResult = assertInteger(args.index ?? 0, "index");
 					if ("success" in indexResult) return indexResult;
 					const index = indexResult.value;
-					const result =
-						await Bun.$`git -C ${context.workingDirectory} stash pop stash@{${index}}`
-							.quiet()
-							.nothrow();
+					const result = await Bun.$`git -C ${context.workingDirectory} stash pop stash@{${index}}`
+						.quiet()
+						.nothrow();
 
 					const output = result.stdout.toString().trim();
 					const stderr = result.stderr.toString().trim();
@@ -110,17 +99,14 @@ export const gitStash: FridayTool = {
 				}
 
 				case "list": {
-					const result =
-						await Bun.$`git -C ${context.workingDirectory} stash list`
-							.quiet()
-							.nothrow();
+					const result = await Bun.$`git -C ${context.workingDirectory} stash list`
+						.quiet()
+						.nothrow();
 
 					if (result.exitCode !== 0) {
 						return {
 							success: false,
-							output:
-								result.stderr.toString().trim() ||
-								"git stash list failed",
+							output: result.stderr.toString().trim() || "git stash list failed",
 						};
 					}
 
@@ -135,17 +121,14 @@ export const gitStash: FridayTool = {
 					const indexResult = assertInteger(args.index ?? 0, "index");
 					if ("success" in indexResult) return indexResult;
 					const index = indexResult.value;
-					const result =
-						await Bun.$`git -C ${context.workingDirectory} stash drop stash@{${index}}`
-							.quiet()
-							.nothrow();
+					const result = await Bun.$`git -C ${context.workingDirectory} stash drop stash@{${index}}`
+						.quiet()
+						.nothrow();
 
 					if (result.exitCode !== 0) {
 						return {
 							success: false,
-							output:
-								result.stderr.toString().trim() ||
-								"git stash drop failed",
+							output: result.stderr.toString().trim() || "git stash drop failed",
 						};
 					}
 

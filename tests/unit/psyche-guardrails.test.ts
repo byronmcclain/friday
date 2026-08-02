@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { EMOTIONAL_GUARDRAILS } from "../../src/psyche/guardrails.ts";
 
 describe("EMOTIONAL_GUARDRAILS", () => {

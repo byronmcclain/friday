@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { assertSafeArg, assertAllowedProtocol, assertInteger, assertNotPrivateIP } from "../../src/modules/validation.ts";
+import {
+	assertAllowedProtocol,
+	assertInteger,
+	assertNotPrivateIP,
+	assertSafeArg,
+} from "../../src/modules/validation.ts";
 
 describe("assertSafeArg", () => {
 	test("returns null for safe values", () => {

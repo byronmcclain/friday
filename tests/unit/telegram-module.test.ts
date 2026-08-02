@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import telegramModule from "../../src/modules/telegram/index.ts";
 import type { ModuleContext } from "../../src/modules/types.ts";
 

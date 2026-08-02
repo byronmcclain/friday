@@ -1,13 +1,8 @@
-import { describe, test, expect } from "bun:test";
-import {
-	VoiceWorker,
-	type VoiceWorkerConfig,
-} from "../../src/core/workers/voice-worker.ts";
+import { describe, expect, test } from "bun:test";
 import type { WorkerRequest } from "../../src/core/workers/types.ts";
+import { VoiceWorker, type VoiceWorkerConfig } from "../../src/core/workers/voice-worker.ts";
 
-function makeConfig(
-	overrides: Partial<VoiceWorkerConfig> = {},
-): VoiceWorkerConfig {
+function makeConfig(overrides: Partial<VoiceWorkerConfig> = {}): VoiceWorkerConfig {
 	const sent: string[] = [];
 	return {
 		send: (data: string) => sent.push(data),
@@ -35,23 +30,17 @@ describe("VoiceWorker", () => {
 
 	test("process sends session.update with system prompt", () => {
 		const sent: string[] = [];
-		const worker = new VoiceWorker(
-			makeConfig({ send: (d) => sent.push(d) }),
-		);
+		const worker = new VoiceWorker(makeConfig({ send: (d) => sent.push(d) }));
 		worker.process(makeRequest({ systemPrompt: "Custom prompt" }));
 
-		const sessionUpdate = sent
-			.map((s) => JSON.parse(s))
-			.find((m) => m.type === "session.update");
+		const sessionUpdate = sent.map((s) => JSON.parse(s)).find((m) => m.type === "session.update");
 		expect(sessionUpdate).toBeDefined();
 		expect(sessionUpdate.session.instructions).toBe("Custom prompt");
 	});
 
 	test("process sends tools in Grok format via session.update", () => {
 		const sent: string[] = [];
-		const worker = new VoiceWorker(
-			makeConfig({ send: (d) => sent.push(d) }),
-		);
+		const worker = new VoiceWorker(makeConfig({ send: (d) => sent.push(d) }));
 		worker.process(
 			makeRequest({
 				tools: [
@@ -71,9 +60,7 @@ describe("VoiceWorker", () => {
 			}),
 		);
 
-		const sessionUpdate = sent
-			.map((s) => JSON.parse(s))
-			.find((m) => m.type === "session.update");
+		const sessionUpdate = sent.map((s) => JSON.parse(s)).find((m) => m.type === "session.update");
 		expect(sessionUpdate.session.tools).toHaveLength(1);
 		expect(sessionUpdate.session.tools[0].type).toBe("function");
 		expect(sessionUpdate.session.tools[0].name).toBe("git.status");
@@ -81,14 +68,10 @@ describe("VoiceWorker", () => {
 
 	test("process sends response.create with audio+text modalities", () => {
 		const sent: string[] = [];
-		const worker = new VoiceWorker(
-			makeConfig({ send: (d) => sent.push(d) }),
-		);
+		const worker = new VoiceWorker(makeConfig({ send: (d) => sent.push(d) }));
 		worker.process(makeRequest());
 
-		const responseCreate = sent
-			.map((s) => JSON.parse(s))
-			.find((m) => m.type === "response.create");
+		const responseCreate = sent.map((s) => JSON.parse(s)).find((m) => m.type === "response.create");
 		expect(responseCreate).toBeDefined();
 		expect(responseCreate.response.modalities).toEqual(["text", "audio"]);
 	});
@@ -168,9 +151,7 @@ describe("VoiceWorker", () => {
 			name: string;
 			args: Record<string, unknown>;
 		}> = [];
-		const worker = new VoiceWorker(
-			makeConfig({ send: (d) => sent.push(d) }),
-		);
+		const worker = new VoiceWorker(makeConfig({ send: (d) => sent.push(d) }));
 		const result = worker.process(
 			makeRequest({
 				executeTool: async (name, args) => {
@@ -211,17 +192,13 @@ describe("VoiceWorker", () => {
 		const outputMsg = sent
 			.map((s) => JSON.parse(s))
 			.find(
-				(m) =>
-					m.type === "conversation.item.create" &&
-					m.item?.type === "function_call_output",
+				(m) => m.type === "conversation.item.create" && m.item?.type === "function_call_output",
 			);
 		expect(outputMsg).toBeDefined();
 		expect(outputMsg.item.call_id).toBe("call_abc");
 		expect(outputMsg.item.output).toBe("tool result here");
 
-		const continueMsg = sent
-			.map((s) => JSON.parse(s))
-			.filter((m) => m.type === "response.create");
+		const continueMsg = sent.map((s) => JSON.parse(s)).filter((m) => m.type === "response.create");
 		// At least 2: initial + after tool
 		expect(continueMsg.length).toBeGreaterThanOrEqual(2);
 

@@ -1,6 +1,6 @@
-import { describe, test, expect } from "bun:test";
-import { createMockModel } from "../helpers/stubs.ts";
+import { describe, expect, test } from "bun:test";
 import { generateText, streamText } from "ai";
+import { createMockModel } from "../helpers/stubs.ts";
 
 describe("createMockModel", () => {
 	test("generates default text response", async () => {

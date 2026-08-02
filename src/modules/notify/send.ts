@@ -1,6 +1,6 @@
+import { SLACK_LEVEL_EMOJI } from "../../core/notifications.ts";
 import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
 import { assertAllowedProtocol, assertNotPrivateIP } from "../validation.ts";
-import { SLACK_LEVEL_EMOJI } from "../../core/notifications.ts";
 
 const WEBHOOK_TIMEOUT_MS = 10_000;
 
@@ -24,8 +24,7 @@ export const notifySend: FridayTool = {
 		{
 			name: "level",
 			type: "string",
-			description:
-				'Notification level: "info", "warning", "alert" (default: "info")',
+			description: 'Notification level: "info", "warning", "alert" (default: "info")',
 			required: false,
 			default: "info",
 		},
@@ -46,10 +45,7 @@ export const notifySend: FridayTool = {
 	],
 	clearance: ["network"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const title = args.title as string;
 		if (!title) {
 			return { success: false, output: "Missing required parameter: title" };
@@ -103,8 +99,7 @@ export const notifySend: FridayTool = {
 		try {
 			switch (channel) {
 				case "slack": {
-					const webhookUrl =
-						explicitUrl ?? process.env.FRIDAY_SLACK_WEBHOOK_URL;
+					const webhookUrl = explicitUrl ?? process.env.FRIDAY_SLACK_WEBHOOK_URL;
 					if (!webhookUrl) {
 						return {
 							success: localDelivered,
@@ -122,12 +117,19 @@ export const notifySend: FridayTool = {
 						text: `${SLACK_LEVEL_EMOJI[level]} *${title}*\n${body}`,
 					};
 
-					return dispatchNotification("Slack", webhookUrl, payload, title, level, localDelivered, context);
+					return dispatchNotification(
+						"Slack",
+						webhookUrl,
+						payload,
+						title,
+						level,
+						localDelivered,
+						context,
+					);
 				}
 
 				case "webhook": {
-					const webhookUrl =
-						explicitUrl ?? process.env.FRIDAY_WEBHOOK_URL;
+					const webhookUrl = explicitUrl ?? process.env.FRIDAY_WEBHOOK_URL;
 					if (!webhookUrl) {
 						return {
 							success: localDelivered,
@@ -149,12 +151,19 @@ export const notifySend: FridayTool = {
 						timestamp: new Date().toISOString(),
 					};
 
-					return dispatchNotification("Webhook", webhookUrl, payload, title, level, localDelivered, context);
+					return dispatchNotification(
+						"Webhook",
+						webhookUrl,
+						payload,
+						title,
+						level,
+						localDelivered,
+						context,
+					);
 				}
 
 				case "email": {
-					const emailWebhookUrl =
-						explicitUrl ?? process.env.FRIDAY_EMAIL_WEBHOOK_URL;
+					const emailWebhookUrl = explicitUrl ?? process.env.FRIDAY_EMAIL_WEBHOOK_URL;
 					if (!emailWebhookUrl) {
 						return {
 							success: localDelivered,
@@ -176,7 +185,15 @@ export const notifySend: FridayTool = {
 						timestamp: new Date().toISOString(),
 					};
 
-					return dispatchNotification("Email", emailWebhookUrl, payload, title, level, localDelivered, context);
+					return dispatchNotification(
+						"Email",
+						emailWebhookUrl,
+						payload,
+						title,
+						level,
+						localDelivered,
+						context,
+					);
 				}
 
 				default:

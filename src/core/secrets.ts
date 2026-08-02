@@ -116,10 +116,7 @@ export class SecretStore {
 		const cipher = createCipheriv(ALGORITHM, masterKey, iv, {
 			authTagLength: AUTH_TAG_LENGTH,
 		});
-		const encrypted = Buffer.concat([
-			cipher.update(value, "utf-8"),
-			cipher.final(),
-		]);
+		const encrypted = Buffer.concat([cipher.update(value, "utf-8"), cipher.final()]);
 		const authTag = cipher.getAuthTag();
 
 		// Store as "iv:authTag:ciphertext" in base64
@@ -143,10 +140,7 @@ export class SecretStore {
 			authTagLength: AUTH_TAG_LENGTH,
 		});
 		decipher.setAuthTag(authTag);
-		const decrypted = Buffer.concat([
-			decipher.update(encrypted),
-			decipher.final(),
-		]);
+		const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
 		return decrypted.toString("utf-8");
 	}
 

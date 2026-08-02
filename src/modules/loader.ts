@@ -3,59 +3,59 @@ import { resolve } from "node:path";
 import type { FridayModule } from "./types.ts";
 
 export interface ValidationResult {
-  valid: boolean;
-  error?: string;
+	valid: boolean;
+	error?: string;
 }
 
 export function validateModule(mod: FridayModule): ValidationResult {
-  if (!mod.name || mod.name.trim() === "") {
-    return { valid: false, error: "Module must have a non-empty name" };
-  }
-  if (!mod.version || mod.version.trim() === "") {
-    return { valid: false, error: "Module must have a non-empty version" };
-  }
-  if (!mod.description || mod.description.trim() === "") {
-    return { valid: false, error: "Module must have a non-empty description" };
-  }
-  return { valid: true };
+	if (!mod.name || mod.name.trim() === "") {
+		return { valid: false, error: "Module must have a non-empty name" };
+	}
+	if (!mod.version || mod.version.trim() === "") {
+		return { valid: false, error: "Module must have a non-empty version" };
+	}
+	if (!mod.description || mod.description.trim() === "") {
+		return { valid: false, error: "Module must have a non-empty description" };
+	}
+	return { valid: true };
 }
 
 export async function discoverModules(modulesDir: string): Promise<FridayModule[]> {
-  const modules: FridayModule[] = [];
-  const glob = new Bun.Glob("*/index.ts");
-  const resolvedDir = resolve(modulesDir);
+	const modules: FridayModule[] = [];
+	const glob = new Bun.Glob("*/index.ts");
+	const resolvedDir = resolve(modulesDir);
 
-  try {
-    for await (const match of glob.scan({ cwd: resolvedDir, onlyFiles: true })) {
-      const indexPath = `${resolvedDir}/${match}`;
+	try {
+		for await (const match of glob.scan({ cwd: resolvedDir, onlyFiles: true })) {
+			const indexPath = `${resolvedDir}/${match}`;
 
-      // Resolve symlinks before checking containment
-      const realIndexPath = await realpath(indexPath).catch(() => indexPath);
-      const realDir = await realpath(resolvedDir).catch(() => resolvedDir);
-      if (!realIndexPath.startsWith(`${realDir}/`)) {
-        console.warn(`Skipping module with path traversal: ${match}`);
-        continue;
-      }
+			// Resolve symlinks before checking containment
+			const realIndexPath = await realpath(indexPath).catch(() => indexPath);
+			const realDir = await realpath(resolvedDir).catch(() => resolvedDir);
+			if (!realIndexPath.startsWith(`${realDir}/`)) {
+				console.warn(`Skipping module with path traversal: ${match}`);
+				continue;
+			}
 
-      try {
-        const mod = await import(indexPath);
-        const manifest: FridayModule = mod.default ?? mod;
-        const validation = validateModule(manifest);
-        if (validation.valid) {
-          modules.push(manifest);
-        } else {
-          console.warn(`Skipping invalid module at ${indexPath}: ${validation.error}`);
-        }
-      } catch (err) {
-        console.warn(`Failed to load module at ${indexPath}:`, err);
-      }
-    }
-  } catch (err) {
-    console.warn("[Loader]", err);
-    return [];
-  }
+			try {
+				const mod = await import(indexPath);
+				const manifest: FridayModule = mod.default ?? mod;
+				const validation = validateModule(manifest);
+				if (validation.valid) {
+					modules.push(manifest);
+				} else {
+					console.warn(`Skipping invalid module at ${indexPath}: ${validation.error}`);
+				}
+			} catch (err) {
+				console.warn(`Failed to load module at ${indexPath}:`, err);
+			}
+		}
+	} catch (err) {
+		console.warn("[Loader]", err);
+		return [];
+	}
 
-  return modules;
+	return modules;
 }
 
 export interface ForgeLoadResult {
@@ -63,9 +63,7 @@ export interface ForgeLoadResult {
 	failed: { name: string; error: string }[];
 }
 
-export async function discoverForgeModules(
-	forgeDir: string,
-): Promise<ForgeLoadResult> {
+export async function discoverForgeModules(forgeDir: string): Promise<ForgeLoadResult> {
 	const result: ForgeLoadResult = { loaded: [], failed: [] };
 	const resolvedDir = resolve(forgeDir);
 	const glob = new Bun.Glob("*/index.ts");
@@ -83,12 +81,8 @@ export async function discoverForgeModules(
 			const indexPath = `${resolvedDir}/${match}`;
 
 			// Resolve symlinks before checking containment
-			const realIndexPath = await realpath(indexPath).catch(
-				() => indexPath,
-			);
-			const realDir = await realpath(resolvedDir).catch(
-				() => resolvedDir,
-			);
+			const realIndexPath = await realpath(indexPath).catch(() => indexPath);
+			const realDir = await realpath(resolvedDir).catch(() => resolvedDir);
 			if (!realIndexPath.startsWith(`${realDir}/`)) {
 				result.failed.push({
 					name: moduleName,

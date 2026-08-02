@@ -1,9 +1,9 @@
-import { ClientRegistry, type RegisteredClient } from "./client-registry.ts";
-import type { ServerMessage } from "./protocol.ts";
 import type { FridayRuntime } from "../core/runtime.ts";
 import type { ConversationSummarizer } from "../core/summarizer.ts";
-import type { SmartsCurator } from "../smarts/curator.ts";
 import type { PsycheCurator } from "../psyche/curator.ts";
+import type { SmartsCurator } from "../smarts/curator.ts";
+import { ClientRegistry, type RegisteredClient } from "./client-registry.ts";
+import type { ServerMessage } from "./protocol.ts";
 
 export interface SessionHubConfig {
 	runtime: FridayRuntime;
@@ -57,10 +57,7 @@ export class SessionHub {
 	}
 
 	broadcast(msg: ServerMessage, excludeId?: string): void {
-		this.registry.broadcast(
-			msg,
-			excludeId ? (c) => c.id !== excludeId : undefined,
-		);
+		this.registry.broadcast(msg, excludeId ? (c) => c.id !== excludeId : undefined);
 	}
 
 	/** Save active session without clearing. Used before runtime.shutdown() on SIGINT. */
@@ -117,9 +114,10 @@ export class SessionHub {
 			? this.curator.extractFromConversation(history).catch(() => {})
 			: undefined;
 
-		const psychePromise = this.psycheCurator && this.sessionId
-			? this.psycheCurator.analyzeSession(this.sessionId, history).catch(() => {})
-			: undefined;
+		const psychePromise =
+			this.psycheCurator && this.sessionId
+				? this.psycheCurator.analyzeSession(this.sessionId, history).catch(() => {})
+				: undefined;
 
 		let summary: string | undefined;
 		if (this.summarizer) {
@@ -163,10 +161,7 @@ export class SessionHub {
 			client.send({
 				type: "conversation:message",
 				role: msg.role,
-				content:
-					typeof msg.content === "string"
-						? msg.content
-						: String(msg.content),
+				content: typeof msg.content === "string" ? msg.content : String(msg.content),
 				source: "replay",
 			});
 		}

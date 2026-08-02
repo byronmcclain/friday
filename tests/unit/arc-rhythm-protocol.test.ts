@@ -1,19 +1,20 @@
 // tests/unit/arc-rhythm-protocol.test.ts
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { createArcProtocol } from "../../src/arc-rhythm/protocol.ts";
-import { RhythmStore } from "../../src/arc-rhythm/store.ts";
-import { RhythmScheduler } from "../../src/arc-rhythm/scheduler.ts";
+
+import { Database } from "bun:sqlite";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { unlink } from "node:fs/promises";
 import { RhythmExecutor } from "../../src/arc-rhythm/executor.ts";
-import { Cortex } from "../../src/core/cortex.ts";
-import { ProtocolRegistry } from "../../src/protocols/registry.ts";
-import { ClearanceManager } from "../../src/core/clearance.ts";
+import { createArcProtocol } from "../../src/arc-rhythm/protocol.ts";
+import { RhythmScheduler } from "../../src/arc-rhythm/scheduler.ts";
+import { RhythmStore } from "../../src/arc-rhythm/store.ts";
 import { AuditLogger } from "../../src/audit/logger.ts";
+import { ClearanceManager } from "../../src/core/clearance.ts";
+import { Cortex } from "../../src/core/cortex.ts";
 import { SignalBus } from "../../src/core/events.ts";
 import { NotificationManager } from "../../src/core/notifications.ts";
-import { createMockModel } from "../helpers/stubs.ts";
 import type { ProtocolContext } from "../../src/modules/types.ts";
-import { Database } from "bun:sqlite";
-import { unlink } from "node:fs/promises";
+import { ProtocolRegistry } from "../../src/protocols/registry.ts";
+import { createMockModel } from "../helpers/stubs.ts";
 
 const TEST_DB = "/tmp/friday-test-arc-protocol.db";
 
@@ -25,7 +26,12 @@ const stubContext: ProtocolContext = {
 	workingDirectory: "/tmp",
 	audit: { log: () => {} } as unknown as ProtocolContext["audit"],
 	signal: { emit: async () => {} } as unknown as ProtocolContext["signal"],
-	memory: { get: async () => undefined, set: async () => {}, delete: async () => {}, list: async () => [] },
+	memory: {
+		get: async () => undefined,
+		set: async () => {},
+		delete: async () => {},
+		list: async () => [],
+	},
 	tools: new Map(),
 };
 
@@ -40,7 +46,8 @@ beforeEach(() => {
 	const executor = new RhythmExecutor({ cortex, protocols, clearance, audit: new AuditLogger() });
 
 	scheduler = new RhythmScheduler({
-		store, executor,
+		store,
+		executor,
 		signals: new SignalBus(),
 		notifications: new NotificationManager(),
 		audit: new AuditLogger(),
@@ -50,11 +57,7 @@ beforeEach(() => {
 afterEach(async () => {
 	await scheduler.stop();
 	db.close();
-	await Promise.allSettled([
-		unlink(TEST_DB),
-		unlink(`${TEST_DB}-wal`),
-		unlink(`${TEST_DB}-shm`),
-	]);
+	await Promise.allSettled([unlink(TEST_DB), unlink(`${TEST_DB}-wal`), unlink(`${TEST_DB}-shm`)]);
 });
 
 describe("/arc protocol", () => {
@@ -72,7 +75,16 @@ describe("/arc protocol", () => {
 	});
 
 	test("list shows created rhythms", async () => {
-		store.create({ name: "Morning", description: "check", cron: "0 9 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "hi" }, nextRun: new Date(), clearance: [] });
+		store.create({
+			name: "Morning",
+			description: "check",
+			cron: "0 9 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "hi" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		const proto = createArcProtocol(store, scheduler);
 		const result = await proto.execute({ rawArgs: "list" }, stubContext);
 		expect(result.success).toBe(true);
@@ -80,7 +92,16 @@ describe("/arc protocol", () => {
 	});
 
 	test("show returns rhythm details", async () => {
-		const rhythm = store.create({ name: "Morning", description: "check PRs", cron: "0 9 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "hi" }, nextRun: new Date(), clearance: [] });
+		const rhythm = store.create({
+			name: "Morning",
+			description: "check PRs",
+			cron: "0 9 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "hi" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		const proto = createArcProtocol(store, scheduler);
 		const result = await proto.execute({ rawArgs: `show ${rhythm.id}` }, stubContext);
 		expect(result.success).toBe(true);
@@ -107,37 +128,70 @@ describe("/arc protocol", () => {
 
 	test("create rejects invalid cron", async () => {
 		const proto = createArcProtocol(store, scheduler);
-		const result = await proto.execute(
-			{ rawArgs: 'create "invalid" Do something' },
-			stubContext,
-		);
+		const result = await proto.execute({ rawArgs: 'create "invalid" Do something' }, stubContext);
 		expect(result.success).toBe(false);
 		expect(result.summary).toContain("Invalid");
 	});
 
 	test("pause disables a rhythm", async () => {
-		const rhythm = store.create({ name: "A", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
+		const rhythm = store.create({
+			name: "A",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		const proto = createArcProtocol(store, scheduler);
 		await proto.execute({ rawArgs: `pause ${rhythm.id}` }, stubContext);
 		expect(store.get(rhythm.id)!.enabled).toBe(false);
 	});
 
 	test("resume enables a rhythm", async () => {
-		const rhythm = store.create({ name: "A", description: "", cron: "0 0 * * *", enabled: false, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
+		const rhythm = store.create({
+			name: "A",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: false,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		const proto = createArcProtocol(store, scheduler);
 		await proto.execute({ rawArgs: `resume ${rhythm.id}` }, stubContext);
 		expect(store.get(rhythm.id)!.enabled).toBe(true);
 	});
 
 	test("delete removes a rhythm", async () => {
-		const rhythm = store.create({ name: "A", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
+		const rhythm = store.create({
+			name: "A",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		const proto = createArcProtocol(store, scheduler);
 		await proto.execute({ rawArgs: `delete ${rhythm.id}` }, stubContext);
 		expect(store.get(rhythm.id)).toBeUndefined();
 	});
 
 	test("history shows execution log", async () => {
-		const rhythm = store.create({ name: "A", description: "", cron: "0 0 * * *", enabled: true, origin: "user", action: { type: "prompt", prompt: "a" }, nextRun: new Date(), clearance: [] });
+		const rhythm = store.create({
+			name: "A",
+			description: "",
+			cron: "0 0 * * *",
+			enabled: true,
+			origin: "user",
+			action: { type: "prompt", prompt: "a" },
+			nextRun: new Date(),
+			clearance: [],
+		});
 		store.logExecution({ rhythmId: rhythm.id, startedAt: new Date(), status: "success" });
 		const proto = createArcProtocol(store, scheduler);
 		const result = await proto.execute({ rawArgs: "history" }, stubContext);

@@ -1,8 +1,5 @@
 import type { Command } from "commander";
-import {
-	checkSingletonSocket,
-	DEFAULT_SOCKET_PATH,
-} from "../../server/socket.ts";
+import { checkSingletonSocket, DEFAULT_SOCKET_PATH } from "../../server/socket.ts";
 
 export function chatCommand(program: Command): void {
 	program

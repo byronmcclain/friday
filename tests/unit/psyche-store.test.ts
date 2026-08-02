@@ -1,8 +1,9 @@
 // tests/unit/psyche-store.test.ts
-import { describe, test, expect, beforeEach } from "bun:test";
+
 import { Database } from "bun:sqlite";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { PsycheStore } from "../../src/psyche/store.ts";
-import { PSYCHE_DEFAULTS, NEUTRAL_SEED_DIMENSIONS } from "../../src/psyche/types.ts";
+import { NEUTRAL_SEED_DIMENSIONS, PSYCHE_DEFAULTS } from "../../src/psyche/types.ts";
 
 describe("PsycheStore", () => {
 	let db: Database;
@@ -91,9 +92,7 @@ describe("PsycheStore", () => {
 			});
 			const milestones = store.getMilestones();
 			expect(milestones).toHaveLength(1);
-			expect(milestones[0]!.summary).toBe(
-				"Shipped the Forge after a 3-day grind.",
-			);
+			expect(milestones[0]!.summary).toBe("Shipped the Forge after a 3-day grind.");
 			expect(milestones[0]!.emotionalType).toBe("triumph");
 			expect(milestones[0]!.relevanceDecay).toBe(1.0);
 			expect(milestones[0]!.id).toBeTruthy();
@@ -215,9 +214,7 @@ describe("PsycheStore", () => {
 		});
 
 		test("decayMilestones reduces decay for old milestones", () => {
-			const oldDate = new Date(
-				Date.now() - 30 * 24 * 60 * 60 * 1000,
-			).toISOString();
+			const oldDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 			db.query(
 				"INSERT INTO psyche_milestones (id, occurred_at, summary, emotional_type, relevance_decay) VALUES (?, ?, ?, ?, 1.0)",
 			).run("old-1", oldDate, "Old milestone", "warmth");
@@ -232,9 +229,7 @@ describe("PsycheStore", () => {
 		});
 
 		test("decayMilestones respects floor", () => {
-			const veryOldDate = new Date(
-				Date.now() - 365 * 24 * 60 * 60 * 1000,
-			).toISOString();
+			const veryOldDate = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
 			db.query(
 				"INSERT INTO psyche_milestones (id, occurred_at, summary, emotional_type, relevance_decay) VALUES (?, ?, ?, ?, 1.0)",
 			).run("ancient-1", veryOldDate, "Ancient milestone", "warmth");
@@ -244,9 +239,7 @@ describe("PsycheStore", () => {
 					"SELECT relevance_decay FROM psyche_milestones WHERE id = ?",
 				)
 				.get("ancient-1");
-			expect(row!.relevance_decay).toBeGreaterThanOrEqual(
-				PSYCHE_DEFAULTS.decayFloor,
-			);
+			expect(row!.relevance_decay).toBeGreaterThanOrEqual(PSYCHE_DEFAULTS.decayFloor);
 		});
 	});
 

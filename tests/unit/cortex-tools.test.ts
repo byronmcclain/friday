@@ -1,8 +1,8 @@
-import { describe, test, expect } from "bun:test";
-import { Cortex } from "../../src/core/cortex.ts";
+import { describe, expect, test } from "bun:test";
 import { ClearanceManager } from "../../src/core/clearance.ts";
-import { createMockModel, createErrorModel, mockTool } from "../helpers/stubs.ts";
+import { Cortex } from "../../src/core/cortex.ts";
 import { SignalBus } from "../../src/core/events.ts";
+import { createErrorModel, createMockModel, mockTool } from "../helpers/stubs.ts";
 
 describe("Cortex — tool integration (AI SDK path)", () => {
 	test("chat without tools returns text", async () => {
@@ -31,7 +31,7 @@ describe("Cortex — tool integration (AI SDK path)", () => {
 
 		const result = await cortex.chat("Use the tool");
 		// The mock model returns both text and tool calls in the stream,
-		// but AI SDK stepCountIs(1) limits to 1 tool step
+		// but AI SDK isStepCount(1) limits to 1 tool step
 		expect(result).toContain("Tool executed successfully");
 	});
 
@@ -63,7 +63,7 @@ describe("Cortex — tool integration (AI SDK path)", () => {
 	});
 
 	// Note: Cortex tool:blocked audit logging is verified by code review.
-	// MockLanguageModelV3's streamText does not invoke tool execute callbacks,
+	// MockLanguageModelV4's streamText does not invoke tool execute callbacks,
 	// so the audit log in buildAiTools() cannot be exercised in unit tests.
 
 	test("tool execution error is caught and returned as string", async () => {

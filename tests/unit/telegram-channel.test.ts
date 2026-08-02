@@ -1,4 +1,4 @@
-import { describe, test, expect } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { TelegramChannel } from "../../src/modules/telegram/channel.ts";
 
 describe("TelegramChannel", () => {

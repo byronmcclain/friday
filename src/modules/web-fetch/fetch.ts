@@ -32,7 +32,8 @@ export const webFetch: FridayTool = {
 		{
 			name: "body",
 			type: "string",
-			description: "Request body (for POST/PUT). JSON strings are sent with Content-Type: application/json.",
+			description:
+				"Request body (for POST/PUT). JSON strings are sent with Content-Type: application/json.",
 			required: false,
 		},
 		{
@@ -45,10 +46,7 @@ export const webFetch: FridayTool = {
 	],
 	clearance: ["network"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const url = args.url as string;
 		if (!url) {
 			return { success: false, output: "Missing required parameter: url" };

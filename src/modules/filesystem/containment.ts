@@ -1,9 +1,7 @@
 import { realpath } from "node:fs/promises";
 import { resolve } from "node:path";
 
-export type ContainmentResult =
-	| { ok: true; resolved: string }
-	| { ok: false; reason: string };
+export type ContainmentResult = { ok: true; resolved: string } | { ok: false; reason: string };
 
 /**
  * Verify that a resolved path is contained within a base directory.

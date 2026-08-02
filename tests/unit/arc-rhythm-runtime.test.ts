@@ -1,8 +1,8 @@
 // tests/unit/arc-rhythm-runtime.test.ts
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { rm } from "node:fs/promises";
 import { FridayRuntime } from "../../src/core/runtime.ts";
 import { createMockModel } from "../helpers/stubs.ts";
-import { rm } from "node:fs/promises";
 
 const TEST_DATA_DIR = "/tmp/friday-test-arc-runtime";
 
@@ -14,9 +14,7 @@ beforeEach(() => {
 
 afterEach(async () => {
 	if (runtime.isBooted) await runtime.shutdown();
-	await Promise.allSettled([
-		rm(TEST_DATA_DIR, { recursive: true }),
-	]);
+	await Promise.allSettled([rm(TEST_DATA_DIR, { recursive: true })]);
 });
 
 describe("FridayRuntime + Arc Rhythm", () => {

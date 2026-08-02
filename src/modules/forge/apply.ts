@@ -1,9 +1,9 @@
-import { mkdir, realpath, cp } from "node:fs/promises";
+import { cp, mkdir, realpath } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
-import type { ForgeProposal } from "./types.ts";
-import { ForgeManifestManager } from "./manifest.ts";
 import { isProtectedPath } from "../filesystem/containment.ts";
+import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
+import { ForgeManifestManager } from "./manifest.ts";
+import type { ForgeProposal } from "./types.ts";
 
 export const forgeApply: FridayTool = {
 	name: "forge_apply",
@@ -19,10 +19,7 @@ export const forgeApply: FridayTool = {
 	],
 	clearance: ["write-fs", "forge-modify"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const proposalId = args.proposalId as string;
 		const forgeDir = (args.forgeDir as string) ?? resolve(context.workingDirectory, "forge");
 
@@ -33,8 +30,7 @@ export const forgeApply: FridayTool = {
 			};
 		}
 
-		const proposal =
-			await context.memory.get<ForgeProposal>(`proposal:${proposalId}`);
+		const proposal = await context.memory.get<ForgeProposal>(`proposal:${proposalId}`);
 		if (!proposal) {
 			return {
 				success: false,
@@ -43,12 +39,10 @@ export const forgeApply: FridayTool = {
 		}
 
 		// Resolve symlinks for path containment (e.g. /tmp → /private/tmp on macOS)
-		const resolvedForge = await realpath(forgeDir).catch(
-			() => resolve(forgeDir),
-		);
-		const resolvedModule = await realpath(
+		const resolvedForge = await realpath(forgeDir).catch(() => resolve(forgeDir));
+		const resolvedModule = await realpath(resolve(resolvedForge, proposal.moduleName)).catch(() =>
 			resolve(resolvedForge, proposal.moduleName),
-		).catch(() => resolve(resolvedForge, proposal.moduleName));
+		);
 
 		// Path containment check (trailing slash prevents prefix collisions like forge → forge-evil)
 		if (!resolvedModule.startsWith(`${resolvedForge}/`)) {
@@ -86,9 +80,7 @@ export const forgeApply: FridayTool = {
 					".backups",
 					`${proposal.moduleName}-${Date.now()}`,
 				);
-				const moduleExists = await Bun.file(
-					resolve(resolvedModule, "index.ts"),
-				).exists();
+				const moduleExists = await Bun.file(resolve(resolvedModule, "index.ts")).exists();
 				if (moduleExists) {
 					await cp(resolvedModule, backupDir, { recursive: true });
 				}
@@ -98,9 +90,7 @@ export const forgeApply: FridayTool = {
 			const written: string[] = [];
 			for (const file of proposal.files) {
 				const filePath = resolve(resolvedModule, file.path);
-				const resolvedFilePath = await realpath(filePath).catch(
-					() => filePath,
-				);
+				const resolvedFilePath = await realpath(filePath).catch(() => filePath);
 
 				// Path containment per-file (trailing slash prevents prefix collisions)
 				if (!resolvedFilePath.startsWith(`${resolvedModule}/`)) {

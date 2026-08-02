@@ -63,10 +63,7 @@ export const codeEval: FridayTool = {
 	],
 	clearance: ["exec-shell"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const code = args.code as string;
 		if (!code) {
 			return { success: false, output: "Missing required parameter: code" };
@@ -87,7 +84,10 @@ export const codeEval: FridayTool = {
 		);
 
 		// Create a temporary sandbox directory under OS tmpdir (not working directory)
-		const sandboxDir = resolve(tmpdir(), `.friday-sandbox-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`);
+		const sandboxDir = resolve(
+			tmpdir(),
+			`.friday-sandbox-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
+		);
 
 		try {
 			// Write the code to a temp file (Bun.write creates parent dirs)

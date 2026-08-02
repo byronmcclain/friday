@@ -1,4 +1,4 @@
-import { MAX_LOG_ENTRIES, type LogEntry } from "./log-types.ts";
+import { type LogEntry, MAX_LOG_ENTRIES } from "./log-types.ts";
 
 export type LogSubscriber = () => void;
 

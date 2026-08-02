@@ -38,15 +38,9 @@ export const gitLog: FridayTool = {
 	],
 	clearance: ["git-read"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		try {
-			const count = Math.min(
-				MAX_COUNT,
-				Math.max(1, (args.count as number) ?? DEFAULT_COUNT),
-			);
+			const count = Math.min(MAX_COUNT, Math.max(1, (args.count as number) ?? DEFAULT_COUNT));
 			const oneline = (args.oneline as boolean) ?? true;
 			const ref = args.ref as string | undefined;
 			const path = args.path as string | undefined;
@@ -56,19 +50,11 @@ export const gitLog: FridayTool = {
 				if (refCheck) return refCheck;
 			}
 
-			const cmdParts = [
-				"git",
-				"-C",
-				context.workingDirectory,
-				"log",
-				`-${count}`,
-			];
+			const cmdParts = ["git", "-C", context.workingDirectory, "log", `-${count}`];
 			if (oneline) {
 				cmdParts.push("--oneline", "--decorate");
 			} else {
-				cmdParts.push(
-					"--format=%H %an <%ae> %ai%n  %s%n",
-				);
+				cmdParts.push("--format=%H %an <%ae> %ai%n  %s%n");
 			}
 			if (ref) cmdParts.push(ref);
 			if (path) {

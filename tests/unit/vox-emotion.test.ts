@@ -1,7 +1,7 @@
-import { describe, test, expect } from "bun:test";
-import { emotionalRewrite, EMOTION_REWRITE_PROMPT } from "../../src/core/voice/emotion.ts";
-import { createMockModel, createErrorModel } from "../helpers/stubs.ts";
+import { describe, expect, test } from "bun:test";
+import { EMOTION_REWRITE_PROMPT, emotionalRewrite } from "../../src/core/voice/emotion.ts";
 import type { EmotionMood } from "../../src/core/voice/types.ts";
+import { createErrorModel, createMockModel } from "../helpers/stubs.ts";
 
 describe("emotionalRewrite", () => {
 	test("returns rewritten text and emotion profile from fast model", async () => {
@@ -65,12 +65,7 @@ describe("emotionalRewrite", () => {
 	test("falls back on invalid JSON from model", async () => {
 		const model = createMockModel({ text: "not valid json at all" });
 
-		const result = await emotionalRewrite(
-			"Hello boss.",
-			[],
-			"on",
-			model,
-		);
+		const result = await emotionalRewrite("Hello boss.", [], "on", model);
 
 		expect(result.text).toBe("Hello boss.");
 		expect(result.emotion.mood).toBe("neutral");
@@ -79,12 +74,7 @@ describe("emotionalRewrite", () => {
 	test("falls back on missing fields in model JSON", async () => {
 		const model = createMockModel({ text: JSON.stringify({ text: "hey" }) });
 
-		const result = await emotionalRewrite(
-			"Hello boss.",
-			["User: Hi"],
-			"on",
-			model,
-		);
+		const result = await emotionalRewrite("Hello boss.", ["User: Hi"], "on", model);
 
 		// Missing mood/intensity → fallback
 		expect(result.text).toBe("Hello boss.");
@@ -113,12 +103,7 @@ describe("emotionalRewrite", () => {
 		});
 		const model = createMockModel({ text: mockResponse });
 
-		const result = await emotionalRewrite(
-			"Starting up.",
-			[],
-			"on",
-			model,
-		);
+		const result = await emotionalRewrite("Starting up.", [], "on", model);
 
 		expect(result.text).toBe("Right so, here we go.");
 		expect(result.emotion.mood).toBe("neutral");

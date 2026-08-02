@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
-import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
 import { assertContained } from "../filesystem/containment.ts";
+import type { FridayTool, ToolContext, ToolResult } from "../types.ts";
 import { assertSafeArg } from "../validation.ts";
 
 const MAX_OUTPUT_BYTES = 500_000;
@@ -39,10 +39,7 @@ export const dockerBuild: FridayTool = {
 	],
 	clearance: ["exec-shell", "network"],
 
-	async execute(
-		args: Record<string, unknown>,
-		context: ToolContext,
-	): Promise<ToolResult> {
+	async execute(args: Record<string, unknown>, context: ToolContext): Promise<ToolResult> {
 		const tag = args.tag as string;
 		if (!tag) {
 			return { success: false, output: "Missing required parameter: tag" };
@@ -52,17 +49,17 @@ export const dockerBuild: FridayTool = {
 		if (tagCheck) return tagCheck;
 
 		try {
-			const buildContext = resolve(
-				context.workingDirectory,
-				(args.context as string) ?? ".",
-			);
+			const buildContext = resolve(context.workingDirectory, (args.context as string) ?? ".");
 			const dockerfile = args.dockerfile as string | undefined;
 			const buildArgs = args.buildArgs as Record<string, string> | undefined;
 
 			const cmdParts = ["docker", "build", "-t", tag];
 			if (dockerfile) {
 				const resolvedDockerfile = resolve(context.workingDirectory, dockerfile);
-				const containmentCheck = await assertContained(resolvedDockerfile, context.workingDirectory);
+				const containmentCheck = await assertContained(
+					resolvedDockerfile,
+					context.workingDirectory,
+				);
 				if (!containmentCheck.ok) {
 					return { success: false, output: `Invalid dockerfile path: ${containmentCheck.reason}` };
 				}
@@ -71,13 +68,22 @@ export const dockerBuild: FridayTool = {
 			if (buildArgs) {
 				for (const [key, value] of Object.entries(buildArgs)) {
 					if (key.includes("=")) {
-						return { success: false, output: `Invalid build-arg key "${key}": must not contain "="` };
+						return {
+							success: false,
+							output: `Invalid build-arg key "${key}": must not contain "="`,
+						};
 					}
 					if (key.startsWith("-")) {
-						return { success: false, output: `Invalid build-arg key "${key}": must not start with "-"` };
+						return {
+							success: false,
+							output: `Invalid build-arg key "${key}": must not start with "-"`,
+						};
 					}
 					if (/\s/.test(key)) {
-						return { success: false, output: `Invalid build-arg key "${key}": must not contain spaces` };
+						return {
+							success: false,
+							output: `Invalid build-arg key "${key}": must not contain spaces`,
+						};
 					}
 					cmdParts.push("--build-arg", `${key}=${value}`);
 				}

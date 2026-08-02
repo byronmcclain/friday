@@ -1,7 +1,7 @@
 import type { ModelMessage } from "ai";
 
-export type { ToolDefinition } from "../tool-bridge.ts";
 export type { TokenUsage } from "../stream-types.ts";
+export type { ToolDefinition } from "../tool-bridge.ts";
 
 /** Tool execution event — emitted during agent loop */
 export interface ToolEvent {

@@ -1,4 +1,4 @@
-import type { LanguageModelV3 } from "@ai-sdk/provider";
+import type { LanguageModelV4 } from "@ai-sdk/provider";
 import { createXai } from "@ai-sdk/xai";
 
 export const GROK_DEFAULTS = {
@@ -10,10 +10,10 @@ export const GROK_DEFAULTS = {
 // avoids per-call process.env lookup inside the xAI provider's getHeaders()
 const xai = createXai({ apiKey: process.env.XAI_API_KEY });
 
-/** Create an AI SDK LanguageModelV3 for the given Grok model ID.
+/** Create an AI SDK LanguageModelV4 for the given Grok model ID.
  *  When sessionId is provided, creates a session-scoped provider with
  *  the x-grok-conv-id header for xAI prompt cache routing. */
-export function createModel(modelId: string, sessionId?: string): LanguageModelV3 {
+export function createModel(modelId: string, sessionId?: string): LanguageModelV4 {
 	if (!sessionId) return xai(modelId);
 
 	const sessionXai = createXai({

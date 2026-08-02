@@ -1,19 +1,20 @@
 // tests/unit/arc-rhythm-scheduler.test.ts
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
+
+import { Database } from "bun:sqlite";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { unlink } from "node:fs/promises";
+import { simulateReadableStream } from "ai";
+import { MockLanguageModelV4 } from "ai/test";
+import { RhythmExecutor } from "../../src/arc-rhythm/executor.ts";
 import { RhythmScheduler } from "../../src/arc-rhythm/scheduler.ts";
 import { RhythmStore } from "../../src/arc-rhythm/store.ts";
-import { RhythmExecutor } from "../../src/arc-rhythm/executor.ts";
-import { SignalBus } from "../../src/core/events.ts";
-import { NotificationManager } from "../../src/core/notifications.ts";
 import { AuditLogger } from "../../src/audit/logger.ts";
 import { ClearanceManager } from "../../src/core/clearance.ts";
 import { Cortex } from "../../src/core/cortex.ts";
+import { SignalBus } from "../../src/core/events.ts";
+import { NotificationManager } from "../../src/core/notifications.ts";
 import { ProtocolRegistry } from "../../src/protocols/registry.ts";
-import { createMockModel, buildUsage } from "../helpers/stubs.ts";
-import { MockLanguageModelV3 } from "ai/test";
-import { simulateReadableStream } from "ai";
-import { Database } from "bun:sqlite";
-import { unlink } from "node:fs/promises";
+import { buildUsage, createMockModel } from "../helpers/stubs.ts";
 
 const TEST_DB = "/tmp/friday-test-arc-scheduler.db";
 
@@ -52,11 +53,7 @@ beforeEach(() => {
 afterEach(async () => {
 	await scheduler.stop();
 	db.close();
-	await Promise.allSettled([
-		unlink(TEST_DB),
-		unlink(`${TEST_DB}-wal`),
-		unlink(`${TEST_DB}-shm`),
-	]);
+	await Promise.allSettled([unlink(TEST_DB), unlink(`${TEST_DB}-wal`), unlink(`${TEST_DB}-shm`)]);
 });
 
 describe("RhythmScheduler", () => {
@@ -222,7 +219,7 @@ describe("RhythmScheduler", () => {
 	test("reentrant guard skips rhythm that is already running", async () => {
 		const clearance = new ClearanceManager(["system", "provider"]);
 		const slowCortex = new Cortex({
-			injectedModel: new MockLanguageModelV3({
+			injectedModel: new MockLanguageModelV4({
 				doGenerate: async () => {
 					await new Promise((r) => setTimeout(r, 200));
 					return {
@@ -240,7 +237,11 @@ describe("RhythmScheduler", () => {
 								{ type: "text-start" as const, id: "text-0" },
 								{ type: "text-delta" as const, id: "text-0", delta: "done" },
 								{ type: "text-end" as const, id: "text-0" },
-								{ type: "finish" as const, finishReason: { unified: "stop" as const, raw: undefined }, usage: buildUsage() },
+								{
+									type: "finish" as const,
+									finishReason: { unified: "stop" as const, raw: undefined },
+									usage: buildUsage(),
+								},
 							],
 							initialDelayInMs: null,
 							chunkDelayInMs: null,
@@ -256,7 +257,12 @@ describe("RhythmScheduler", () => {
 			audit,
 		});
 		const slowScheduler = new RhythmScheduler({
-			store, executor: slowExecutor, signals, notifications, audit, tickInterval: 100,
+			store,
+			executor: slowExecutor,
+			signals,
+			notifications,
+			audit,
+			tickInterval: 100,
 		});
 
 		const pastDate = new Date(Date.now() - 60_000);

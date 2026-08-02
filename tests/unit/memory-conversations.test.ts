@@ -1,7 +1,7 @@
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { SQLiteMemory } from "../../src/core/memory.ts";
-import type { ConversationSession } from "../../src/core/memory.ts";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { unlink } from "node:fs/promises";
+import type { ConversationSession } from "../../src/core/memory.ts";
+import { SQLiteMemory } from "../../src/core/memory.ts";
 
 const TEST_DB = "/tmp/friday-test-memory-conversations.db";
 
@@ -29,11 +29,7 @@ describe("SQLiteMemory conversation indexing", () => {
 
 	afterEach(async () => {
 		memory.close();
-		await Promise.allSettled([
-			unlink(TEST_DB),
-			unlink(`${TEST_DB}-wal`),
-			unlink(`${TEST_DB}-shm`),
-		]);
+		await Promise.allSettled([unlink(TEST_DB), unlink(`${TEST_DB}-wal`), unlink(`${TEST_DB}-shm`)]);
 	});
 
 	test("indexConversation embeds summary into FTS5", async () => {
@@ -64,7 +60,11 @@ describe("SQLiteMemory conversation indexing", () => {
 	});
 
 	test("searchConversations returns results with metadata", async () => {
-		const session = makeSession("sess-meta", "Debugged CPU polling in Sensorium.", new Date("2026-02-21T14:30:00Z"));
+		const session = makeSession(
+			"sess-meta",
+			"Debugged CPU polling in Sensorium.",
+			new Date("2026-02-21T14:30:00Z"),
+		);
 		await memory.indexConversation(session);
 
 		const results = await memory.searchConversations("Sensorium");
@@ -126,7 +126,11 @@ describe("SQLiteMemory conversation indexing", () => {
 	});
 
 	test("saveConversation cleans up orphaned embeddings on prune", async () => {
-		const s1 = makeSession("will-survive", "Survivor conversation.", new Date("2026-02-22T10:00:00Z"));
+		const s1 = makeSession(
+			"will-survive",
+			"Survivor conversation.",
+			new Date("2026-02-22T10:00:00Z"),
+		);
 		const s2 = makeSession("will-die", "Doomed conversation.", new Date("2026-01-01T10:00:00Z"));
 
 		await memory.saveConversation(s2);

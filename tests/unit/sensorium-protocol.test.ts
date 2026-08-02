@@ -1,8 +1,8 @@
-import { describe, test, expect, beforeEach } from "bun:test";
-import { createEnvProtocol } from "../../src/sensorium/protocol.ts";
-import { Sensorium } from "../../src/sensorium/sensorium.ts";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { SignalBus } from "../../src/core/events.ts";
 import { NotificationManager } from "../../src/core/notifications.ts";
+import { createEnvProtocol } from "../../src/sensorium/protocol.ts";
+import { Sensorium } from "../../src/sensorium/sensorium.ts";
 import { SENSORIUM_DEFAULTS } from "../../src/sensorium/types.ts";
 
 const stubContext = {
@@ -46,10 +46,7 @@ describe("/env protocol", () => {
 	});
 
 	test("status subcommand shows full summary", async () => {
-		const result = await protocol.execute(
-			{ rawArgs: "status" },
-			stubContext,
-		);
+		const result = await protocol.execute({ rawArgs: "status" }, stubContext);
 		expect(result.success).toBe(true);
 		expect(result.summary).toContain("CPU");
 	});
@@ -62,10 +59,7 @@ describe("/env protocol", () => {
 	});
 
 	test("memory subcommand shows memory details", async () => {
-		const result = await protocol.execute(
-			{ rawArgs: "memory" },
-			stubContext,
-		);
+		const result = await protocol.execute({ rawArgs: "memory" }, stubContext);
 		expect(result.success).toBe(true);
 		expect(result.summary).toContain("Total");
 		expect(result.summary).toContain("Used");
@@ -79,10 +73,7 @@ describe("/env protocol", () => {
 	});
 
 	test("unknown subcommand returns error", async () => {
-		const result = await protocol.execute(
-			{ rawArgs: "invalid" },
-			stubContext,
-		);
+		const result = await protocol.execute({ rawArgs: "invalid" }, stubContext);
 		expect(result.success).toBe(false);
 		expect(result.summary).toContain("Unknown subcommand");
 	});

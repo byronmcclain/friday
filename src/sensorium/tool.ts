@@ -1,6 +1,6 @@
 import type { FridayTool, ToolContext, ToolResult } from "../modules/types.ts";
-import type { Sensorium } from "./sensorium.ts";
 import { formatBytes, formatUptime } from "./format.ts";
+import type { Sensorium } from "./sensorium.ts";
 
 export function createEnvironmentTool(sensorium: Sensorium): FridayTool {
 	return {
@@ -18,10 +18,7 @@ export function createEnvironmentTool(sensorium: Sensorium): FridayTool {
 			},
 		],
 		clearance: ["system"],
-		execute: async (
-			args: Record<string, unknown>,
-			_context: ToolContext,
-		): Promise<ToolResult> => {
+		execute: async (args: Record<string, unknown>, _context: ToolContext): Promise<ToolResult> => {
 			const snap = sensorium.currentSnapshot;
 			if (!snap) {
 				return {
@@ -46,10 +43,7 @@ export function createEnvironmentTool(sensorium: Sensorium): FridayTool {
 				case "memory":
 				case "mem": {
 					const m = snap.machine.memory;
-					const percent =
-						m.total > 0
-							? Math.round((m.used / m.total) * 100)
-							: 0;
+					const percent = m.total > 0 ? Math.round((m.used / m.total) * 100) : 0;
 					return {
 						success: true,
 						output: `Memory: ${formatBytes(m.used)}/${formatBytes(m.total)} (${percent}% used), ${formatBytes(m.free)} free`,
@@ -74,12 +68,7 @@ export function createEnvironmentTool(sensorium: Sensorium): FridayTool {
 						output:
 							snap.dev.ports.length === 0
 								? "No listening ports."
-								: snap.dev.ports
-										.map(
-											(p) =>
-												`:${p.port} (PID:${p.pid} ${p.process})`,
-										)
-										.join("\n"),
+								: snap.dev.ports.map((p) => `:${p.port} (PID:${p.pid} ${p.process})`).join("\n"),
 						artifacts: { ports: snap.dev.ports },
 					};
 
@@ -95,10 +84,7 @@ export function createEnvironmentTool(sensorium: Sensorium): FridayTool {
 				case "all":
 				default: {
 					const m = snap.machine.memory;
-					const memPercent =
-						m.total > 0
-							? Math.round((m.used / m.total) * 100)
-							: 0;
+					const memPercent = m.total > 0 ? Math.round((m.used / m.total) * 100) : 0;
 					const lines = [
 						`System: ${snap.machine.osVersion} ${snap.machine.arch} (${snap.machine.hostname}), uptime ${formatUptime(snap.machine.uptime)}`,
 						`CPU: ${snap.machine.cpus.count} cores @ ${snap.machine.cpus.usage}%, load ${snap.machine.loadAvg.map((l) => l.toFixed(2)).join(", ")}`,
@@ -116,9 +102,7 @@ export function createEnvironmentTool(sensorium: Sensorium): FridayTool {
 						);
 					}
 					if (snap.dev.ports.length > 0) {
-						lines.push(
-							`Ports: ${snap.dev.ports.map((p) => `:${p.port}`).join(", ")}`,
-						);
+						lines.push(`Ports: ${snap.dev.ports.map((p) => `:${p.port}`).join(", ")}`);
 					}
 					if (snap.dev.runtimes.length > 0) {
 						lines.push(
@@ -140,4 +124,3 @@ export function createEnvironmentTool(sensorium: Sensorium): FridayTool {
 		},
 	};
 }
-
