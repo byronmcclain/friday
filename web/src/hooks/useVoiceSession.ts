@@ -91,9 +91,11 @@ export function useVoiceSession({ wsUrl }: UseVoiceSessionOptions): UseVoiceSess
           setStatusText("Reconnecting\u2026");
           setIsTyping(false);
         } else if (msg.state === "error") {
-          setStatusText("Session lost. Please restart voice.");
+          // Soft/transient failures may still emit this state while the server
+          // session remains alive. Do not clear sessionActive here — terminal
+          // death is signaled via voice:error (RECONNECT_FAILED / START_FAILED).
+          setStatusText("Something went wrong. Still listening\u2026");
           setIsTyping(false);
-          setSessionActive(false);
         }
         break;
 
@@ -130,8 +132,9 @@ export function useVoiceSession({ wsUrl }: UseVoiceSessionOptions): UseVoiceSess
       case "voice:error":
         setState("error");
         setStatusText(msg.message ?? "Error.");
-        // SESSION_IN_USE means an existing session is still fine — don't tear it down.
-        if (msg.code !== "SESSION_IN_USE") {
+        // Only terminal session death should clear the client session.
+        // SESSION_IN_USE (and any future soft codes) must leave it alone.
+        if (msg.code === "RECONNECT_FAILED" || msg.code === "START_FAILED") {
           setSessionActive(false);
         }
         break;

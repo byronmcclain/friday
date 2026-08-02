@@ -125,19 +125,26 @@ export class VoiceSessionManager {
 		this._lastState = "idle";
 		this.callbacks.onStateChange("idle");
 
-		const ws = await openGrokWebSocket(apiKey);
-		this.grokWs = ws;
+		try {
+			const ws = await this._openSocket();
+			this.grokWs = ws;
 
-		// Initial session config: voice, VAD, audio format
-		// Tools and instructions are sent per-turn by VoiceWorker via session.update
-		ws.send(JSON.stringify(buildInitialSessionPayload(this.config)));
+			// Initial session config: voice, VAD, audio format
+			// Tools and instructions are sent per-turn by VoiceWorker via session.update
+			ws.send(JSON.stringify(buildInitialSessionPayload(this.config)));
 
-		// Create VoiceWorker with send bound to this WebSocket
-		this.voiceWorker = new VoiceWorker({
-			send: (data) => this.sendToGrok(data),
-		});
+			// Create VoiceWorker with send bound to this WebSocket
+			this.voiceWorker = new VoiceWorker({
+				send: (data) => this.sendToGrok(data),
+			});
 
-		this.bindSocketHandlers(ws, gen);
+			this.bindSocketHandlers(ws, gen);
+		} catch (err) {
+			this.active = false;
+			this.grokWs = null;
+			this.voiceWorker = null;
+			throw err;
+		}
 	}
 
 	/** Wire message/error/close listeners for a Grok WebSocket. Shared by start() and reconnect. */
@@ -215,11 +222,18 @@ export class VoiceSessionManager {
 				this.voiceWorker = new VoiceWorker({ send: (d) => this.sendToGrok(d) });
 				this.emitStateChange("listening");
 				return;
-			} catch {
+			} catch (err) {
 				// Drop a potentially stale/rejected conversation id so the next
 				// attempt opens a fresh session instead of retrying with the
-				// same id for every remaining attempt.
+				// same id for every remaining attempt. Also reset _greeted:
+				// mid-session resume keeps the greeting suppressed, but a
+				// fresh (no conversation_id) fallback is a new conversation
+				// and should greet again on session.updated.
+				this.log("RECONNECT", "attempt failed", {
+					error: err instanceof Error ? err.message : String(err),
+				});
 				this._conversationId = null;
+				this._greeted = false;
 			}
 		}
 		this.active = false;
@@ -394,8 +408,10 @@ export class VoiceSessionManager {
 			}
 
 			case "error": {
+				// Soft protocol/turn errors: session stays alive. Terminal death
+				// is reserved for reconnect exhaustion → onSessionError + "error".
 				this.log("ERROR", JSON.stringify(data));
-				this.emitStateChange("error");
+				this.emitStateChange("listening");
 				break;
 			}
 		}
@@ -410,7 +426,7 @@ export class VoiceSessionManager {
 			await stream.fullText;
 		} catch (err) {
 			this.log("ERROR", err instanceof Error ? err.message : String(err));
-			this.emitStateChange("error");
+			this.emitStateChange("listening");
 		} finally {
 			this._activeTurn = null;
 		}

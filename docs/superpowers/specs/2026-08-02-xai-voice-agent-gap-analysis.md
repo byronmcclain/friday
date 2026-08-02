@@ -1,9 +1,11 @@
 # xAI Voice Agent Gap Analysis
 
 **Date:** 2026-08-02  
-**Status:** Decisions locked (2026-08-02) — ready for implementation planning  
-**Baseline:** Friday voice stack as of `feature/deps-upgrade-voice-audit`  
+**Status:** Decisions locked (2026-08-02) — first pass shipped on `feature/deps-upgrade-voice-audit`  
+**Baseline:** Pre-first-pass Friday voice stack (snapshot before this work)  
 **Sources:** [xAI Speech to Speech docs](https://docs.x.ai/developers/model-capabilities/audio/speech-to-speech), [Voice overview](https://docs.x.ai/developers/model-capabilities/audio/voice), [Grok Voice Think Fast 2.0 announcement](https://x.ai/news/grok-voice-think-fast-2)
+
+> **As-shipped note:** The “Friday baseline” table below describes the stack *before* first-pass adoption. Post-ship: realtime URL includes `?model=grok-voice-latest` (override `FRIDAY_VOICE_MODEL`), `silence_duration_ms` + `FRIDAY_VOICE_SILENCE_MS`, visible `"reconnecting"`, session resumption with backoff + `onSessionError`, and `force_message` greeting with pending-response protection.
 
 ---
 
@@ -15,7 +17,7 @@ Inventory what Friday’s realtime voice path already does versus current xAI Vo
 
 ---
 
-## Friday baseline (today)
+## Friday baseline (pre-first-pass)
 
 Two separate xAI voice paths:
 

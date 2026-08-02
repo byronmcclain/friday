@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **As-shipped hardening (beyond Task 4/5 sketches):** orphaned-turn unwind on close; drop stale `conversation_id` after failed reconnect (and reset `_greeted` for fresh-session fallback); `onSessionError` → `voice:error` + null session; `_pendingGreeting` so force_message is not auto-cancelled; soft Grok/turn failures stay on `listening` (terminal death only via `voice:error`); `START_FAILED` tears down zombie `VoiceSessionManager`.
+
 **Goal:** Bring Friday’s realtime voice path up to locked first-pass xAI Voice Agent capabilities: track `grok-voice-latest`, session resumption with a visible reconnecting state, tunable VAD silence via env, and `force_message` greetings.
 
 **Architecture:** Keep the existing proxy model (browser ↔ Friday `/ws` ↔ Grok realtime). Extend `openGrokWebSocket` for model + optional `conversation_id`; teach `VoiceSessionManager` to opt into `resumption`, reconnect with backoff while emitting `"reconnecting"`, apply `silence_duration_ms` on `session.update`, and send a `force_message` greeting after session ready. Cascade the new voice state through server protocol and web orb.

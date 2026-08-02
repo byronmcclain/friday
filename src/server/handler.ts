@@ -362,6 +362,14 @@ export class WebSocketHandler {
 					await this.voiceSession.start();
 					send({ type: "voice:started", requestId: msg.id });
 				} catch (err) {
+					// start() may have set active=true before the socket opened.
+					// Tear down so a retry doesn't hit SESSION_IN_USE on a zombie.
+					try {
+						await this.voiceSession.stop();
+					} catch {
+						/* ignore stop errors during failed start cleanup */
+					}
+					this.voiceSession = null;
 					send({
 						type: "voice:error",
 						code: "START_FAILED",

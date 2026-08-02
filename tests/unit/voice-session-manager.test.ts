@@ -561,6 +561,120 @@ describe("VoiceSessionManager reconnect", () => {
 		expect(opens[1]?.conversationId).toBeUndefined();
 	});
 
+	test("resets greeted when reconnect falls back to a fresh session", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			makeMockCallbacks(),
+		);
+		(manager as any).active = true;
+		(manager as any)._generation = 1;
+		(manager as any)._conversationId = "stale-conv";
+		(manager as any)._greeted = true;
+
+		let attempt = 0;
+		const reconnectSent: string[] = [];
+		(manager as any)._openSocket = async () => {
+			attempt++;
+			if (attempt === 1) throw new Error("conversation not found");
+			return {
+				send: (d: string) => reconnectSent.push(d),
+				readyState: 1,
+				close: () => {},
+				addEventListener: () => {},
+			};
+		};
+		(manager as any)._reconnectDelaysMs = [0, 0];
+
+		await (manager as any).handleSocketClose(1);
+		expect((manager as any)._greeted).toBe(false);
+
+		// Fresh session.updated after fallback should greet again.
+		await (manager as any).handleGrokMessage(JSON.stringify({ type: "session.updated" }));
+		const force = reconnectSent
+			.map((s) => JSON.parse(s))
+			.find((m) => m.item?.type === "force_message");
+		expect(force).toBeDefined();
+	});
+
+	test("socket error leaves active true so close can reconnect", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			makeMockCallbacks(),
+		);
+
+		const listeners = new Map<string, Array<() => void>>();
+		const ws = {
+			send: () => {},
+			readyState: 1,
+			close: () => {},
+			addEventListener: (type: string, fn: () => void) => {
+				const list = listeners.get(type) ?? [];
+				list.push(fn);
+				listeners.set(type, list);
+			},
+		};
+		(manager as any).active = true;
+		(manager as any)._generation = 1;
+		(manager as any).bindSocketHandlers(ws, 1);
+
+		for (const fn of listeners.get("error") ?? []) fn();
+
+		expect(manager.isActive).toBe(true);
+	});
+
+	test("start() resets active when openSocket throws", async () => {
+		const prev = process.env.XAI_API_KEY;
+		process.env.XAI_API_KEY = "test-key";
+		try {
+			const model = createMockModel({ text: "unused" });
+			const cortex = new Cortex({ injectedModel: model });
+			const manager = new VoiceSessionManager(
+				cortex,
+				{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+				makeMockCallbacks(),
+			);
+			(manager as any)._openSocket = async () => {
+				throw new Error("connection refused");
+			};
+
+			await expect(manager.start()).rejects.toThrow("connection refused");
+			expect(manager.isActive).toBe(false);
+		} finally {
+			if (prev === undefined) delete process.env.XAI_API_KEY;
+			else process.env.XAI_API_KEY = prev;
+		}
+	});
+
+	test("soft Grok error keeps session active and returns to listening", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const states: string[] = [];
+		const callbacks = makeMockCallbacks();
+		callbacks.onStateChange = mock((s: string) => {
+			states.push(s);
+		});
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			callbacks,
+		);
+		(manager as any).active = true;
+		attachMockWs(manager);
+
+		await (manager as any).handleGrokMessage(
+			JSON.stringify({ type: "error", error: { message: "transient" } }),
+		);
+
+		expect(manager.isActive).toBe(true);
+		expect(states[states.length - 1]).toBe("listening");
+	});
+
 	test("clears assistant transcript buffer on socket close", async () => {
 		const model = createMockModel({ text: "unused" });
 		const cortex = new Cortex({ injectedModel: model });
