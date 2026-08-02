@@ -1,19 +1,10 @@
 import type { Cortex } from "../cortex.ts";
 import { VoiceWorker } from "../workers/voice-worker.ts";
-import {
-	buildForceMessagePayload,
-	VOICE_SESSION_GREETING,
-} from "./force-message.ts";
+import { buildForceMessagePayload, VOICE_SESSION_GREETING } from "./force-message.ts";
 import type { GrokVoice } from "./types.ts";
 import { openGrokWebSocket } from "./ws.ts";
 
-export type VoiceState =
-	| "idle"
-	| "listening"
-	| "thinking"
-	| "speaking"
-	| "reconnecting"
-	| "error";
+export type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "reconnecting" | "error";
 
 export interface VoiceSessionConfig {
 	voice: GrokVoice;

@@ -5,8 +5,8 @@ import {
 	buildInitialSessionPayload,
 	type VoiceSessionCallbacks,
 	type VoiceSessionConfig,
-	type VoiceState,
 	VoiceSessionManager,
+	type VoiceState,
 } from "../../src/core/voice/session-manager.ts";
 import { VoiceWorker } from "../../src/core/workers/voice-worker.ts";
 import { createMockModel } from "../helpers/stubs.ts";

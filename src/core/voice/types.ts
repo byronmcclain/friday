@@ -67,10 +67,7 @@ export function resolveVoiceSilenceMs(): number {
 	return Math.min(n, 10_000);
 }
 
-export function buildGrokRealtimeUrl(opts?: {
-	model?: string;
-	conversationId?: string;
-}): string {
+export function buildGrokRealtimeUrl(opts?: { model?: string; conversationId?: string }): string {
 	const model = opts?.model?.trim() || resolveVoiceModel();
 	const url = new URL(GROK_REALTIME_URL);
 	url.searchParams.set("model", model);

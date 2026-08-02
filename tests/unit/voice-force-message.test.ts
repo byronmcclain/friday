@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
-	VOICE_SESSION_GREETING,
 	buildForceMessagePayload,
+	VOICE_SESSION_GREETING,
 } from "../../src/core/voice/force-message.ts";
 
 describe("buildForceMessagePayload", () => {
