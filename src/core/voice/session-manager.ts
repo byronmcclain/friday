@@ -1,5 +1,9 @@
 import type { Cortex } from "../cortex.ts";
 import { VoiceWorker } from "../workers/voice-worker.ts";
+import {
+	buildForceMessagePayload,
+	VOICE_SESSION_GREETING,
+} from "./force-message.ts";
 import type { GrokVoice } from "./types.ts";
 import { openGrokWebSocket } from "./ws.ts";
 
@@ -70,6 +74,7 @@ export class VoiceSessionManager {
 	private voiceWorker: VoiceWorker | null = null;
 	private debug: boolean;
 	private _conversationId: string | null = null;
+	private _greeted = false;
 	private _reconnectDelaysMs = [500, 1000, 2000, 4000, 8000];
 	private _openSocket = (opts?: { conversationId?: string }) =>
 		openGrokWebSocket(process.env.XAI_API_KEY!, 10_000, {
@@ -219,6 +224,7 @@ export class VoiceSessionManager {
 
 	async stop(): Promise<void> {
 		this.active = false;
+		this._greeted = false;
 		if (this.voiceWorker) {
 			this.voiceWorker.abort();
 			this.voiceWorker = null;
@@ -288,8 +294,18 @@ export class VoiceSessionManager {
 				break;
 			}
 
-			// -- Session lifecycle (no-op events)
-			case "session.updated":
+			// -- Session lifecycle
+			case "session.updated": {
+				if (!this._greeted) {
+					this._greeted = true;
+					this.sendToGrok(
+						JSON.stringify(
+							buildForceMessagePayload(VOICE_SESSION_GREETING, { interruptible: true }),
+						),
+					);
+				}
+				break;
+			}
 			case "input_audio_buffer.committed":
 			case "conversation.item.created": {
 				break;

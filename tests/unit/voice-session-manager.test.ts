@@ -1,5 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import { Cortex } from "../../src/core/cortex.ts";
+import { VOICE_SESSION_GREETING } from "../../src/core/voice/force-message.ts";
 import {
 	buildInitialSessionPayload,
 	type VoiceSessionCallbacks,
@@ -166,6 +167,76 @@ describe("VoiceSessionManager", () => {
 
 		const cancel = sent.map((s) => JSON.parse(s)).find((m) => m.type === "response.cancel");
 		expect(cancel).toBeDefined();
+	});
+
+	test("sends force_message greeting after session.updated", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			makeMockCallbacks(),
+		);
+		const sent = attachMockWs(manager);
+
+		await (manager as any).handleGrokMessage(JSON.stringify({ type: "session.updated" }));
+
+		const parsed = sent.map((s) => JSON.parse(s));
+		const force = parsed.find((m) => m.item?.type === "force_message");
+		expect(force).toBeDefined();
+		expect(force.item.content[0].text).toBe(VOICE_SESSION_GREETING);
+		expect(force.item.interruptible).toBe(true);
+
+		const responseCreateAfterGreeting = parsed.findIndex(
+			(m, i) => m.type === "response.create" && i > parsed.indexOf(force),
+		);
+		expect(responseCreateAfterGreeting).toBe(-1);
+	});
+
+	test("does not re-greet on mid-session reconnect", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			makeMockCallbacks(),
+		);
+		const sent = attachMockWs(manager);
+
+		await (manager as any).handleGrokMessage(JSON.stringify({ type: "session.updated" }));
+		const greetingCount = sent
+			.map((s) => JSON.parse(s))
+			.filter((m) => m.item?.type === "force_message").length;
+		expect(greetingCount).toBe(1);
+
+		// Simulate reconnect session.updated — should not greet again
+		await (manager as any).handleGrokMessage(JSON.stringify({ type: "session.updated" }));
+		const afterReconnect = sent
+			.map((s) => JSON.parse(s))
+			.filter((m) => m.item?.type === "force_message").length;
+		expect(afterReconnect).toBe(1);
+	});
+
+	test("re-greets after stop then start", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			makeMockCallbacks(),
+		);
+		const sent = attachMockWs(manager);
+
+		await (manager as any).handleGrokMessage(JSON.stringify({ type: "session.updated" }));
+		await manager.stop();
+
+		const sent2 = attachMockWs(manager);
+		await (manager as any).handleGrokMessage(JSON.stringify({ type: "session.updated" }));
+
+		const greetingCount = [...sent, ...sent2]
+			.map((s) => JSON.parse(s))
+			.filter((m) => m.item?.type === "force_message").length;
+		expect(greetingCount).toBe(2);
 	});
 
 	test("stop cleans up state", async () => {
