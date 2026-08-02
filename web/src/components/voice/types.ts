@@ -1,4 +1,10 @@
-export type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "error";
+export type VoiceState =
+  | "idle"
+  | "listening"
+  | "thinking"
+  | "speaking"
+  | "reconnecting"
+  | "error";
 
 export interface VoiceOrbProps {
   state: VoiceState;

@@ -4,6 +4,7 @@ import {
 	buildInitialSessionPayload,
 	type VoiceSessionCallbacks,
 	type VoiceSessionConfig,
+	type VoiceState,
 	VoiceSessionManager,
 } from "../../src/core/voice/session-manager.ts";
 import { VoiceWorker } from "../../src/core/workers/voice-worker.ts";
@@ -183,6 +184,18 @@ describe("VoiceSessionManager", () => {
 		expect(manager.isActive).toBe(false);
 		expect(callbacks.onStateChange).toHaveBeenCalledWith("idle");
 	});
+});
+
+test("VoiceState includes reconnecting", () => {
+	const states: VoiceState[] = [
+		"idle",
+		"listening",
+		"thinking",
+		"speaking",
+		"reconnecting",
+		"error",
+	];
+	expect(states).toContain("reconnecting");
 });
 
 test("initial session.update includes silence_duration_ms and resumption", () => {

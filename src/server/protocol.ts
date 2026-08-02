@@ -64,7 +64,10 @@ export type ServerMessage =
 			requestId: string;
 			protocols: { name: string; description: string; aliases?: string[] }[];
 	  }
-	| { type: "voice:state"; state: "idle" | "listening" | "thinking" | "speaking" | "error" }
+	| {
+			type: "voice:state";
+			state: "idle" | "listening" | "thinking" | "speaking" | "reconnecting" | "error";
+	  }
 	| { type: "voice:transcript"; role: "user" | "assistant"; delta: string; done: boolean }
 	| { type: "voice:audio"; delta: string }
 	| { type: "voice:started"; requestId: string }

@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-
-type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "error";
+import type { VoiceState } from "../components/voice/types.ts";
 
 interface UseVoiceSessionOptions {
   wsUrl: string;
@@ -87,6 +86,9 @@ export function useVoiceSession({ wsUrl }: UseVoiceSessionOptions): UseVoiceSess
           transcriptBufferRef.current = "";
         } else if (msg.state === "thinking") {
           setStatusText("Processing...");
+          setIsTyping(false);
+        } else if (msg.state === "reconnecting") {
+          setStatusText("Reconnecting\u2026");
           setIsTyping(false);
         }
         break;

@@ -3,7 +3,13 @@ import { VoiceWorker } from "../workers/voice-worker.ts";
 import type { GrokVoice } from "./types.ts";
 import { openGrokWebSocket } from "./ws.ts";
 
-export type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "error";
+export type VoiceState =
+	| "idle"
+	| "listening"
+	| "thinking"
+	| "speaking"
+	| "reconnecting"
+	| "error";
 
 export interface VoiceSessionConfig {
 	voice: GrokVoice;
