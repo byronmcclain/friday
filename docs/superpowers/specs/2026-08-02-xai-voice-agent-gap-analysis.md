@@ -5,7 +5,7 @@
 **Baseline:** Pre-first-pass Friday voice stack (snapshot before this work)  
 **Sources:** [xAI Speech to Speech docs](https://docs.x.ai/developers/model-capabilities/audio/speech-to-speech), [Voice overview](https://docs.x.ai/developers/model-capabilities/audio/voice), [Grok Voice Think Fast 2.0 announcement](https://x.ai/news/grok-voice-think-fast-2)
 
-> **As-shipped note:** The “Friday baseline” table below describes the stack *before* first-pass adoption. Post-ship: realtime URL includes `?model=grok-voice-latest` (override `FRIDAY_VOICE_MODEL`), `silence_duration_ms` + `FRIDAY_VOICE_SILENCE_MS`, visible `"reconnecting"`, session resumption with backoff + `onSessionError`, and `force_message` greeting with pending-response protection.
+> **As-shipped note:** The “Friday baseline” table below describes the stack *before* first-pass adoption. Post-ship: realtime URL includes `?model=grok-voice-latest` (override `FRIDAY_VOICE_MODEL`), `silence_duration_ms` + `FRIDAY_VOICE_SILENCE_MS`, visible `"reconnecting"`, session resumption with backoff + `onSessionError`, `force_message` greeting with pending-response protection, and always-on **binary PCM transport** on the Friday↔Grok hop (browser↔Friday uplink was already binary; downlink stays `voice:audio` base64).
 
 ---
 
@@ -224,7 +224,7 @@ Each item: what it is → Friday impact → effort → **seed recommendation** (
 
 | # | Item | Notes |
 |---|------|-------|
-| 3 | Binary audio transport | Friday server ↔ Grok; browser ↔ Friday can stay as-is |
+| 3 | Binary audio transport | **Shipped** — always-on `audio.*.transport: "binary"` Friday↔Grok; browser↔Friday unchanged |
 
 ### Later
 
