@@ -266,6 +266,8 @@ Optional: `FRIDAY_REASONING_MODEL` and `FRIDAY_FAST_MODEL` to override default m
 Optional: `FRIDAY_SECRET_KEY` — fallback master key for SecretStore when OS keychain is unavailable.
 Optional: `FRIDAY_GENESIS_PATH` to override default `~/.friday/GENESIS.md` location.
 Optional: `FRIDAY_VOICE` to override default voice (Eve). Available: Ara, Eve, Rex, Sal, Leo.
+Optional: `FRIDAY_VOICE_MODEL` to override realtime voice model (default `grok-voice-latest`).
+Optional: `FRIDAY_VOICE_SILENCE_MS` to set server VAD silence duration in ms (default `800`, max `10000`).
 Optional: `TELEGRAM_BOT_TOKEN` for Telegram bot module (from @BotFather).
 Optional: `TELEGRAM_OWNER_ID` to restrict Telegram bot to a single user.
 Optional: `TELEGRAM_WEBHOOK_URL` for Telegram webhook mode (requires public URL, e.g., Cloudflare tunnel).
