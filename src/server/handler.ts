@@ -84,8 +84,8 @@ export class WebSocketHandler {
 
 	handleAudio(audioData: Buffer): void {
 		if (!this.voiceSession?.isActive) return;
-		const base64 = audioData.toString("base64");
-		this.voiceSession.appendAudio(base64);
+		// Pass raw PCM through — Grok session uses audio.*.transport: "binary".
+		this.voiceSession.appendAudio(audioData);
 	}
 
 	pushSensoriumUpdate(send?: SendFn): void {

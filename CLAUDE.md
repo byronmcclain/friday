@@ -85,7 +85,7 @@ src/
 │       ├── audio.ts        # detectPlayer, playAudio, cleanupTempFile
 │       ├── prompt.ts       # FRIDAY_VOICE_IDENTITY, buildVoiceSystemPrompt, VOICE_DELIVERY_RULES
 │       ├── vox.ts          # Vox class — REST TTS lifecycle, modes, speak/cancel
-│       ├── session-manager.ts # VoiceSessionManager — thin audio I/O + lifecycle (replaces VoiceBridge)
+│       ├── session-manager.ts # VoiceSessionManager — audio I/O + lifecycle; binary PCM to Grok
 │       ├── narration.ts    # NarrationPicker, ACK_PHRASES, TOOL_NARRATIONS — Vox notification TTS phrases
 │       ├── channel.ts      # VoiceChannel — notification bridge (NotificationChannel impl)
 │       ├── emotion.ts      # emotionalRewrite() — conversation-aware emotional TTS rewriting
@@ -193,7 +193,7 @@ tests/
 | **Genesis** | `src/core/genesis.ts` | Identity prompt at `~/.friday/GENESIS.md`. Protected path (`chmod 600`). Seed template: `GENESIS_TEMPLATE` in `prompts.ts`. |
 | **Vox** | `src/core/voice/vox.ts` | Fire-and-forget TTS via REST API (`POST /v1/tts`). 4 modes: off/on/whisper/flat. Emotional rewrite via fast model with native speech tags. |
 | **VoiceWorker** | `src/core/workers/voice-worker.ts` | Grok realtime WebSocket agent loop. Implements CortexWorker — reasoning + tool calling + speech natively. |
-| **VoiceSessionManager** | `src/core/voice/session-manager.ts` | Thin audio I/O + lifecycle. Manages Grok WebSocket, VAD, routes transcripts through `cortex.chatStreamVoice()`. |
+| **VoiceSessionManager** | `src/core/voice/session-manager.ts` | Thin audio I/O + lifecycle. Manages Grok WebSocket, VAD, routes transcripts through `cortex.chatStreamVoice()`. Always-on binary PCM transport to Grok (`audio.*.transport: "binary"`); browser still gets `voice:audio` base64. |
 | **Recall (Deja Vu)** | `src/core/recall-tool.ts` | `search` (FTS5 summaries) → `recall` (full transcript). Registered in Cortex at boot. |
 | **Arc Rhythm** | `src/arc-rhythm/` | 60s scheduler tick. Auto-pause after 5 failures. Shares Memory's SQLite via `memory.database`. |
 | **Psyche** | `src/psyche/` | Emotional intelligence. Boot + session-end analysis. Shares Memory's SQLite. 5 relational dimensions (natural language), milestones with FTS5 + relevance decay, session mood tracking. |

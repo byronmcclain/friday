@@ -5,7 +5,7 @@
 **Baseline:** Pre-first-pass Friday voice stack (snapshot before this work)  
 **Sources:** [xAI Speech to Speech docs](https://docs.x.ai/developers/model-capabilities/audio/speech-to-speech), [Voice overview](https://docs.x.ai/developers/model-capabilities/audio/voice), [Grok Voice Think Fast 2.0 announcement](https://x.ai/news/grok-voice-think-fast-2)
 
-> **As-shipped note:** The “Friday baseline” table below describes the stack *before* first-pass adoption. Post-ship: realtime URL includes `?model=grok-voice-latest` (override `FRIDAY_VOICE_MODEL`), `silence_duration_ms` + `FRIDAY_VOICE_SILENCE_MS`, visible `"reconnecting"`, session resumption with backoff + `onSessionError`, and `force_message` greeting with pending-response protection.
+> **As-shipped note:** The “Friday baseline” table below describes the stack *before* first-pass adoption. Post-ship: realtime URL includes `?model=grok-voice-latest` (override `FRIDAY_VOICE_MODEL`), `silence_duration_ms` + `FRIDAY_VOICE_SILENCE_MS`, visible `"reconnecting"`, session resumption with backoff + `onSessionError`, `force_message` greeting with pending-response protection, and always-on **binary PCM transport** on the Friday↔Grok hop (browser↔Friday uplink was already binary; downlink stays `voice:audio` base64).
 
 ---
 
@@ -87,13 +87,13 @@ Each item: what it is → Friday impact → effort → **seed recommendation** (
 
 **What:** `audio.input/output.transport: "binary"` sends raw PCM/Opus as WS binary frames instead of base64 JSON. Lifecycle events stay JSON.
 
-**Friday impact:** Today every mic/audio frame is base64’d into JSON (~50–100 Hz). Binary would cut CPU/bandwidth between Friday server ↔ Grok. Browser ↔ Friday already uses binary PCM on `/ws`.
+**Friday impact (pre-ship):** Mic/audio frames on Friday↔Grok were base64’d into JSON (~50–100 Hz). Binary cuts CPU/bandwidth on that hop. Browser ↔ Friday already used binary PCM uplink on `/ws`.
 
 **Effort:** Medium (Grok WS binary handling in `session-manager`; keep Friday↔browser protocol as-is or align).
 
 **Seed:** **Later** — clear win, not blocking Think Fast 2.0.
 
-**Decision:** **Fast follow-up** (immediately after first pass, not parked indefinitely).
+**Decision:** **Shipped** — always-on binary PCM Friday↔Grok; browser downlink stays `voice:audio` base64.
 
 ---
 
@@ -224,7 +224,7 @@ Each item: what it is → Friday impact → effort → **seed recommendation** (
 
 | # | Item | Notes |
 |---|------|-------|
-| 3 | Binary audio transport | Friday server ↔ Grok; browser ↔ Friday can stay as-is |
+| 3 | Binary audio transport | **Shipped** — always-on `audio.*.transport: "binary"` Friday↔Grok; browser↔Friday unchanged |
 
 ### Later
 

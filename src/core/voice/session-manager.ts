@@ -28,8 +28,14 @@ export function buildInitialSessionPayload(config: VoiceSessionConfig) {
 			},
 			input_audio_transcription: { model: "whisper-1" },
 			audio: {
-				input: { format: { type: "audio/pcm", rate: config.sampleRate } },
-				output: { format: { type: "audio/pcm", rate: config.sampleRate } },
+				input: {
+					format: { type: "audio/pcm", rate: config.sampleRate },
+					transport: "binary" as const,
+				},
+				output: {
+					format: { type: "audio/pcm", rate: config.sampleRate },
+					transport: "binary" as const,
+				},
 			},
 		},
 	};
@@ -102,10 +108,20 @@ export class VoiceSessionManager {
 		this.callbacks.onStateChange(state);
 	}
 
-	private sendToGrok(payload: string): void {
+	private sendToGrok(payload: string | Buffer | Uint8Array): void {
 		if (this.grokWs && this.grokWs.readyState === 1) {
 			this.grokWs.send(payload);
 		}
+	}
+
+	/** Normalize Grok binary frame payloads to a Node/Bun Buffer. */
+	private static toPcmBuffer(data: unknown): Buffer | null {
+		if (Buffer.isBuffer(data)) return data;
+		if (data instanceof ArrayBuffer) return Buffer.from(data);
+		if (ArrayBuffer.isView(data)) {
+			return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+		}
+		return null;
 	}
 
 	async start(): Promise<void> {
@@ -152,7 +168,10 @@ export class VoiceSessionManager {
 		ws.addEventListener("message", (event) => {
 			if (typeof event.data === "string") {
 				void this.handleGrokMessage(event.data);
+				return;
 			}
+			// Binary frames are raw PCM16 when audio.*.transport is "binary".
+			void this.handleGrokBinaryAudio(event.data);
 		});
 
 		ws.addEventListener("error", () => {
@@ -244,11 +263,37 @@ export class VoiceSessionManager {
 		);
 	}
 
-	appendAudio(pcmBase64: string): void {
+	/** Forward mic PCM to Grok as a raw binary WebSocket frame. */
+	appendAudio(pcm: Buffer | Uint8Array): void {
 		if (!this.active) return;
-		// Template literal avoids JSON.stringify on every audio frame (~50-100Hz).
-		// Base64 chars [A-Za-z0-9+/=] need no JSON escaping.
-		this.sendToGrok(`{"type":"input_audio_buffer.append","audio":"${pcmBase64}"}`);
+		this.sendToGrok(pcm);
+	}
+
+	/**
+	 * Handle a binary Grok audio frame: convert to base64 for the browser
+	 * `voice:audio` path and for VoiceWorker's audio stream during turns.
+	 */
+	private async handleGrokBinaryAudio(data: unknown): Promise<void> {
+		const buf = VoiceSessionManager.toPcmBuffer(data);
+		if (!buf || buf.byteLength === 0) {
+			this.log("BINARY_AUDIO", "dropping unrecognized binary frame", {
+				type: data === null ? "null" : typeof data,
+			});
+			return;
+		}
+		await this.forwardAssistantAudio(buf.toString("base64"));
+	}
+
+	/** Shared path for assistant PCM whether it arrived as binary or JSON delta. */
+	private async forwardAssistantAudio(base64: string): Promise<void> {
+		this.emitStateChange("speaking");
+		this.callbacks.onAudioDelta(base64);
+		if (this.voiceWorker?.isProcessing) {
+			await this.voiceWorker.handleGrokEvent({
+				type: "response.output_audio.delta",
+				delta: base64,
+			});
+		}
 	}
 
 	async stop(): Promise<void> {
@@ -357,13 +402,11 @@ export class VoiceSessionManager {
 			}
 
 			// -- Audio + transcript (from Grok agent response)
+			// Primary path is WS binary frames. JSON deltas are a defensive leftover —
+			// xAI binary output transport is exclusive, so this should rarely fire.
 			case "response.output_audio.delta": {
-				if (data.delta) {
-					this.emitStateChange("speaking");
-					this.callbacks.onAudioDelta(data.delta);
-				}
-				if (this.voiceWorker?.isProcessing) {
-					await this.voiceWorker.handleGrokEvent(data);
+				if (typeof data.delta === "string" && data.delta.length > 0) {
+					await this.forwardAssistantAudio(data.delta);
 				}
 				break;
 			}

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { FridayRuntime } from "../../src/core/runtime.ts";
 import { WebSocketHandler } from "../../src/server/handler.ts";
 import type { ServerMessage } from "../../src/server/protocol.ts";
@@ -136,6 +136,21 @@ describe("WebSocketHandler", () => {
 			if (prev === undefined) delete process.env.XAI_API_KEY;
 			else process.env.XAI_API_KEY = prev;
 		}
+	});
+
+	test("handleAudio passes raw Buffer to appendAudio without base64 wrap", () => {
+		const pcm = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
+		const appendAudio = mock((_data: Buffer | Uint8Array) => {});
+		(handler as any).voiceSession = {
+			isActive: true,
+			appendAudio,
+		};
+
+		handler.handleAudio(pcm);
+
+		expect(appendAudio).toHaveBeenCalledTimes(1);
+		expect(appendAudio.mock.calls[0]?.[0]).toBe(pcm);
+		expect(Buffer.isBuffer(appendAudio.mock.calls[0]?.[0])).toBe(true);
 	});
 
 	test("onSessionError wiring emits voice:error and clears voiceSession", async () => {
