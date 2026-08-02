@@ -69,6 +69,12 @@ export class VoiceSessionManager {
 	private _assistantBuffer = "";
 	private voiceWorker: VoiceWorker | null = null;
 	private debug: boolean;
+	private _conversationId: string | null = null;
+	private _reconnectDelaysMs = [500, 1000, 2000, 4000, 8000];
+	private _openSocket = (opts?: { conversationId?: string }) =>
+		openGrokWebSocket(process.env.XAI_API_KEY!, 10_000, {
+			conversationId: opts?.conversationId,
+		});
 
 	constructor(cortex: Cortex, config: VoiceSessionConfig, callbacks: VoiceSessionCallbacks) {
 		this.cortex = cortex;
@@ -123,6 +129,11 @@ export class VoiceSessionManager {
 			send: (data) => this.sendToGrok(data),
 		});
 
+		this.bindSocketHandlers(ws, gen);
+	}
+
+	/** Wire message/error/close listeners for a Grok WebSocket. Shared by start() and reconnect. */
+	private bindSocketHandlers(ws: WebSocket, gen: number): void {
 		ws.addEventListener("message", (event) => {
 			if (typeof event.data === "string") {
 				void this.handleGrokMessage(event.data);
@@ -137,14 +148,47 @@ export class VoiceSessionManager {
 		});
 
 		ws.addEventListener("close", () => {
-			if (this._generation !== gen) return;
-			this.grokWs = null;
-			if (this.active) {
-				this.active = false;
-				this._lastState = "idle";
-				this.callbacks.onStateChange("idle");
-			}
+			void this.handleSocketClose(gen);
 		});
+	}
+
+	/**
+	 * Handle an unexpected (or intentional) socket close for generation `gen`.
+	 * If the session is still active, attempt to reconnect with backoff,
+	 * re-establishing the session and opting back into resumption.
+	 */
+	private async handleSocketClose(gen: number): Promise<void> {
+		if (this._generation !== gen) return;
+		this.grokWs = null;
+		if (!this.active) return;
+
+		this.emitStateChange("reconnecting");
+		for (const delay of this._reconnectDelaysMs) {
+			if (this._generation !== gen || !this.active) return;
+			if (delay > 0) await Bun.sleep(delay);
+			if (this._generation !== gen || !this.active) return;
+			try {
+				const ws = await this._openSocket({
+					conversationId: this._conversationId ?? undefined,
+				});
+				if (this._generation !== gen || !this.active) {
+					try {
+						ws.close();
+					} catch {}
+					return;
+				}
+				this.grokWs = ws;
+				this.bindSocketHandlers(ws, gen);
+				ws.send(JSON.stringify(buildInitialSessionPayload(this.config)));
+				this.voiceWorker = new VoiceWorker({ send: (d) => this.sendToGrok(d) });
+				this.emitStateChange("listening");
+				return;
+			} catch {
+				// try next delay
+			}
+		}
+		this.active = false;
+		this.emitStateChange("error");
 	}
 
 	appendAudio(pcmBase64: string): void {
@@ -229,6 +273,12 @@ export class VoiceSessionManager {
 			case "session.updated":
 			case "input_audio_buffer.committed":
 			case "conversation.item.created": {
+				break;
+			}
+
+			case "conversation.created": {
+				const id = data.conversation?.id;
+				if (typeof id === "string" && id.length > 0) this._conversationId = id;
 				break;
 			}
 

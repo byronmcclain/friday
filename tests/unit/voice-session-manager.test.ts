@@ -186,6 +186,116 @@ describe("VoiceSessionManager", () => {
 	});
 });
 
+describe("VoiceSessionManager reconnect", () => {
+	test("stores conversation id from conversation.created", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const callbacks = makeMockCallbacks();
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			callbacks,
+		);
+		attachMockWs(manager);
+		await (manager as any).handleGrokMessage(
+			JSON.stringify({
+				type: "conversation.created",
+				conversation: { id: "conv_123" },
+			}),
+		);
+		expect((manager as any)._conversationId).toBe("conv_123");
+	});
+
+	test("unexpected close while active emits reconnecting then reopens", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const states: string[] = [];
+		const callbacks = makeMockCallbacks();
+		callbacks.onStateChange = mock((s: string) => {
+			states.push(s);
+		});
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			callbacks,
+		);
+		(manager as any).active = true;
+		(manager as any)._generation = 1;
+		(manager as any)._conversationId = "conv_123";
+
+		// Inject a fake reconnect opener that resolves immediately
+		const opens: Array<{ conversationId?: string }> = [];
+		(manager as any)._openSocket = async (opts: { conversationId?: string }) => {
+			opens.push(opts);
+			const ws = {
+				send: mock(() => {}),
+				readyState: 1,
+				close: mock(() => {}),
+				addEventListener: mock(() => {}),
+			};
+			(manager as any).grokWs = ws;
+			return ws;
+		};
+		(manager as any)._reconnectDelaysMs = [0]; // no wait in tests
+
+		await (manager as any).handleSocketClose(1);
+		expect(states).toContain("reconnecting");
+		expect(opens[0]?.conversationId).toBe("conv_123");
+	});
+
+	test("stop() cancels reconnect loop", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const callbacks = makeMockCallbacks();
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			callbacks,
+		);
+		attachMockWs(manager);
+
+		let openSocketCalled = false;
+		(manager as any)._openSocket = async () => {
+			openSocketCalled = true;
+			throw new Error("should not be called after stop()");
+		};
+		(manager as any)._reconnectDelaysMs = [0];
+
+		await manager.stop();
+		// Close handler fires after stop() has already reset generation/active.
+		await (manager as any).handleSocketClose((manager as any)._generation);
+
+		expect(openSocketCalled).toBe(false);
+	});
+
+	test("exhausted reconnect attempts emit error state", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const callbacks = makeMockCallbacks();
+		const states: string[] = [];
+		callbacks.onStateChange = mock((s: string) => {
+			states.push(s);
+		});
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			callbacks,
+		);
+		(manager as any).active = true;
+		(manager as any)._generation = 1;
+
+		(manager as any)._openSocket = async () => {
+			throw new Error("connection refused");
+		};
+		(manager as any)._reconnectDelaysMs = [0, 0];
+
+		await (manager as any).handleSocketClose(1);
+		expect(states).toContain("reconnecting");
+		expect(states[states.length - 1]).toBe("error");
+		expect((manager as any).active).toBe(false);
+	});
+});
+
 test("VoiceState includes reconnecting", () => {
 	const states: VoiceState[] = [
 		"idle",
