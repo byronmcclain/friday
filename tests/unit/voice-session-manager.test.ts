@@ -582,6 +582,52 @@ describe("VoiceSessionManager reconnect", () => {
 
 		expect((manager as any)._assistantBuffer).toBe("");
 	});
+
+	test("clears stale pending greeting state on socket close", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const callbacks = makeMockCallbacks();
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			callbacks,
+		);
+		attachMockWs(manager);
+
+		// Greeting is sent (session.updated -> force_message), leaving
+		// _pendingGreeting true, but the socket dies before response.created
+		// ever arrives to clear it.
+		await (manager as any).handleGrokMessage(JSON.stringify({ type: "session.updated" }));
+		expect((manager as any)._pendingGreeting).toBe(true);
+
+		// Reconnect succeeds with a fresh socket so the post-close
+		// response.created below has somewhere to send response.cancel.
+		const reconnectSent: string[] = [];
+		const reconnectedWs = {
+			send: (d: string) => reconnectSent.push(d),
+			readyState: 1,
+			close: () => {},
+			addEventListener: () => {},
+		};
+		(manager as any)._openSocket = async () => reconnectedWs;
+		(manager as any)._reconnectDelaysMs = [0];
+
+		await (manager as any).handleSocketClose((manager as any)._generation);
+
+		expect((manager as any)._pendingGreeting).toBe(false);
+		expect((manager as any)._pendingGreetingResponseId).toBeNull();
+
+		// An unrelated response.created after reconnect must not be mistaken
+		// for the (now-stale) greeting's ack -- it should still be cancelled.
+		await (manager as any).handleGrokMessage(
+			JSON.stringify({ type: "response.created", response: { id: "unrelated-1" } }),
+		);
+
+		const cancel = reconnectSent
+			.map((s) => JSON.parse(s))
+			.find((m) => m.type === "response.cancel");
+		expect(cancel).toBeDefined();
+	});
 });
 
 test("VoiceState includes reconnecting", () => {

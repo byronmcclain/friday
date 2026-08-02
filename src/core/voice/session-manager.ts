@@ -188,6 +188,8 @@ export class VoiceSessionManager {
 		}
 		this._activeTurn = null;
 		this._assistantBuffer = "";
+		this._pendingGreeting = false;
+		this._pendingGreetingResponseId = null;
 
 		this.emitStateChange("reconnecting");
 		for (const delay of this._reconnectDelaysMs) {
