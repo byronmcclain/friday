@@ -111,6 +111,7 @@ export class VoiceSessionManager {
 		const apiKey = process.env.XAI_API_KEY;
 		if (!apiKey) throw new Error("XAI_API_KEY not set");
 
+		this._conversationId = null;
 		this.active = true;
 		this._generation++;
 		const gen = this._generation;
@@ -142,9 +143,14 @@ export class VoiceSessionManager {
 
 		ws.addEventListener("error", () => {
 			if (this._generation !== gen) return;
-			this.active = false;
-			this._lastState = "error";
-			this.callbacks.onStateChange("error");
+			// Chosen approach: do nothing here (and, crucially, do NOT set
+			// `active = false`). Per the WHATWG WebSocket spec, an "error"
+			// event is always followed by a "close" event, and all
+			// reconnect-with-backoff logic lives in handleSocketClose().
+			// Killing `active` here would make handleSocketClose() bail out
+			// immediately, so a typical network failure (which surfaces as
+			// error -> close) would never trigger reconnection.
+			this.log("WS_ERROR", "socket error; deferring to close handler for reconnect");
 		});
 
 		ws.addEventListener("close", () => {
@@ -161,6 +167,19 @@ export class VoiceSessionManager {
 		if (this._generation !== gen) return;
 		this.grokWs = null;
 		if (!this.active) return;
+
+		// The socket is gone, so any in-flight VoiceWorker turn is now orphaned:
+		// it will never receive the remaining Grok events (e.g. response.done)
+		// needed to resolve its promise, since handleGrokMessage will route
+		// future events to whatever VoiceWorker we create after reconnecting.
+		// Abort it now — mirrors what stop() does for the worker — so its
+		// push streams close out, `_activeTurn` settles, and a later stop()
+		// can't hang forever awaiting a promise that will never resolve.
+		if (this.voiceWorker) {
+			this.voiceWorker.abort();
+			this.voiceWorker = null;
+		}
+		this._activeTurn = null;
 
 		this.emitStateChange("reconnecting");
 		for (const delay of this._reconnectDelaysMs) {

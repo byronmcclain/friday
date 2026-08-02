@@ -268,6 +268,68 @@ describe("VoiceSessionManager reconnect", () => {
 		expect(openSocketCalled).toBe(false);
 	});
 
+	test("mid-turn close orphans old worker but stop() does not hang", async () => {
+		const model = createMockModel({ text: "unused" });
+		const cortex = new Cortex({ injectedModel: model });
+		const callbacks = makeMockCallbacks();
+		const manager = new VoiceSessionManager(
+			cortex,
+			{ voice: "Eve", sampleRate: 48000, instructions: "Test", silenceDurationMs: 800 },
+			callbacks,
+		);
+
+		// A ws that never auto-completes response.create, so the turn
+		// stays in-flight (simulating a close arriving mid-turn).
+		const ws = {
+			send: mock((_data: string) => {}),
+			readyState: 1,
+			close: mock(() => {}),
+		};
+		(manager as any).grokWs = ws;
+		(manager as any).active = true;
+		(manager as any)._generation = 1;
+		(manager as any).voiceWorker = new VoiceWorker({
+			send: (data: string) => ws.send(data),
+		});
+
+		// Kick off a turn but don't await it here -- it won't resolve on
+		// its own since nothing ever sends response.done.
+		const turnStarted = (manager as any).handleGrokMessage(
+			JSON.stringify({
+				type: "conversation.item.input_audio_transcription.completed",
+				transcript: "hello",
+			}),
+		);
+		await Bun.sleep(0);
+		expect((manager as any)._activeTurn).not.toBeNull();
+		expect((manager as any).voiceWorker.isProcessing).toBe(true);
+
+		// Reconnect opener resolves immediately.
+		(manager as any)._openSocket = async () => ({
+			send: mock(() => {}),
+			readyState: 1,
+			close: mock(() => {}),
+			addEventListener: mock(() => {}),
+		});
+		(manager as any)._reconnectDelaysMs = [0];
+
+		// Simulate the socket closing mid-turn and reconnecting.
+		await (manager as any).handleSocketClose(1);
+
+		// The orphaned turn must have been unwound -- not left dangling.
+		expect((manager as any)._activeTurn).toBeNull();
+
+		// stop() must complete promptly instead of hanging on the orphaned turn.
+		const hungTimeout = new Promise((_, reject) =>
+			setTimeout(() => reject(new Error("stop() hung awaiting orphaned turn")), 1000),
+		);
+		await Promise.race([manager.stop(), hungTimeout]);
+		expect(manager.isActive).toBe(false);
+
+		// Let the original in-flight handleGrokMessage settle so it doesn't leak.
+		await turnStarted;
+	});
+
 	test("exhausted reconnect attempts emit error state", async () => {
 		const model = createMockModel({ text: "unused" });
 		const cortex = new Cortex({ injectedModel: model });
