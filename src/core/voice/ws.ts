@@ -1,12 +1,16 @@
-import { GROK_REALTIME_URL } from "./types.ts";
+import { buildGrokRealtimeUrl } from "./types.ts";
 
 /**
  * Open an authenticated WebSocket to the Grok realtime API.
  * Resolves with the connected WebSocket, or rejects on timeout/error.
  */
-export function openGrokWebSocket(apiKey: string, timeoutMs = 10_000): Promise<WebSocket> {
+export function openGrokWebSocket(
+	apiKey: string,
+	timeoutMs = 10_000,
+	opts?: { model?: string; conversationId?: string },
+): Promise<WebSocket> {
 	return new Promise<WebSocket>((resolve, reject) => {
-		const ws = new WebSocket(GROK_REALTIME_URL, {
+		const ws = new WebSocket(buildGrokRealtimeUrl(opts), {
 			headers: {
 				Authorization: `Bearer ${apiKey}`,
 				"Content-Type": "application/json",

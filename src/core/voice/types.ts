@@ -50,6 +50,26 @@ export interface VoxOptions {
 
 export const GROK_REALTIME_URL = "wss://api.x.ai/v1/realtime";
 
+export const GROK_VOICE_MODEL_DEFAULT = "grok-voice-latest";
+
+export function resolveVoiceModel(): string {
+	const fromEnv = process.env.FRIDAY_VOICE_MODEL?.trim();
+	return fromEnv && fromEnv.length > 0 ? fromEnv : GROK_VOICE_MODEL_DEFAULT;
+}
+
+export function buildGrokRealtimeUrl(opts?: {
+	model?: string;
+	conversationId?: string;
+}): string {
+	const model = opts?.model?.trim() || resolveVoiceModel();
+	const url = new URL(GROK_REALTIME_URL);
+	url.searchParams.set("model", model);
+	if (opts?.conversationId) {
+		url.searchParams.set("conversation_id", opts.conversationId);
+	}
+	return url.toString();
+}
+
 export const VOX_TTS_URL = "https://api.x.ai/v1/tts";
 
 export const VOX_DEFAULTS: VoxConfig = {
