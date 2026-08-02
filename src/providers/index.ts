@@ -2,8 +2,8 @@ import type { LanguageModelV4 } from "@ai-sdk/provider";
 import { createXai } from "@ai-sdk/xai";
 
 export const GROK_DEFAULTS = {
-	model: "grok-4.20-reasoning",
-	fastModel: "grok-4.20-non-reasoning",
+	model: "grok-4.5-latest",
+	fastModel: "grok-latest",
 } as const;
 
 // Create provider once at module load with cached API key —

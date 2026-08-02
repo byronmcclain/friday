@@ -28,7 +28,7 @@ describe("Cortex", () => {
 		expect(GENESIS_TEMPLATE).toContain("Friday");
 	});
 
-	test("defaults to grok-4.20-reasoning model", () => {
+	test("defaults to GROK_DEFAULTS model", () => {
 		const cortex = new Cortex({ injectedModel: createMockModel() });
 		expect(cortex.modelName).toBe(GROK_DEFAULTS.model);
 	});

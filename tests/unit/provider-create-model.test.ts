@@ -16,7 +16,7 @@ describe("createModel", () => {
 	});
 
 	test("GROK_DEFAULTS has reasoning and fast model", () => {
-		expect(GROK_DEFAULTS.model).toBe("grok-4.20-reasoning");
-		expect(GROK_DEFAULTS.fastModel).toBe("grok-4.20-non-reasoning");
+		expect(GROK_DEFAULTS.model).toBe("grok-4.5-latest");
+		expect(GROK_DEFAULTS.fastModel).toBe("grok-latest");
 	});
 });
